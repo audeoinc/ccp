@@ -101,11 +101,10 @@ const BANNED = [
   // Power Apps・Power Platform・Copilot などは、2026-10-30 から書いてよい(その検証の文書を入れるため。利用者)
   ['Cloud Run', /cloud\s*run|run\.app|\bkaniko\b/i],
   ['Cloud SQL', /cloud[\s_-]*sql|sqladmin/i],
-  ['本番の反映', /deploy[:-]gcp|gcp-smoke|cloudbuild|cloud\s*build|\bgcloud\b|dockerfile|gcloudignore/i],
-  ['DB の自動起動・停止', /dbctl|cloud\s*scheduler|idle[-_]check|CCP_DEV_GCLOUD/i],
-  ['DB の自動起動・停止の設定', /\bDB_CONTROL\b|\bIDLE_CHECK_/], // 大文字だけ(db_controller などに当てないため)
-  ['本番のサービス名', /contents-planner/i],
-  ['開発用の文書', /HANDOVER\.md|CLOUD\.md|ONBOARDING\.md|GCP\.md|RELEASE\.md/],
+  // 開発元の本番のサービス名(本番の URL の一部)
+  ['開発元の名前', /contents-planner/i],
+  // 2026-11-03 利用者: 消すのは「開発元が Cloud Run・Cloud SQL で動かしていること」だけ。
+  // gcloud・dbctl・本番の反映・開発用の文書の名前などの言葉の禁止はやめた(ファイルは RULES でこれまでどおり外す)
 ]
 // 中身を検査しないファイル(画像など。名前は検査する)
 const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|zip)$/i

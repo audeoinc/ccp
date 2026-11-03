@@ -57,13 +57,11 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
 
 | 分類 | 言葉 |
 |---|---|
-| 開発元の名前 | `audeo`(リポジトリ名 `audeoinc/ccp` も) |
+| 開発元の名前 | `audeo`(リポジトリ名 `audeoinc/ccp` も)・本番のサービス名 `contents-planner` |
 | Cloud Run | Cloud Run・`run.app`・kaniko |
 | Cloud SQL | Cloud SQL(`cloud-sql`・`CLOUD_SQL_INSTANCE` も)・`sqladmin` |
-| 本番の反映 | `deploy:gcp`・`deploy-gcp`・`gcp-smoke`・`cloudbuild`・Cloud Build・`gcloud`・Dockerfile・`gcloudignore` |
-| DB の自動起動・停止 | `dbctl`・Cloud Scheduler・`idle-check`・`CCP_DEV_GCLOUD`・`DB_CONTROL`・`IDLE_CHECK_*` |
-| 本番のサービス名 | `contents-planner` |
-| 開発用の文書 | `HANDOVER.md`・`CLOUD.md`・`ONBOARDING.md`・`GCP.md`・`RELEASE.md` |
+
+2026-11-03 利用者: 「GCP の存在を消す」は、**開発元が Cloud Run・Cloud SQL で動かしていることを消す**だけ。それまで禁止していた、本番の反映(`deploy:gcp`・`gcloud`・Dockerfile など)・DB の自動起動・停止(`dbctl` など)・開発用の文書の名前(`HANDOVER.md` など)の言葉は、禁止をやめた(それらのファイルは、2 章の `RULES` でこれまでどおり外す)。
 
 あわせて、文書の中の相対リンク(`[…](パス)`)の先が ZIP にあるかも確かめる(外した文書へのリンクが残らないように)。
 
