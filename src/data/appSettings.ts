@@ -29,16 +29,42 @@ export interface SettingsView {
   choices: { thinking?: string[] }
 }
 
-type Res<T> = { data?: T; error?: string }
+/** いま使える Gemini のモデル(サーバーが Vertex AI から読み、1 日覚える) */
+export interface AiModels {
+  models: string[]
+  /** 最後に読めた時刻(読めたことがなければ null) */
+  at: string | null
+  /** いま読めた(false = 前の一覧かコードの一覧を出している) */
+  live: boolean
+  /** 読めなかった理由 */
+  error: string
+  /** コードに持つ一覧を出している */
+  builtin: boolean
+}
+
+/** AI を短く 1 回呼んだ結果 */
+export interface AiTry {
+  ok: boolean
+  seconds: number
+  message: string
+  via: 'gemini' | 'outlet'
+  model: string
+}
+
+type Res<T> = { data?: T; error?: string; code?: string }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<Res<T>> {
   const r = await callApi<T>(method, url, body)
-  return r.success && r.data !== undefined ? { data: r.data } : { error: r.error?.message ?? 'error' }
+  return r.success && r.data !== undefined ? { data: r.data } : { error: r.error?.message ?? 'error', code: r.error?.code }
 }
 
 export const AppSettingsService = {
   get: (group: SettingsGroup) => call<SettingsView>('GET', `/api/settings/${group}`),
-  save: (group: SettingsGroup, values: Record<string, string | number>) => call<SettingsView>('PUT', `/api/settings/${group}`, { values }),
+  /** AI は、呼び方が変わるときサーバーが保存の前に試し、通らなければ code=try_failed で断る。force = それでも保存する */
+  save: (group: SettingsGroup, values: Record<string, string | number>, force = false) => call<SettingsView>('PUT', `/api/settings/${group}`, { values, force }),
+  aiModels: (refresh = false) => call<AiModels>('GET', `/api/settings/ai/models${refresh ? '?refresh=true' : ''}`),
+  /** 保存の前の値で、AI を短く 1 回呼んでみる(何も保存しない) */
+  tryAi: (values: Record<string, string | number>) => call<AiTry>('POST', '/api/settings/ai/try', { values }),
   /** 保存の前に、入れた表の場所で読んで確かめる(何も書かない)。names で出力を絞る */
   tryBq: (values: Record<string, string | number>, names?: string[]) => call<ImportCheck>('POST', '/api/settings/bq/try', { values, only: names ?? [] }),
 }

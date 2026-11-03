@@ -32,12 +32,25 @@ const state: Record<SettingsGroup, Omit<SettingsView, 'saved' | 'choices'>> = {
 
 const view = (g: SettingsGroup): SettingsView => ({ ...structuredClone(state[g]), saved: true, choices: g === 'ai' ? { thinking: ['minimal', 'low', 'medium', 'high'] } : {} })
 const wait = () => new Promise((r) => setTimeout(r, 500))
+// 見本: 一覧にあるモデルは呼べる、ほかは見つからない。出口は 127.0.0.1 だけ届く
+const MODELS = ['gemini-3.5-flash', 'gemini-3.5-pro', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']
+const tried = (v: Record<string, string | number>) => {
+  const outlet = String(v.outlet_url ?? '')
+  const via = outlet ? ('outlet' as const) : ('gemini' as const)
+  const ok = outlet ? outlet.startsWith('http://127.0.0.1') : MODELS.includes(String(v.model))
+  const message = ok ? '' : outlet ? 'AI の出口(⚙ →「AI の設定」の URL)に届きませんでした: ConnectionError' : 'このモデルは、この環境(プロジェクト・地域)で見つかりません。名前か、GOOGLE_CLOUD_LOCATION を確かめてください。(NotFound: 404)'
+  return { ok, seconds: ok ? 1.4 : 0.6, message, via, model: String(v.model) }
+}
 const shape = (v: string) => !v || (v.split('.').length >= 3 && !/\s/.test(v))
 
 export const AppSettingsService: typeof Real = {
   get: async (g) => ({ data: view(g) }),
-  save: async (g, values) => {
+  save: async (g, values, force) => {
     await wait()
+    if (g === 'ai' && !force && ['model', 'thinking', 'outlet_url', 'outlet_timeout'].some((k) => String(values[k]) !== String(state.ai.values[k]))) {
+      const r = tried(values)
+      if (!r.ok) return { error: `試しに呼べなかったので、保存していません: ${r.message}`, code: 'try_failed' }
+    }
     for (const [k, v] of Object.entries(values)) if (g === 'bq' && k !== 'project' && !shape(String(v))) return { error: `表の場所は <プロジェクト>.<データセット>.<テーブルかビュー> の形で書いてください: ${v}` }
     const s = state[g]
     const changes = Object.keys(values).filter((k) => String(values[k]) !== String(s.values[k]))
@@ -64,5 +77,13 @@ export const AppSettingsService: typeof Real = {
       }
     })
     return { data: { configured: outputs.length > 0, checkedAt: new Date().toISOString(), outputs } }
+  },
+  aiModels: async (refresh) => {
+    await wait()
+    return { data: { models: MODELS, at: refresh ? new Date().toISOString() : ago(5 * 60), live: true, error: '', builtin: false } }
+  },
+  tryAi: async (values) => {
+    await wait()
+    return { data: tried({ ...state.ai.values, ...values }) }
   },
 }

@@ -48,6 +48,8 @@ AI_FIELDS: dict[str, tuple[str, Any]] = {
     "outlet_timeout": ("AI_OUTLET_TIMEOUT", 120),
 }
 GROUPS = ("bq", "ai")
+# 変えたら保存の前に試す AI の項目(同時に呼ぶ数は、呼べるかに関係しない)
+TRIED_KEYS = {"model", "thinking", "outlet_url", "outlet_timeout"}
 
 # まとめ(name) → 最新の行 {value, by, at, source, changes}
 _rows: dict[str, dict[str, Any]] = {}
@@ -369,6 +371,14 @@ async def put_group(group: str, request: Request) -> dict[str, Any]:
     await ensure()
     before = current(group)
     changes = sorted(k for k in value if str(value[k]) != str(before.get(k)))
+    # AI は、呼び方が変わるときは保存の前に 1 回だけ試し、通らなければ保存しない(いまの設定のまま動き続ける)。
+    # 試さずに保存して AI が止まる、をなくすため。理由を見たうえで「それでも保存する」(force)は、管理する人だけが押せる(この窓口ごと管理する人だけ)
+    if group == "ai" and set(changes) & TRIED_KEYS and not (body or {}).get("force"):
+        from .ai import try_call
+
+        tried = await try_call(value)
+        if not tried["ok"]:
+            return {"success": False, "error": {"message": f"試しに呼べなかったので、保存していません: {tried['message']}", "code": "try_failed"}, "tried": tried}
     if changes or group not in _rows:
         await save(group, value, _actor(request), changes)
         await ensure()
@@ -395,3 +405,31 @@ async def try_bq(request: Request) -> dict[str, Any]:
         raise
     except Exception as e:  # noqa: BLE001
         return _bq_error(e, "確認")
+
+
+@router.get("/ai/models")
+async def ai_models(request: Request, refresh: bool = False) -> dict[str, Any]:
+    """いま使える Gemini のモデルの一覧(1 日覚える。refresh で読み直す。読めなければ前の一覧か既定)"""
+    if bad := await _denied(request):
+        return bad
+    from .ai import list_models
+
+    await ensure()
+    return {"success": True, "data": await list_models(refresh)}
+
+
+@router.post("/ai/try")
+async def try_ai(request: Request) -> dict[str, Any]:
+    """保存の前の値で、AI を短く 1 回呼んでみる(何も保存しない)"""
+    if bad := await _denied(request):
+        return bad
+    body = await request.json()
+    await ensure()
+    try:
+        values = clean("ai", {**current("ai"), **((body or {}).get("values") or {})})
+    except Invalid as e:
+        return {"success": False, "error": {"message": str(e)}}
+    from .ai import try_call
+
+    return {"success": True, "data": await try_call(values)}
+

@@ -27,7 +27,9 @@ import asyncio
 import base64
 import logging
 import os
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Union
 
 from fastapi import APIRouter, Depends
@@ -160,6 +162,86 @@ def _ask_outlet(purpose: str, parts: list[Part], effort: str | None) -> str:
 def reason(e: Exception) -> str:
     """失敗の理由の短い文(出口の層の理由は、そのまま見せてよい約束)"""
     return e.message if isinstance(e, OutletError) else type(e).__name__
+
+
+# ---- 使えるモデルの一覧と「試す」(⚙ →「AI の設定」。2026-11-03 利用者)
+
+# 一覧を読めないとき(権限がない・外に出られない環境)に出す、コードに持つ一覧。古くなっても「そのほか」で書けるので止まらない
+DEFAULT_MODELS = ("gemini-3.5-flash", "gemini-3.5-pro", "gemini-2.5-flash", "gemini-2.5-pro")
+MODELS_TTL_S = 24 * 3600
+# 文章を作れないモデル(埋め込み・画像・音声など)は、名前で外す(一覧に「何に使えるか」が来ない環境もあるため)
+_NOT_TEXT = ("embedding", "image", "tts", "audio", "live", "vision")
+_models: dict = {"models": [], "at": None, "live": False, "error": ""}
+
+
+def _read_models() -> list[str]:
+    got: set[str] = set()
+    for m in get_client().models.list(config={"query_base": True}):
+        base = (m.name or "").rsplit("/", 1)[-1]
+        actions = getattr(m, "supported_actions", None)
+        if not base.startswith("gemini") or any(x in base for x in _NOT_TEXT):
+            continue
+        if actions and "generateContent" not in actions:
+            continue
+        got.add(base)
+    return sorted(got, reverse=True)
+
+
+async def list_models(refresh: bool = False) -> dict:
+    """いま使える Gemini のモデル。1 日覚えておく。読めなければ、前に読めた一覧か、コードの一覧(live=False と理由を添える)"""
+    at = _models["at"]
+    fresh = _models["live"] and at and time.time() - at.timestamp() < MODELS_TTL_S
+    if refresh or not fresh:
+        try:
+            names = await asyncio.wait_for(asyncio.to_thread(_read_models), timeout=20)
+            if not names:
+                raise RuntimeError("文章を作れるモデルが 1 つも返りませんでした")
+            _models.update(models=names, at=datetime.now(timezone.utc), live=True, error="")
+        except Exception as e:  # noqa: BLE001 — 読めなくても、前の一覧か既定で続ける
+            log.warning("モデルの一覧を読めませんでした: %s", e)
+            _models.update(live=False, error=explain(e))
+    names = list(_models["models"] or DEFAULT_MODELS)
+    model = str(appsettings.get("ai", "model"))
+    if model and model not in names:
+        names.insert(0, model)
+    return {"models": names, "at": _models["at"].isoformat() if _models["at"] else None, "live": _models["live"], "error": _models["error"], "builtin": not _models["models"]}
+
+
+def explain(e: BaseException) -> str:
+    """AI を呼べなかった理由を、人に分かる言葉で(元の文も短く添える)"""
+    if isinstance(e, OutletError):
+        return e.message
+    if isinstance(e, (asyncio.TimeoutError, TimeoutError)):
+        return "時間内に返事がありませんでした(待ち時間を延ばすか、混み具合・つながりを確かめてください)"
+    if isinstance(e, KeyError) and "GOOGLE_CLOUD_PROJECT" in str(e):
+        return "サーバーの設定に GOOGLE_CLOUD_PROJECT がありません"
+    text = f"{type(e).__name__}: {e}"
+    hints = (
+        (("404", "NOT_FOUND"), "このモデルは、この環境(プロジェクト・地域)で見つかりません。名前か、GOOGLE_CLOUD_LOCATION を確かめてください"),
+        (("403", "PERMISSION_DENIED"), "権限がありません(サーバーのアカウントに Vertex AI を使う権限が要ります)"),
+        (("429", "RESOURCE_EXHAUSTED"), "混み合っているか、使える量の上限に達しています。しばらくしてから試してください"),
+        (("400", "INVALID_ARGUMENT"), "このモデルでは使えない設定です(考える深さなど)"),
+        (("DefaultCredentialsError", "credentials"), "Google の認証がありません(サーバーの認証の設定を確かめてください)"),
+        (("ConnectError", "ConnectionError", "getaddrinfo"), "Vertex AI に届きませんでした(外へのつながりを確かめてください)"),
+    )
+    for keys, hint in hints:
+        if any(k in text for k in keys):
+            return f"{hint}。({text[:200]})"
+    return text[:300]
+
+
+async def try_call(values: dict | None = None) -> dict:
+    """入れた設定(保存の前の値)で、短く 1 回だけ呼ぶ。何も保存しない"""
+    with appsettings.trying("ai", values or {}):
+        via = "outlet" if outlet_url() else "gemini"
+        limit = float(appsettings.get("ai", "outlet_timeout")) + 5 if via == "outlet" else 60.0
+        start = time.monotonic()
+        try:
+            text = await asyncio.wait_for(generate("ask", ['次の JSON だけを返してください: {"ok": true}'], effort=str(appsettings.get("ai", "thinking"))), timeout=limit)
+            ok, message = bool(text), "" if text else "返事が空でした"
+        except Exception as e:  # noqa: BLE001
+            ok, message = False, explain(e)
+        return {"ok": ok, "seconds": round(time.monotonic() - start, 1), "message": message, "via": via, "model": str(appsettings.get("ai", "model"))}
 
 
 class AskIn(BaseModel):
