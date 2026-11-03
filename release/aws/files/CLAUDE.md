@@ -1,26 +1,65 @@
 # CLAUDE.md — Campaign Contents Planner(CCP / 配信コンテンツプランナー)AWS 版(AI コーディングアシスタント向け)
 
 React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサーバー。**AWS などの Linux のサーバー**の上で動く。
-全体像は [README.md](README.md)、サーバーでの動かし方は [docs/AWS.md](docs/AWS.md)、設計の約束事は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+データは PostgreSQL、商品などのデータは BigQuery から取り込み、AI は Vertex AI の Gemini(または AI の出口の層)。
 いまの版は [VERSION.txt](VERSION.txt)。
+
+## まず読む文書
+
+| 何をするとき | 読む文書 |
+|---|---|
+| 立ち上げ・設定・更新・困りごと(**最初にこれ**) | [docs/AWS.md](docs/AWS.md) |
+| くわしい手順・よくあるつまずきの補足 | [docs/WORKBENCH.md](docs/WORKBENCH.md)(「Workbench」は、CCP を動かしているサーバーと読み替える) |
+| 画面の各機能が何をするか(利用者に聞かれたとき) | [docs/FEATURES.md](docs/FEATURES.md)、使い方の流れは [docs/FLOWS.md](docs/FLOWS.md) |
+| データの表と列 | [docs/DATA_TABLES.md](docs/DATA_TABLES.md)(ZIP を作るときに `server/schema.json` から自動で作る) |
+| サーバーの API | [docs/API.md](docs/API.md)(ZIP を作るときに `server/ccp/` から自動で作る) |
+| BigQuery の取り込み・表の約束 | [docs/BIGQUERY.md](docs/BIGQUERY.md)、[docs/BIGQUERY_EXPORT.md](docs/BIGQUERY_EXPORT.md) |
+| ほかの AI につなぐ(AI の出口) | [docs/AI_OUTLET.md](docs/AI_OUTLET.md) |
+| 設計の約束事・ソースの地図 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、[docs/SOURCE_MAP.md](docs/SOURCE_MAP.md) |
+| 承認の流れ・販売方針 | [docs/APPROVAL.md](docs/APPROVAL.md)、[docs/POLICY.md](docs/POLICY.md) |
+
+大きい文書は、まるごと読まずに、見出しや ID で grep して、要る所だけを読む。
+
+## 使う道具
+
+すべて `scripts/workbench.sh`(名前は Workbench だが、Linux のサーバーならそのまま使える。設定 `server/workbench.env` の読み込みも、裏での起動も、スクリプトが行う)。
+
+| コマンド | すること |
+|---|---|
+| `scripts/workbench.sh setup` | 初回の準備(足りない道具を最初に教える → Python の環境・パッケージ・画面のビルド・設定ファイルの用意) |
+| `scripts/workbench.sh start` / `stop` / `restart` | サーバーの起動・停止・起動し直し |
+| `scripts/workbench.sh status` | 動いているか・いまの版 |
+| `scripts/workbench.sh update` | 最新の版にして(git pull → ビルド)、起動し直す |
+| `scripts/workbench.sh check` | 設定・DB・BigQuery・AI・画面のビルドを確かめる(`python -m ccp.cli check` と同じ。何も変えない) |
+| `scripts/workbench.sh log` | サーバーのログの最後 |
+
+## 困ったら、最初に流すもの
+
+```bash
+scripts/workbench.sh check      # [NG] の行の → を直す。画面では ⚙ →「設定の状態」
+scripts/workbench.sh log        # サーバーのログの最後
+```
+
+**足りない設定と直し方は、`check` と画面(⚙ →「設定の状態」)が教える。** 手順書に書いてあることを覚えておく必要はない。`check` の出力の `[NG]` の行から直し、直らなければ [docs/AWS.md](docs/AWS.md) の「よくあるつまずき」を見る。
 
 ## このリポジトリについて
 
 - コードは、版ごとに ZIP で届き、利用先の Git に入れて管理している。
-- **このリポジトリの中で、コードを直さない。** 次の版で上書きされる。直したい不具合・足したい手順に気づいたら、内容を人に伝える(開発の担当が直して、次の版で届ける)。
+- **このリポジトリの中で、コードを直さない。** 次の版で上書きされる。直したい不具合・足したい手順に気づいたら、内容(`check` の出力・ログの最後・やったこと)を人に伝える(開発の担当が直して、次の版で届ける)。
 - **置き先でコードを直したくなったら、汎用になっていない所の見つけ物。** その環境で直さず、開発の担当に伝える(置き先の違いは、設定とアダプターで吸収する作り。[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) の 0.5 章)。
 
-## サーバーで作業するとき
+## してはいけないこと
 
-- **まず [docs/AWS.md](docs/AWS.md)(手順書)を読む。** 立ち上げ・更新・チェックリストが書いてある。くわしい手順とよくあるつまずきは [docs/WORKBENCH.md](docs/WORKBENCH.md)(「Workbench」は、CCP を動かしているサーバーと読み替える)。
-- **操作は `scripts/workbench.sh` を使う**(`setup` / `update` / `start` / `stop` / `restart` / `status` / `check` / `log`。名前は Workbench だが、Linux のサーバーならそのまま使える。設定の読み込みも、裏での起動も、スクリプトが行う)。
-- **困ったら、最初に `cd server && .venv/bin/python -m ccp.cli check` を実行する**(設定・DB への接続・BigQuery・AI・画面のビルドを確かめる。パスワードは出さず、何も変えない)。`[NG]` の行の → を直す。画面では ⚙ →「設定の状態」。
-- **環境:** Linux(Python は `.venv/bin/python`)。DB は PostgreSQL(`DATABASE_URL`)。AI は Vertex AI の Gemini、データの取り込みは BigQuery(Google の認証情報は、その機械の標準の方法 `google.auth.default` で渡す。手順書の 2 章)。
-- **してはいけないこと:** サーバーからの `git push`、`server/workbench.env`(パスワードを含む)や写真のフォルダを Git に入れること、HTTPS とログインなしで外から開ける状態にすること。
+- サーバーからの `git push`(コードの変更は、開発の担当が行う)。
+- 秘密を Git に入れる: `server/workbench.env`(DB のパスワードなど)、Google の鍵のファイル、写真のフォルダ。
+- **HTTPS とログインなしで、外から開ける状態にする**(画面のパスワード `APP_PASSWORD` か、手前のログインを必ず付ける)。
+- 人の確認なしに、DB の中身を消す・置き換える操作をする。
+- 本番の環境への反映を、人の指示なしに行う(反映は、人が手で行う)。
 
 ## コードを読むときの手がかり
 
-- データの名前は、画面・API・PostgreSQL で同じ(表 `delivery_cards`、列 `scheduled_at` など)。列・テーブルの定義は `server/schema.json`。
+- データの名前は、画面・API・PostgreSQL で同じ(表 `delivery_cards`、列 `scheduled_at` など)。列・テーブルの定義は `server/schema.json`([docs/DATA_TABLES.md](docs/DATA_TABLES.md))。
+- 設定は 2 か所: 起動に要るもの・秘密は環境変数(`server/workbench.env`)、仕事の設定(BigQuery の表の場所・AI のモデルなど)は ⚙ の画面で DB(表 `app_settings`)に持つ(`server/ccp/appsettings.py`)。
 - 画面の文言は `t('日本語', 'English')`。AI の呼び出しは `askAgent`(`src/aiSelect.ts`)→ サーバーの `/api/ask` → Gemini(または AI の出口の層)。
-- ソースの地図は [docs/SOURCE_MAP.md](docs/SOURCE_MAP.md)、これから作る機能は [docs/BACKLOG.md](docs/BACKLOG.md)。
+- 健康診断は `server/ccp/health.py`(画面と `check` の両方が使う)。
 - 利用者の画面に出る文言・データに、個人情報や機密を、サンプルとして埋め込まない。

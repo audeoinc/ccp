@@ -30,7 +30,7 @@ const TARGETS = {
     about: 'AWS などの Linux のサーバーで動かす CCP',
     guide: 'docs/AWS.md',
     // 手順書・操作のスクリプト・設定の見本がないと、立ち上げられない(作り忘れ・規則の書き違いで落ちたら、ここで止める)
-    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'docs/AWS.md', 'docs/WORKBENCH.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
+    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'docs/AWS.md', 'docs/WORKBENCH.md', 'docs/DATA_TABLES.md', 'docs/API.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
   },
   workbench: {
     name: 'Workbench 版',
@@ -206,6 +206,11 @@ for (const [path, f] of files) {
   }
 }
 
+// 表と列・API の一覧を、ZIP に入る中身から作る(手で書く文書にすると、列や API を足したときに古くなるため。
+// 利用先の Claude が、利用者に聞かれて答える・調べるのに使う)
+files.set('docs/DATA_TABLES.md', { data: Buffer.from(dataTablesDoc(JSON.parse(files.get('server/schema.json').data.toString('utf8')))), mode: 0o644 })
+files.set('docs/API.md', { data: Buffer.from(apiDoc([...files].filter(([p]) => /^server\/ccp\/.*\.py$/.test(p)).map(([p, f]) => [p, f.data.toString('utf8')]))), mode: 0o644 })
+
 files.set('VERSION.txt', {
   data: Buffer.from(`CCP(Campaign Contents Planner)${target.name}\n版: ${version}\n元のコミット: ${sha}\nコミットの日付: ${commitDate}\n`),
   mode: 0o644,
@@ -338,6 +343,82 @@ function stripHosted(path, text) {
   // 消したあとに、空行が 3 つ以上続かないようにする
   const lines = out.split(/\r?\n/)
   return lines.filter((line, i) => !(line.trim() === '' && lines[i - 1]?.trim() === '' && lines[i - 2]?.trim() === '')).join(nl)
+}
+
+// 関数の宣言は先に読まれるので、ファイルの上のほうから呼べる(定数だと、まだ決まっていないと言われる)
+function generated(src) {
+  return `(この文書は、ZIP を作るときに自動で作りました。手で直さないでください。元は \`${src}\` です)`
+}
+
+// server/schema.json(データ定義の唯一の正)から、表と列の一覧を作る
+function dataTablesDoc(schema) {
+  const out = [
+    '# データの表と列の一覧',
+    '',
+    generated('server/schema.json'),
+    '',
+    '- 表・列の名前は、画面・API・PostgreSQL で同じです。読み書きの API は `/api/data/<表>`([API.md](API.md))。',
+    '- 型: `text`・`int`・`numeric`・`float`・`date`・`timestamptz`・`choice`。`choice` は決まった文字の値だけ(下の「選べる値」)。JSON の中身は `text` に文字で持つ。',
+    '- どの表にも、主キー `id`(UUID)・`state_code`・作った日時 `created_on`・変えた日時 `modified_on` があります(下の列の一覧には出していません。`server/ccp/schema.py` の `SYSTEM_COLUMNS`)。',
+    '- ほかの表を指す列(`…_id`)は、各表の最後に書いています。',
+    `- 表の数: ${Object.keys(schema.tables).length}`,
+    '',
+    '## 表の一覧',
+    '',
+    ...Object.keys(schema.tables).map((n) => `- [\`${n}\`](#${n})`),
+    '',
+  ]
+  for (const [name, t] of Object.entries(schema.tables)) {
+    out.push(`## ${name}`, '')
+    if (t._comment) out.push(t._comment, '')
+    out.push('| 列 | 型 | 印 | 選べる値 |', '|---|---|---|---|')
+    for (const [col, type, opt = {}] of t.columns) {
+      const marks = [opt.required && '必須', opt.index && '索引'].filter(Boolean).join('・')
+      const choices = schema.choices?.[`${name}.${col}`]
+      out.push(`| \`${col}\` | ${type} | ${marks} | ${choices ? choices.map((c) => `\`${c}\``).join(' / ') : ''} |`)
+    }
+    for (const [col, ref, opt = {}] of t.lookups ?? []) out.push('', `- \`${col}\` は表 \`${ref}\` の \`id\` を指す${opt.onDelete ? `(相手を消したとき: ${opt.onDelete})` : ''}`)
+    if (t.unique?.length) out.push('', `- 重ならない組: ${t.unique.map((u) => `(${u.join(', ')})`).join('・')}`)
+    if (t.retired?.length) out.push('', `- 使わなくなった列(書き込みは無視する): ${t.retired.map((c) => `\`${c}\``).join('・')}`)
+    out.push('')
+  }
+  return out.join('\n')
+}
+
+// server/ccp/ の FastAPI の窓口(@router.get("…") など)を、ソースを読んで一覧にする(サーバーを動かさずに作れるように)
+function apiDoc(sources) {
+  const rows = []
+  for (const [path, text] of sources.sort(([a], [b]) => a.localeCompare(b))) {
+    const prefix = text.match(/^router\s*=\s*APIRouter\(([^\n]*)\)/m)?.[1].match(/prefix\s*=\s*"([^"]*)"/)?.[1] ?? ''
+    const lines = text.split('\n')
+    lines.forEach((line, i) => {
+      const m = line.match(/^@(router|app)\.(get|post|put|patch|delete)\(\s*"([^"]*)"/)
+      if (!m) return
+      // 関数の宣言の行のあと、最初の行が文字列(docstring)なら、その 1 行目を説明にする
+      let j = i + 1
+      while (j < lines.length && !/^\s*(async\s+)?def\s/.test(lines[j])) j++
+      const fn = lines[j]?.match(/def\s+(\w+)/)?.[1] ?? ''
+      while (j < lines.length && !/:\s*(#.*)?$/.test(lines[j])) j++
+      const doc = lines[j + 1]?.trim().match(/^[rbu]?("""|''')(.*?)(\1|$)/)?.[2].trim() ?? ''
+      rows.push({ file: path.replace(/^server\//, ''), method: m[2].toUpperCase(), url: (m[1] === 'app' ? '' : prefix) + m[3], fn, doc })
+    })
+  }
+  const out = [
+    '# サーバーの API の一覧',
+    '',
+    generated('server/ccp/ のソース'),
+    '',
+    '- 画面は、この API を呼んで動きます。ログイン(画面のパスワード・OIDC など)は、画面と同じものが要ります。',
+    '- `/api/data/<表>` は、表の読み書きの共通の窓口です(表と列は [DATA_TABLES.md](DATA_TABLES.md))。',
+    '- 設定の状態(健康診断)は `/api/settings/health`。コマンドなら `python -m ccp.cli check`。',
+    `- 窓口の数: ${rows.length}`,
+    '',
+    '| 方法 | URL | 説明(関数の docstring の 1 行目。なければ関数名) | ファイル |',
+    '|---|---|---|---|',
+    ...rows.map((r) => `| ${r.method} | \`${r.url || '/'}\` | ${(r.doc || r.fn).replaceAll('|', '\\|')} | \`${r.file}\` |`),
+    '',
+  ]
+  return out.join('\n')
 }
 
 function findPython() {
