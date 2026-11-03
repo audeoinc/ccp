@@ -8,6 +8,8 @@ export interface ImportOutput {
   name: string
   label: string
   env: string
+  /** 写す先の CCP の DB の表(変えられない) */
+  dest: string
   /** ok / error / never(まだ取り込んでいない) */
   status: string
   message: string
@@ -46,7 +48,7 @@ export interface ImportAuto {
 export interface ImportStatus {
   configured: boolean
   outputs: ImportOutput[]
-  unconfigured: { name: string; label: string; env: string }[]
+  unconfigured: { name: string; label: string; env: string; dest: string }[]
   auto: ImportAuto
 }
 
@@ -60,7 +62,7 @@ export interface ImportSyncResult extends ImportStatus {
 export interface ImportCheck {
   configured: boolean
   checkedAt?: string
-  outputs: { name: string; label: string; ok: boolean; rows: number | null; dataAsOf: string | null; issues: { level: string; text: string }[] }[]
+  outputs: { name: string; label: string; ok: boolean; rows: number | null; dataAsOf: string | null; /** BigQuery の種類(TABLE / VIEW など。読めたときだけ) */ kind?: string; issues: { level: string; text: string }[] }[]
 }
 
 export interface ImportRecord {
