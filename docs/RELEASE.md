@@ -17,7 +17,7 @@ npm run release:aws                  # HEAD から作る。検査 → 展開し�
 npm run release:aws -- --ref main    # 作る元を指定する(タグやコミットでもよい)
 npm run release:aws -- --no-test     # 検査だけ(ビルドとテストを省く。途中の確認用。渡す ZIP は省かずに作る)
 npm run release:aws -- --publish     # すべて通ったら、GitHub の Releases に公開する(利用者の確認のあと)
-npm run release:aws -- --publish --note "…"   # 公開の説明に、その版だけの知らせを足す(更新で気を付けることなど)
+npm run release:aws -- --publish --note "…"   # 公開の説明に、その版だけの知らせを足す(更新で気を付けることなど。1 段ずつ --note を繰り返す。改行を入れると Windows では落ちる)
 ```
 
 - できるもの: `release-out/ccp-aws-<版>.zip`(`release-out/` は Git に入れない)。版は `<コミットの日付 YYYYMMDD>-<コミットの短い ID>`。

@@ -3,7 +3,7 @@
 //   npm run release:aws -- --ref main   作る元のコミットを指定する
 //   npm run release:aws -- --no-test    検査だけ(npm ci・ビルド・サーバーのテストを省く。急ぐときの確認用。渡す ZIP は省かずに作る)
 //   npm run release:aws -- --publish    すべての確かめを通ったら、GitHub の Releases に公開する(タグ aws-<版>。利用先は、そこからダウンロードする)
-//   npm run release:aws -- --publish --note "…"   公開の説明に、その版だけの知らせを 1 段足す
+//   npm run release:aws -- --publish --note "…"   公開の説明に、その版だけの知らせを 1 段足す(段が複数なら --note を繰り返す)
 //   npm run release:workbench           Workbench 版(2026-11-03 に停止。作って確かめることはできるが、公開はしない)
 // 版の種類は --target(下の TARGETS)。npm のスクリプトが付ける。
 //
@@ -306,8 +306,9 @@ if (publish) {
     '',
     `添付の ${top}.zip をダウンロードし、利用先の Git に入れてください。立ち上げ・更新の手順は、ZIP の中の ${target.guide} にあります。`,
     '検査(残してはいけない言葉・リンク切れ・必ず入っているべきファイル)と、展開した先での npm ci・npm run verify・サーバーのテストを通っています。',
-    // その版だけの知らせ(--note "…")。利用先が更新するときに気を付けることなど
-    ...(option('--note', '') ? ['', option('--note', '')] : []),
+    // その版だけの知らせ(--note "…")。利用先が更新するときに気を付けることなど。
+    // Windows の npm run は引数の改行から先を落とすので、段落ごとに --note を繰り返して渡す
+    ...args.flatMap((a, i) => (a === '--note' && args[i + 1] ? ['', args[i + 1]] : [])),
   ].join('\n')
   const r = spawnSync('gh', ['release', 'create', tag, zipPath, '--target', full, '--title', `CCP ${target.name} ${version}`, '--notes', notes], { cwd: ROOT, stdio: 'inherit' })
   if (r.status !== 0) fail('gh release create に失敗しました(同じ版がすでにあるか、gh auth status でサインインを確かめる)')
