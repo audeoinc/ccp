@@ -26,6 +26,7 @@
 - 2026-11-02 UI 1: X90 の塊 A・E・F、K5(詳しい制作のページを消した)、X93・X94 は main。X87 段 ② の UI 1 の残りは続き(詳しくはアーカイブ 2026-10-28_ の末尾)
 - 2026-11-02 UI 3: X86 の追加分は main(b046f54)。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)。次は D(面の枠に載せる・simple-finish.md の制作の穴)
 - 2026-11-02 UI 2: X92 は main。X89 の部品(ResultsAiPanel・ResultsTalkPanel)はブランチ ui2-results-panels で UI 3 が差し込む
+- 2026-11-03 UI 3 の明日の続き: 割り当てなし(連絡係の指示を待つ)。残り物は X89 の AB の案 B の「詳しく」をプレビューに渡す(`vs.details`)と、利用先の商品が見本でなくパックの商品だったときの消し方の相談(`remove-seed` では消せない)
 - 2026-11-03 UI 3: 見本のデータ(`server/seed.json`)は人が明示したときだけ。自動で入れる所はもともとなかった(入口は `cli seed` と import-pack の手作業)。BigQuery の出力を設定した環境の `cli seed` は止まる(`--with-bq` で入れる)・新しいコマンド `cli remove-seed`(数えるだけ → `--yes`)・`spu_mismatch` の理由に「見本の商品です」と消し方(`ccp/seeddata.py`)。AWS.md 9 章に行。
 - 2026-11-03 UI 3: W5 契約テスト(`test_contract_ai.py`・`test_contract_assets.py`)と X56 (c)(d) は main(8f02dc4)
 - 2026-11-03 UI 3: X56 (b) AI の案の扱い(`ai_runs.adoption`・`src/aiAdoption.ts`)を本物でも記録
