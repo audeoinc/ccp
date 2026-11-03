@@ -18,36 +18,22 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
-- 2026-11-03 UI 1 の区切り: 残したのは見本 `ui1-sso`(返事待ち)だけ。明日は ui1-sso の返事の対応と、X104 を本物の DB で確認(詳しくはアーカイブ 2026-10-28_ の末尾)
-- 2026-11-03 UI 1: X103 開発用の画面(`/dev/`・`/api/dev/`)は、ログインしていれば開発者(`users.is_developer`)だけ(main.py が `identity.developer_denied` で 403)。ログインがなければいまのまま開き、健康診断に注意の行。X104(`dev.tools.pg`。CCP の DB を読むだけ・開発者だけ)も main に入れた(見本 OK 2026-11-03。`server/ccp/devtools/pg_tools.py`。本物の PostgreSQL ではまだ流していない)
-- 2026-11-03 UI 1: W2 の抜け道を直した: 入口の認証がないとき、中継の印(X-Forwarded-*・Forwarded・X-Real-IP)がある依頼は「中から」とみなさず 503(同じ機械の nginx から通っていた)。**Workbench は `workbench.env` に `CCP_AUTH=none` が要る**(example に入れた・`workbench.sh` が起動の前に注意・check は「足りない」)
-- 2026-11-03 UI 1: W2 Entra の SSO のサーバー側は main(`identity.py`・`oidc.py`・`test_auth_port.py`。手順は WORKBENCH.md 7.2)。**画面(ログアウト・切れたときの案内)は見本の ui1-sso で利用者の確認待ち**
-- 2026-11-03 W6 AWS 版の ZIP: `release.mjs`(`npm run release:aws`)・`docs/AWS.md` は main。Releases に公開済み(5 章)
-- 2026-11-03 最適化(optimize-survey の 1〜6)が済んだ: 89675b8・c472ad1・83a4795・2b96f67・adcd6f3・f063157。X95 も本番済み(3250961・c8104ee)。
-- 2026-11-02 UI 1: X90 の塊 A・E・F、K5(詳しい制作のページを消した)、X93・X94 は main。X87 段 ② の UI 1 の残りは続き(詳しくはアーカイブ 2026-10-28_ の末尾)
-- 2026-11-02 UI 3: X86 の追加分は main(b046f54)。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)。次は D(面の枠に載せる・simple-finish.md の制作の穴)
-- 2026-11-02 UI 2: X92 は main。X89 の部品(ResultsAiPanel・ResultsTalkPanel)はブランチ ui2-results-panels で UI 3 が差し込む
-- 2026-11-03 UI 3 の明日の続き: 割り当てなし(連絡係の指示を待つ)。残り物は X89 の AB の案 B の「詳しく」をプレビューに渡す(`vs.details`)と、利用先の商品が見本でなくパックの商品だったときの消し方の相談(`remove-seed` では消せない)
-- 2026-11-03 UI 3: 見本のデータ(`server/seed.json`)は人が明示したときだけ。自動で入れる所はもともとなかった(入口は `cli seed` と import-pack の手作業)。BigQuery の出力を設定した環境の `cli seed` は止まる(`--with-bq` で入れる)・新しいコマンド `cli remove-seed`(数えるだけ → `--yes`)・`spu_mismatch` の理由に「見本の商品です」と消し方(`ccp/seeddata.py`)。AWS.md 9 章に行。
-- 2026-11-03 UI 3: W5 契約テスト(`test_contract_ai.py`・`test_contract_assets.py`)と X56 (c)(d) は main(8f02dc4)
-- 2026-11-03 UI 3: X56 (b) AI の案の扱い(`ai_runs.adoption`・`src/aiAdoption.ts`)を本物でも記録
-- 2026-11-02 UI 3: X89 結果のシンプルな画面は main。**残り**: AB の案 B の「詳しく」をプレビューに渡す(`vs.details`)
-- 2026-11-02 UI 2: AI の出口(AI_OUTLET_PLAN の 7 章 1〜4)は main(`docs/AI_OUTLET.md`)
-- 2026-11-02 UI 2: 塊 B・C、X80 段 ②〜④(X80 は済み)は main
-- 2026-11-03 UI 2: 書く欄の粒度と向き(やり取りを「＋ やり取りを始める」に・`growUp`)は main(3250961)
-- 2026-11-03 UI 2: settings.setup の 1 段目「設定の健康診断」(`ccp/health.py` の `diagnose()`・⚙ の「設定の状態」)は**見本の ui2-setup**。次は初期設定の画面 → 設定の型
-- 2026-11-03 UI 2: settings.dataimport ①②(定期の取り込み・`/api/bq/*`・表 `app_settings`)は main。**③ 管理の画面(`DataImportPanel`)と「AI の設定」は見本の ui2-dataimport(利用者の OK 待ち)**。定期の取り込みが切のあいだ本番の `BQ_AUTO_SYNC=0` を消せる(消すかは利用者)
-- 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを固定(e3723ffb。本番済み)。返信はまだ
-- 2026-10-30 AI の出口: Copilot Studio を CCP から呼ぶ検証 docs/MS_AI_VERIFY.md(ブランチ claude/ai-outlet-b3c4ae)。測る道具は tools/ms-verify/(ブランチのみ)
+- 2026-11-03 1 日の終わりの文書の更新(10-30〜11-03 の分): FEATURES・SOURCE_MAP・FEATURE_REASONS(F189〜F196・S15〜S18)・USER_STORIES・BACKLOG(X101 を DONE、X98 を ▶)・FLOWS 1.1・2.9。`source-map.drawio` は直していない
+- 2026-11-03 UI 1: W2 の SSO のサーバー側・入口の認証がないときの扱い(中継の印は 503。**Workbench・AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。残りは見本 `ui1-sso`(画面。返事待ち)と、X104 を本物の DB で確認
+- 2026-11-03 UI 2: settings.dataimport ①〜③・settings.ai・settings.setup の健康診断(サーバーと画面)・仕事の設定を DB に(`app_settings`)は main。次は初期設定の画面 → 設定の型。本番の `BQ_AUTO_SYNC=0` を消すかは利用者
+- 2026-11-03 UI 3: X56 (b)〜(d)・W5 契約テスト・見本のデータは人が明示したときだけ(`cli remove-seed`)は main。割り当てなし。残り物は AB の案 B の「詳しく」をプレビューに(`vs.details`)と、パックの商品の消し方の相談
+- 2026-11-03 W6 AWS 版の ZIP(`npm run release:aws`・`docs/AWS.md`)は main・公開済み(5 章)。最適化(optimize-survey の 1〜6)・X95 も済み
+- 2026-11-02 X86・X89・X90(K5 で詳しい制作のページを消した)・X80・X92〜X94 は main。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)
 
 ## 3. 次にやること
 
 BACKLOG の ☐ / ❓ / ▶ の行が正。
-1. **X81** シンプルにない機能を足す: 1・2・4・7・8・9 は main(UI 2)、3・6 は UI 1。残りは 5
-2. **X79 段 ⑤** 本番の移し替え(連絡係が反映とまとめて行う)
-3. **App.tsx の残り**(CalendarViews・memo)は UI 1 の C1 と重なるので、連絡係と合わせてから
-4. **本番で確かめる**: BigQuery の取り込み後の列 `source`・テンプレートの版・素材のライブラリ
-5. 保留・判断待ち: T2 は作らない・X59(テンプレートの管理のあと)・D1〜D5・U8・PR9
+1. **X98** SSO の画面(見本 ui1-sso の返事待ち)。そのあと X97・X99・X100(置き先の差し込み口)と X96(引っ越し用のパックを消す)
+2. **X102** AWS 版: 利用者が試した結果を待つ。公開は人の指示で
+3. **X79** の残りは Workbench での移し替え(B13 と一緒)だけ
+4. **App.tsx の残り**(CalendarViews・memo)は UI 1 の C1 と重なるので、連絡係と合わせてから
+5. **本番で確かめる**: BigQuery の取り込み後の列 `source`・テンプレートの版・素材のライブラリ・定期の取り込み
+6. 保留・判断待ち: T2 は作らない・X59(テンプレートの管理のあと)・D1〜D5・U8・PR9
 
 ## 4. 落とし穴
 
