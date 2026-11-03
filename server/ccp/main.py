@@ -56,6 +56,26 @@ app = FastAPI(title="CCP", docs_url=None, redoc_url=None)
 register_errors(app)
 
 
+_bg: set[asyncio.Task] = set()
+
+
+@app.on_event("startup")
+async def start_bq_scheduler() -> None:
+    """BigQuery の定期の取り込み(bq_import.run_scheduler)を、裏で回し始める。
+    BigQuery の設定がない・自動が切・BQ_AUTO_SYNC=0 なら、回っても何もしない(DB にも BigQuery にも触らない)"""
+    from .bq_import import run_scheduler
+
+    task = asyncio.create_task(run_scheduler())
+    _bg.add(task)  # 参照を持っておかないと、途中で片づけられることがある
+    task.add_done_callback(_bg.discard)
+
+
+@app.on_event("shutdown")
+async def stop_bq_scheduler() -> None:
+    for task in list(_bg):
+        task.cancel()
+
+
 @app.middleware("http")
 async def basic_auth(request: Request, call_next):
     # 死活確認(中身は何も返さない)と、内部の呼び出し(/internal/。呼ばれる側で、署名つきトークンを確認する)は、Basic 認証の対象外

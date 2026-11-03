@@ -15,6 +15,14 @@ export interface BqImportFields {
   /** 取り込まなかった理由・注意 */
   message?: string
   imported_at?: string
+  /** 何で取り込んだか: open(画面を開いたとき)/ manual(⚙ のボタン)/ auto(定期)/ startup(サーバーの起動のとき) */
+  trigger?: string
+  /** だれが(ボタンのときの「あなた」。自動は空) */
+  actor?: string
+  /** 最後に確かめた日時(同じ理由の失敗が続くときは、記録を足さずに、ここと回数を進める) */
+  checked_at?: string
+  /** 同じ結果が続いた回数 */
+  repeat_count?: number
   state_code?: number
 }
 

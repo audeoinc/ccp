@@ -1,7 +1,10 @@
-"""BigQuery からの取り込み(バックログ B2・B4。設計は docs/BIGQUERY.md の 5 章と 11 章)。
+"""BigQuery からの取り込み(バックログ B2・B4。設計は docs/BIGQUERY.md の 5 章と 11 章)と、その管理(settings.dataimport)。
 
-  POST /api/bq/sync          画面を開いたとき(force なし)と、⚙ の「BigQuery から取り込む」(force=true)
-  GET  /api/bq/status        出力ごとの、最後の取り込みの記録(画面の「◯時点」)
+  POST /api/bq/sync          画面を開いたとき(force なし)と、⚙ の「今すぐ取り込む」(force。only で出力を絞る。管理する人だけ)
+  GET  /api/bq/status        出力ごとの状態(最後の取り込み・最後に確かめた日時・次に確かめる日時・間隔・古いか)と、自動の入・切
+  POST /api/bq/check         確かめだけ(読んで bq_validate まで。書かない。管理する人だけ)
+  GET  /api/bq/history       取り込みの記録(新しい順。管理する人だけ)
+  GET/PUT /api/bq/settings   自動の取り込みの入・切と、出力ごとの間隔(変えるのは管理する人だけ)
 
 流れ:
   ① 出力ごとに、最終更新の日時を見る(ビューなら BQ_<名前>_WATCH の表。メタデータだけなので、無料・一瞬)
@@ -10,24 +13,32 @@
   ④ NG がない出力だけを、1 つのトランザクションで入れ替える(途中の状態を、画面や AI に見せない)
      NG の出力は、前のデータのまま残し、理由を bq_imports に記録する(画面に出す)
 
-サーバーが常に動いているとは限らない(使われないときは止まる環境がある)ので、定期的には取り込まない(画面を開いたとき + ボタン。11 章)。
+定期の取り込み(2026-11-03 利用者): サーバーの中で回す(run_scheduler。main.py が起動のときに始める)。起動したらすぐ 1 回、そのあとは 1 分ごとに、
+出力ごとの間隔(在庫 5 分・ほか 60 分。画面で変えられる)がたった出力の最終更新を見て、変わっていれば取り込む(上の ①〜④)。
+既定は「切」(管理する人が「確認だけ」と「今すぐ取り込む」で本物のデータを確かめてから入れる。2026-10-17 の取り込みの事故の教訓)。
+環境変数 BQ_AUTO_SYNC=0 なら、画面の設定にかかわらず回さない(使われないときにサーバーが止まる環境・試験)。
+自動が「入」のときは、画面を開いたときの取り込みはしない(状態を返すだけ。二重に読まないため)。
 DB が使えないとき(dbready)は、require_db が「準備中」を返す。画面は、データを読めてから取り込みを依頼する。
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 import re
 from typing import Any
+from urllib.parse import unquote
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from . import bq, bq_validate as bv, dbready, schema as sc
 from .data_api import db, require_db
+from .identity import admin_denied
 
 log = logging.getLogger("ccp.bq")
 router = APIRouter(prefix="/api/bq", dependencies=[Depends(require_db)])
@@ -43,10 +54,85 @@ ORDER = ("spu", "sku", "sku_stock", "weekly", "forecast", "ranking")
 
 _lock = asyncio.Lock()
 _last_check = 0.0
+# 出力ごとに、最後に最終更新を確かめた日時(このプロセスの中。変わっていなければ記録を足さないので、ここで持つ)
+_checked: dict[str, datetime] = {}
+
+# 何で取り込んだか(記録の trigger): 画面を開いたとき / ⚙ のボタン / 定期 / サーバーの起動のとき
+TRIGGERS = ("open", "manual", "auto", "startup")
+# 定期の取り込み: 目を覚ます間隔(秒)と、出力ごとの確かめる間隔(分)の既定と、選べる値
+TICK_S = 60
+DEFAULT_INTERVALS = {"spu": 60, "sku": 60, "sku_stock": 5, "weekly": 60, "forecast": 60, "ranking": 60}
+INTERVAL_CHOICES = (2, 5, 15, 30, 60, 180, 360, 1440)
+# 設定の置き場所(country_settings の name。国なし = 全体)
+SETTINGS_NAME = "bq.sync"
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def env_disabled() -> bool:
+    """環境変数 BQ_AUTO_SYNC=0 で、定期の取り込みを止めているか"""
+    return (os.getenv("BQ_AUTO_SYNC") or "").strip() == "0"
+
+
+def parse_settings(raw: Any) -> dict[str, Any]:
+    """設定の値(JSON の文字列か辞書)を、入・切と出力ごとの間隔(分)にそろえる。知らない出力・選べない間隔は既定に戻す"""
+    v: Any = raw
+    if isinstance(raw, str):
+        try:
+            v = json.loads(raw)
+        except ValueError:
+            v = {}
+    if not isinstance(v, dict):
+        v = {}
+    got = v.get("intervals") if isinstance(v.get("intervals"), dict) else {}
+    intervals = {}
+    for name, default in DEFAULT_INTERVALS.items():
+        try:
+            m = int(got.get(name, default))
+        except (TypeError, ValueError):
+            m = default
+        intervals[name] = m if m in INTERVAL_CHOICES else default
+    return {"enabled": v.get("enabled") is True, "intervals": intervals}
+
+
+async def load_settings() -> dict[str, Any]:
+    """いまの設定(country_settings の最新の行。なければ既定 = 切)"""
+    async with db() as conn:
+        row = (await conn.execute(text(
+            "SELECT value FROM country_settings WHERE name = :name AND (country IS NULL OR country = '') ORDER BY created_on DESC LIMIT 1"
+        ), {"name": SETTINGS_NAME})).mappings().first()
+    return parse_settings(row["value"] if row else None)
+
+
+async def save_settings(value: dict[str, Any], by: str) -> dict[str, Any]:
+    """設定を残す(country_settings は、変えるたびに 1 行足す。前の行は変更の履歴)"""
+    clean = parse_settings(value)
+    async with db(write=True) as conn:
+        await conn.execute(text("INSERT INTO country_settings (name, country, value, changed_by) VALUES (:name, :country, :value, :changed_by)"),
+                           {"name": SETTINGS_NAME, "country": "", "value": json.dumps(clean), "changed_by": by[:100]})
+    return clean
+
+
+def auto_on(settings: dict[str, Any]) -> bool:
+    return bool(settings.get("enabled")) and not env_disabled()
+
+
+def last_checked(name: str, prev: dict[str, Any] | None) -> datetime | None:
+    """出力を最後に確かめた日時(このプロセスで確かめた日時と、記録の日時の新しいほう)"""
+    times = [t for t in (_checked.get(name), (prev or {}).get("checked_at"), (prev or {}).get("imported_at")) if t]
+    return max(times) if times else None
+
+
+def due(names: list[str], settings: dict[str, Any], prev: dict[str, dict[str, Any]], now: datetime) -> list[str]:
+    """間隔がたって、確かめる時機の出力"""
+    out = []
+    for name in names:
+        last = last_checked(name, prev.get(name))
+        if last is None or now - last >= timedelta(minutes=settings["intervals"].get(name, 60)):
+            out.append(name)
+    return out
 
 
 def _modified(o: bq.Output, client: Any) -> datetime | None:
@@ -214,54 +300,105 @@ async def _db_context(conn: AsyncConnection, name: str) -> list[dict[str, Any]]:
 
 
 async def latest() -> dict[str, dict[str, Any]]:
-    """出力ごとの、最後の取り込みの記録(成否を問わない)と、最後に成功した記録"""
+    """出力ごとの、最後の取り込みの記録(成否を問わない)と、最後に成功した記録・その前に成功した行数"""
     async with db() as conn:
         rows = (await conn.execute(text("""
-            SELECT DISTINCT ON (source) source, status, source_modified, data_as_of, row_count, message, imported_at
+            SELECT DISTINCT ON (source) id, source, status, source_modified, data_as_of, row_count, message, imported_at, checked_at, repeat_count, trigger, actor
             FROM bq_imports ORDER BY source, imported_at DESC
         """))).mappings().all()
         ok = (await conn.execute(text("""
-            SELECT DISTINCT ON (source) source, data_as_of, row_count, imported_at
-            FROM bq_imports WHERE status = 'ok' ORDER BY source, imported_at DESC
+            SELECT source, data_as_of, row_count, imported_at, n FROM (
+              SELECT source, data_as_of, row_count, imported_at, ROW_NUMBER() OVER (PARTITION BY source ORDER BY imported_at DESC) AS n
+              FROM bq_imports WHERE status = 'ok'
+            ) AS x WHERE n <= 2
         """))).mappings().all()
-    okmap = {r["source"]: dict(r) for r in ok}
-    return {r["source"]: {**dict(r), "last_ok": okmap.get(r["source"])} for r in rows}
+    okmap = {r["source"]: dict(r) for r in ok if r["n"] == 1}
+    before = {r["source"]: r["row_count"] for r in ok if r["n"] == 2}
+    return {r["source"]: {**dict(r), "last_ok": okmap.get(r["source"]), "rows_before": before.get(r["source"])} for r in rows}
 
 
 def _iso(v: Any) -> Any:
     return sc.serialize(v) if v is not None else None
 
 
+def is_stale(name: str, data_as_of: datetime | None, now: datetime) -> bool:
+    """データが古いか(bq_validate.FRESH と同じ基準。まだ取り込んでいなければ古くない = 「まだ」)"""
+    fresh = bv.FRESH.get(name)
+    return bool(fresh and data_as_of and now - data_as_of > fresh)
+
+
 async def status() -> dict[str, Any]:
     outputs = bq.configured()
+    settings = await load_settings() if outputs else parse_settings(None)
+    auto = {"enabled": settings["enabled"], "envDisabled": env_disabled(), "active": auto_on(settings), "intervals": settings["intervals"], "choices": list(INTERVAL_CHOICES)}
+    # 設定していない出力も、名前と環境変数の名前だけ返す(管理の画面の「未設定」。表の場所は利用先の名前を含むので返さない)
+    unconfigured = [{"name": o.name, "label": o.label, "env": o.env} for o in bq.OUTPUTS if o not in outputs]
     if not outputs:
-        return {"configured": False, "outputs": []}
+        return {"configured": False, "outputs": [], "unconfigured": unconfigured, "auto": auto}
     last = await latest()
+    now = _now()
     out = []
     for o in bq.OUTPUTS:
         if o not in outputs:
             continue
         r = last.get(o.name) or {}
         ok = r.get("last_ok") or {}
+        checked = last_checked(o.name, r)
+        interval = settings["intervals"].get(o.name, 60)
         out.append({
-            "name": o.name, "label": o.label, "status": r.get("status") or "never", "message": r.get("message") or "",
+            "name": o.name, "label": o.label, "env": o.env, "status": r.get("status") or "never", "message": r.get("message") or "",
             "dataAsOf": _iso(ok.get("data_as_of")), "importedAt": _iso(ok.get("imported_at")), "rows": ok.get("row_count"),
-            "triedAt": _iso(r.get("imported_at")),
+            "rowsBefore": r.get("rows_before"),
+            "triedAt": _iso(r.get("imported_at")), "sourceModified": _iso(r.get("source_modified")),
+            "checkedAt": _iso(checked), "intervalMin": interval,
+            "nextCheckAt": _iso(checked + timedelta(minutes=interval)) if checked and auto["active"] else None,
+            "repeat": (r.get("repeat_count") or 1) if r else None, "trigger": r.get("trigger"), "actor": r.get("actor"),
+            "stale": is_stale(o.name, ok.get("data_as_of"), now),
         })
-    return {"configured": True, "outputs": out}
+    return {"configured": True, "outputs": out, "unconfigured": unconfigured, "auto": auto}
 
 
-async def sync(force: bool = False) -> dict[str, Any]:
-    """変わった出力を取り込む。返すのは、取り込んだ出力・取り込まなかった出力と理由・いまの状態"""
+def _judge(name: str, rows: list[dict[str, Any]], prev: dict[str, Any], ctx: dict[str, Any], existing: list[dict[str, Any]], now: datetime) -> list[bv.Issue]:
+    """出力 1 つの確かめ(③。bq_validate と、商品が合っているか・行数が半分を切っていないか)。取り込みと「確認だけ」で同じ"""
+    issues = bv.validate(name, rows, ctx, now=now)
+    if name == "spu" and (why := spu_mismatch(rows, existing)):
+        issues.append(bv.Issue(bv.NG, name, why))
+    before = ((prev or {}).get("last_ok") or {}).get("row_count")
+    if before and before >= 10 and len(rows) < before / 2:
+        issues.append(bv.Issue(bv.NG, name, f"行数が前回の半分を切りました(前回 {before} 行 → 今回 {len(rows)} 行)。元のデータの不具合を疑って、取り込みを止めました"))
+    return issues
+
+
+def _ctx_for(name: str, context: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    return {"spu": context["spu"]} if name in ("sku", "weekly") else {"sku": context["sku"]} if name == "sku_stock" else {}
+
+
+async def _existing_products() -> list[dict[str, Any]]:
+    async with db() as conn:
+        return [dict(r) for r in (await conn.execute(text("SELECT product_code FROM products"))).mappings().all()]
+
+
+def _pick(only: list[str] | None) -> list[bq.Output]:
+    outputs = [o for o in bq.OUTPUTS if o in bq.configured()]
+    return [o for o in outputs if o.name in only] if only else outputs
+
+
+async def sync(force: bool = False, only: list[str] | None = None, trigger: str = "open", actor: str | None = None) -> dict[str, Any]:
+    """変わった出力を取り込む。返すのは、取り込んだ出力・取り込まなかった出力と理由・いまの状態。
+    only で出力を絞る(定期の取り込みは、間隔がたった出力だけ)。trigger・actor は記録に残す"""
     global _last_check
     if not bq.configured():
         return {"configured": False, "imported": [], "failed": [], "outputs": []}
     async with _lock:
-        if not force and time.monotonic() - _last_check < MIN_INTERVAL_S:
-            return {"configured": True, "imported": [], "failed": [], "skipped": "recent", **(await status())}
-        _last_check = time.monotonic()
+        if trigger == "open":
+            # 自動が「入」なら、開いたときは読まない(定期の取り込みが読む。二重に読まないため)
+            if auto_on(await load_settings()):
+                return {"configured": True, "imported": [], "failed": [], "skipped": "auto", **(await status())}
+            if not force and time.monotonic() - _last_check < MIN_INTERVAL_S:
+                return {"configured": True, "imported": [], "failed": [], "skipped": "recent", **(await status())}
+            _last_check = time.monotonic()
         now = _now()
-        outputs = [o for o in bq.OUTPUTS if o in bq.configured()]
+        outputs = _pick(only)
         client = await asyncio.to_thread(bq.client)
         prev = await latest()
 
@@ -272,6 +409,7 @@ async def sync(force: bool = False) -> dict[str, Any]:
         for o in outputs:
             try:
                 modified[o.name] = await asyncio.to_thread(_modified, o, client)
+                _checked[o.name] = now
                 if force or changed(prev.get(o.name), modified[o.name], now):
                     rows[o.name] = await asyncio.to_thread(bv.fetch, o, client)
             except Exception as e:  # noqa: BLE001 — 見つからない・権限がない など。ほかの出力は続ける
@@ -284,21 +422,13 @@ async def sync(force: bool = False) -> dict[str, Any]:
         # ③ 確かめる(SKU は SPU に、在庫は SKU に結びつくか。取り込まない側は、いまの DB の行と比べる)
         async with db() as conn:
             context = {n: rows[n] if n in rows else await _db_context(conn, n) for n in ("spu", "sku")}
+        existing = await _existing_products() if "spu" in rows else []
         good: dict[str, list[dict[str, Any]]] = {}
         notes: dict[str, str] = {}
         for name in ORDER:
             if name not in rows:
                 continue
-            ctx = {"spu": context["spu"]} if name in ("sku", "weekly") else {"sku": context["sku"]} if name == "sku_stock" else {}
-            issues = bv.validate(name, rows[name], ctx, now=now)
-            if name == "spu":
-                async with db() as conn:
-                    existing = [dict(r) for r in (await conn.execute(text("SELECT product_code FROM products"))).mappings().all()]
-                if (why := spu_mismatch(rows[name], existing)):
-                    issues.append(bv.Issue(bv.NG, name, why))
-            before = ((prev.get(name) or {}).get("last_ok") or {}).get("row_count")
-            if before and before >= 10 and len(rows[name]) < before / 2:
-                issues.append(bv.Issue(bv.NG, name, f"行数が前回の半分を切りました(前回 {before} 行 → 今回 {len(rows[name])} 行)。元のデータの不具合を疑って、取り込みを止めました"))
+            issues = _judge(name, rows[name], prev.get(name) or {}, _ctx_for(name, context), existing, now)
             if bv.has_ng(issues):
                 failed.append({"name": name, "message": " / ".join(i.text() for i in issues if i.level == bv.NG)})
                 if name in ("spu", "sku"):
@@ -311,6 +441,7 @@ async def sync(force: bool = False) -> dict[str, Any]:
 
         # ④ 1 つのトランザクションで入れ替える
         imported: list[dict[str, Any]] = []
+        who = (actor or "")[:100] or None
         async with db(write=True) as conn:
             got = (await conn.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": LOCK_KEY})).scalar_one()
             # ほかで取り込み中なら、書かずに抜ける(状態は、この接続を返してから読む。接続を 2 本同時に持たない)
@@ -321,21 +452,31 @@ async def sync(force: bool = False) -> dict[str, Any]:
                         imported.append({"name": name, "rows": len(good[name]), "summary": summary})
                 if "sku" in good or "sku_stock" in good:
                     await _sum_stock(conn)
+                base = {"trigger": trigger, "actor": who, "checked_at": now, "repeat_count": 1, "imported_at": now}
                 records = []
                 for name in ORDER:
                     if name in good:
                         stamp = "issued_at" if name == "forecast" else "as_of"
                         times = [t for t in (bv.as_ts(r.get(stamp)) for r in good[name]) if t]
-                        records.append({"source": name, "status": "ok", "source_modified": modified.get(name), "data_as_of": max(times) if times else None,
-                                        "row_count": len(good[name]), "message": notes.get(name) or None, "imported_at": now})
+                        records.append({**base, "source": name, "status": "ok", "source_modified": modified.get(name), "data_as_of": max(times) if times else None,
+                                        "row_count": len(good[name]), "message": notes.get(name) or None})
+                repeats = []
                 for f in failed:
-                    records.append({"source": f["name"], "status": "error", "source_modified": modified.get(f["name"]), "data_as_of": None,
-                                    "row_count": len(rows.get(f["name"], [])), "message": f["message"][:2000], "imported_at": now})
+                    message = f["message"][:2000]
+                    p = prev.get(f["name"]) or {}
+                    # 同じ理由の失敗が続くときは、記録を足さずに、前の記録の「最後に確かめた日時」と「回数」を進める(定期の取り込みで、記録が同じ行で埋まらないように)
+                    if p.get("status") == "error" and p.get("message") == message and p.get("id"):
+                        repeats.append({"id": p["id"], "checked_at": now, "repeat_count": int(p.get("repeat_count") or 1) + 1, "trigger": trigger, "actor": who})
+                        continue
+                    records.append({**base, "source": f["name"], "status": "error", "source_modified": modified.get(f["name"]), "data_as_of": None,
+                                    "row_count": len(rows.get(f["name"], [])), "message": message})
                 if records:
                     await conn.execute(text("""
-                        INSERT INTO bq_imports (source, status, source_modified, data_as_of, row_count, message, imported_at)
-                        VALUES (:source, :status, :source_modified, :data_as_of, :row_count, :message, :imported_at)
+                        INSERT INTO bq_imports (source, status, source_modified, data_as_of, row_count, message, imported_at, trigger, actor, checked_at, repeat_count)
+                        VALUES (:source, :status, :source_modified, :data_as_of, :row_count, :message, :imported_at, :trigger, :actor, :checked_at, :repeat_count)
                     """), records)
+                for r in repeats:
+                    await conn.execute(text("UPDATE bq_imports SET checked_at = :checked_at, repeat_count = :repeat_count, trigger = :trigger, actor = :actor WHERE id = :id"), r)
                 # 記録は、出力ごとに直近 50 件だけ残す(画面を開くたびに増えるため)
                 await conn.execute(text("""
                     DELETE FROM bq_imports WHERE id IN (
@@ -345,8 +486,113 @@ async def sync(force: bool = False) -> dict[str, Any]:
         if not got:
             return {"configured": True, "imported": [], "failed": [], "skipped": "busy", **(await status())}
         if imported or failed:
-            log.info("BigQuery の取り込み: 取り込んだ %s / 止めた %s", [i["name"] for i in imported], [f["name"] for f in failed])
+            log.info("BigQuery の取り込み(%s): 取り込んだ %s / 止めた %s", trigger, [i["name"] for i in imported], [f["name"] for f in failed])
         return {"configured": True, "imported": imported, "failed": failed, **(await status())}
+
+
+async def check(only: list[str] | None = None) -> dict[str, Any]:
+    """確かめだけ(読んで ③ まで。書かない。ccp.cli bq-check と同じ確かめ)。出力ごとに、NG・注意の一覧と、行数・データの時点"""
+    if not bq.configured():
+        return {"configured": False, "outputs": []}
+    now = _now()
+    outputs = _pick(only)
+    client = await asyncio.to_thread(bq.client)
+    prev = await latest()
+    rows: dict[str, list[dict[str, Any]]] = {}
+    result: dict[str, dict[str, Any]] = {}
+    for o in outputs:
+        try:
+            rows[o.name] = await asyncio.to_thread(bv.fetch, o, client)
+        except Exception as e:  # noqa: BLE001
+            result[o.name] = {"name": o.name, "label": o.label, "ok": False, "rows": None, "dataAsOf": None,
+                              "issues": [{"level": bv.NG, "text": f"BigQuery を読めません({type(e).__name__}: {e})"}]}
+    async with db() as conn:
+        context = {n: rows[n] if n in rows else await _db_context(conn, n) for n in ("spu", "sku")}
+    existing = await _existing_products() if "spu" in rows else []
+    for name in ORDER:
+        if name not in rows:
+            continue
+        issues = _judge(name, rows[name], prev.get(name) or {}, _ctx_for(name, context), existing, now)
+        stamp = "issued_at" if name == "forecast" else "as_of"
+        times = [t for t in (bv.as_ts(r.get(stamp)) for r in rows[name]) if t]
+        result[name] = {"name": name, "label": next(o.label for o in bq.OUTPUTS if o.name == name), "ok": not bv.has_ng(issues), "rows": len(rows[name]),
+                        "dataAsOf": _iso(max(times)) if times else None, "issues": [{"level": i.level, "text": i.text()} for i in issues]}
+    return {"configured": True, "checkedAt": _iso(now), "outputs": [result[o.name] for o in outputs if o.name in result]}
+
+
+async def history(source: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    """取り込みの記録(新しい順)"""
+    limit = max(1, min(int(limit), 300))
+    where = "WHERE source = :source " if source else ""
+    async with db() as conn:
+        rows = (await conn.execute(text(
+            f"SELECT source, status, source_modified, data_as_of, row_count, message, imported_at, checked_at, repeat_count, trigger, actor FROM bq_imports {where}ORDER BY imported_at DESC LIMIT {limit}"
+        ), {"source": source} if source else {})).mappings().all()
+    return [{"source": r["source"], "status": r["status"], "sourceModified": _iso(r["source_modified"]), "dataAsOf": _iso(r["data_as_of"]),
+             "rows": r["row_count"], "message": r["message"] or "", "importedAt": _iso(r["imported_at"]), "checkedAt": _iso(r["checked_at"]),
+             "repeat": r["repeat_count"] or 1, "trigger": r["trigger"], "actor": r["actor"]} for r in rows]
+
+
+# ---- 定期の取り込み
+
+
+async def tick(trigger: str = "auto") -> list[str]:
+    """1 回分の定期の取り込み。間隔がたった出力を確かめ、変わっていれば取り込む。確かめた出力の名前を返す(何もしなければ空)"""
+    if env_disabled() or not bq.configured():
+        return []
+    settings = await load_settings()
+    if not settings["enabled"]:
+        return []
+    if _lock.locked():
+        return []  # 取り込み中(ボタン・開いたとき)なら、この回は飛ばす
+    names = [o.name for o in _pick(None)]
+    targets = names if trigger == "startup" else due(names, settings, await latest(), _now())
+    if targets:
+        await sync(False, targets, trigger)
+    return targets
+
+
+async def run_scheduler() -> None:
+    """サーバーが動いている間、回し続ける。起動したらすぐ 1 回(止めていた間に古くなったデータで動かないように)、そのあとは TICK_S ごと"""
+    first = True
+    while True:
+        try:
+            await tick("startup" if first else "auto")
+            first = False
+        except dbready.DbNotReady:
+            pass  # DB の起動中。次の回に確かめる(起動のときの 1 回も、次の回に回す)
+        except Exception:  # noqa: BLE001 — 認証が取れない など。止めずに、次の回も確かめる(記録は sync が残す)
+            log.exception("BigQuery の定期の取り込みに失敗しました")
+            first = False
+        await asyncio.sleep(TICK_S)
+
+
+# ---- 入口
+
+
+def _only(v: str | None) -> list[str] | None:
+    names = [x.strip() for x in (v or "").split(",") if x.strip()]
+    return names or None
+
+
+async def _admin(request: Request) -> str | None:
+    async with db() as conn:
+        return await admin_denied(conn, request)
+
+
+def _denied(why: str) -> dict[str, Any]:
+    return {"success": False, "error": {"message": why, "code": "forbidden"}}
+
+
+def _actor_name(request: Request) -> str:
+    return unquote(request.headers.get("x-ccp-actor", "")).strip()[:100]
+
+
+def _bq_error(e: Exception, what: str) -> dict[str, Any]:
+    if isinstance(e, ImportError):
+        return {"success": False, "error": {"message": "パッケージ google-cloud-bigquery がありません(server/requirements.txt)"}}
+    log.exception("BigQuery の%sに失敗しました", what)
+    return {"success": False, "error": {"message": f"BigQuery から{what}できませんでした({type(e).__name__}: {e})"}}
 
 
 @router.get("/status")
@@ -355,13 +601,53 @@ async def get_status() -> dict[str, Any]:
 
 
 @router.post("/sync")
-async def post_sync(force: bool = False) -> dict[str, Any]:
+async def post_sync(request: Request, force: bool = False, only: str | None = None, trigger: str | None = None) -> dict[str, Any]:
+    # 出力を絞った取り込みは、管理する人だけ。力ずく(force)は、管理する人でなければ、変わった出力だけの取り込みにする
+    # (⚙ の「今すぐ取り込む」は、だれでも押せる。管理の画面がない人も、いまどおり使えるように)
+    t = trigger if trigger in ("open", "manual") else ("manual" if force else "open")
+    if force or only:
+        why = await _admin(request)
+        if why and only:
+            return _denied(why)
+        if why:
+            force = False
     try:
-        return {"success": True, "data": await sync(force)}
+        return {"success": True, "data": await sync(force, _only(only), t, _actor_name(request) or None)}
     except dbready.DbNotReady:
         raise  # DB の起動中は、ほかの API と同じ「準備中」で返す(register_errors)
-    except ImportError:
-        return {"success": False, "error": {"message": "パッケージ google-cloud-bigquery がありません(server/requirements.txt)"}}
     except Exception as e:  # noqa: BLE001 — 認証が取れない など。画面に理由を出す(取り込みに失敗しても、画面は使える)
-        log.exception("BigQuery の取り込みに失敗しました")
-        return {"success": False, "error": {"message": f"BigQuery から取り込めませんでした({type(e).__name__}: {e})"}}
+        return _bq_error(e, "取り込み")
+
+
+@router.post("/check")
+async def post_check(request: Request, only: str | None = None) -> dict[str, Any]:
+    if (why := await _admin(request)):
+        return _denied(why)
+    try:
+        return {"success": True, "data": await check(_only(only))}
+    except dbready.DbNotReady:
+        raise
+    except Exception as e:  # noqa: BLE001
+        return _bq_error(e, "確認")
+
+
+@router.get("/history")
+async def get_history(request: Request, source: str | None = None, limit: int = 50) -> dict[str, Any]:
+    if (why := await _admin(request)):
+        return _denied(why)
+    return {"success": True, "data": await history(source, limit)}
+
+
+@router.get("/settings")
+async def get_settings() -> dict[str, Any]:
+    s = await load_settings()
+    return {"success": True, "data": {**s, "envDisabled": env_disabled(), "choices": list(INTERVAL_CHOICES)}}
+
+
+@router.put("/settings")
+async def put_settings(request: Request) -> dict[str, Any]:
+    if (why := await _admin(request)):
+        return _denied(why)
+    body = await request.json()
+    s = await save_settings(body if isinstance(body, dict) else {}, _actor_name(request))
+    return {"success": True, "data": {**s, "envDisabled": env_disabled(), "choices": list(INTERVAL_CHOICES)}}

@@ -3,6 +3,7 @@
 // BigQuery の設定がない環境(撮影用のビルド・設定前の Workbench)では、configured: false が返る(何もしない)。
 import { appPath } from '../appRoot'
 import { dropSharedReads } from './readShare'
+import { actorHeaders } from './services'
 import { tr } from '../i18n'
 
 export interface BqOutputStatus {
@@ -30,7 +31,8 @@ const EMPTY: BqSyncResult = { configured: false, imported: [], failed: [], outpu
 /** 取り込みを依頼する。失敗しても投げずに、理由を返す(取り込めなくても、画面はいまのデータで使えるため) */
 export async function syncBigQuery(force: boolean): Promise<{ result: BqSyncResult; error?: string }> {
   try {
-    const res = await fetch(appPath(`/api/bq/sync${force ? '?force=true' : ''}`), { method: 'POST' })
+    // だれが取り込んだかを記録に残し、force(管理する人だけ)をサーバーが確かめられるように、「あなた」を添える
+    const res = await fetch(appPath(`/api/bq/sync${force ? '?force=true' : ''}`), { method: 'POST', headers: actorHeaders() })
     dropSharedReads() // 書いたので、途中の読み込みに相乗りさせない(gcp/readShare.ts)
     const json = (await res.json().catch(() => null)) as { success: boolean; data?: BqSyncResult; error?: { message: string; code?: string } } | null
     // 撮影用のビルドなど、API がない環境は、設定がないのと同じに扱う

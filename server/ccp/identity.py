@@ -86,6 +86,28 @@ async def people_edit_denied(conn: AsyncConnection, request: Request, table: str
     return None
 
 
+async def admin_denied(conn: AsyncConnection, request: Request) -> str | None:
+    """管理する人(役割が admin か、開発者 is_developer。画面の FeaturesManager の canEdit と同じ)だけに限る操作。だめなら理由を返す。
+    ログインしていれば、その人で決める。ログインがなければ、画面が選んだ「あなた」(見出し x-ccp-actor-id。いまの運用と同じく、画面の選択を信じる)"""
+    ident, user = await resolve_user(conn, request)
+    if ident is not None:
+        if user is None:
+            return f"ログインした {ident.email} は、ユーザーに登録されていません"
+        uid = user["id"]
+    else:
+        uid = request.headers.get("x-ccp-actor-id", "").strip()
+        if not uid:
+            return "管理する人だけができます(右上で、管理する人を「あなた」に選んでください)"
+        try:
+            sc.coerce("uuid", uid)
+        except sc.BadRequest:
+            return "管理する人だけができます(「あなた」が見つかりません)"
+    row = (await conn.execute(text("SELECT role, is_developer FROM users WHERE id = :id"), {"id": uid})).mappings().first()
+    if not row or (row["role"] != "admin" and not row["is_developer"]):
+        return "管理する人(管理者か開発者)だけができます"
+    return None
+
+
 @router.get("/me")
 async def me(request: Request):
     from .data_api import db, ok, require_db

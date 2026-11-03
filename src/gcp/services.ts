@@ -9,6 +9,10 @@ import { dropSharedReads, shareRead } from './readShare'
 const actorName = (): string => {
   return loadPref<string>(PREF.myName, '') || loadPref<string>(PREF.legacyCommentAuthor, '')
 }
+// 選んでいる「あなた」の users の id。管理する人だけの窓口(データの取り込みの管理など)を、ログインがないときにサーバーが確かめる(identity.py の admin_denied)
+const actorId = (): string => loadPref<string>(PREF.myUser, '')
+/** サーバーに送る、操作した人の見出し(callApi のほか、自前の fetch でも使う) */
+export const actorHeaders = (): Record<string, string> => ({ 'x-ccp-actor': encodeURIComponent(actorName()), 'x-ccp-actor-id': actorId() })
 import { appPath } from '../appRoot'
 import { PREF } from '../prefKeys'
 import { loadPref } from '../settings'
@@ -52,7 +56,7 @@ export async function callApi<T>(method: string, url: string, body?: unknown): P
     const send = () =>
       fetch(appPath(url), {
         method,
-        headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), 'x-ccp-actor': encodeURIComponent(actorName()) },
+        headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...actorHeaders() },
         body: body === undefined ? undefined : JSON.stringify(body),
       })
     let res = await send()

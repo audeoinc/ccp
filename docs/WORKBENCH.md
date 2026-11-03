@@ -81,7 +81,14 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 | 商品・カテゴリの週の指標を取り込む(CSV) | `import-metrics <CSV> [--yes]` |
 | BigQuery の販売順位がないとき、結果の画面の「販売チャネルごとの順位」のダミーを作る | `ranking-dummy [--yes]` |
 
-画面からは、⚙ の「BigQuery から取り込む」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
+画面からは、⚙ の「データの取り込み」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
+
+**本物の BigQuery のデータの始め方**(2026-11-03。くわしくは [BIGQUERY.md](BIGQUERY.md) の 5 章):
+
+1. 値を確かめる: `bq-check`、または ⚙ →「データの取り込み」の「確認だけ」(管理する人だけ。読んで確かめるだけで、DB には書きません)。NG があれば、出力(ビュー)を直してからやり直します。
+2. 取り込む: 同じ画面の「今すぐ取り込む」。画面で、商品・在庫・実績が正しく見えるかを確かめます。
+3. 定期の取り込みを「入」にする: 同じ画面の上のスイッチ(既定は「切」)。在庫は 5 分ごと、ほかは 60 分ごとに更新を確かめ、変わっていれば取り込みます(間隔は出力ごとに変えられます)。止まった・古い出力があれば、管理する人の ⚙ に赤い点が付きます。
+   - 試験などで定期の取り込みを止めたいときは、`server/workbench.env` に `BQ_AUTO_SYNC=0` と書いて、サーバーを起動し直します(画面の設定にかかわらず回りません)。
 
 - `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる<!-- hosted:begin -->。直さない約束は [UPDATE.md](UPDATE.md)<!-- hosted:end -->)→ (`requirements.txt` が変わったときだけ)`pip install` → (`package-lock.json` が変わったときだけ)`npm ci` → `npm run build` → 停止 → 起動、の順に行います。
 - ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる。**8081 のまま使い続けるなら、`server/workbench.env` に `CCP_PORT=8081` と書く**(コマンドの前に `CCP_PORT=8081` を付けてもよい))、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
@@ -523,6 +530,7 @@ PY
 | `CCP_PORT` | — | サーバーのポート(`scripts/workbench.sh`) | 既定 8082 |
 | `CCP_PYTHON` / `CCP_PGDATA` / `CCP_PG_BIN` | — | スクリプトが使う Python・Workbench の中の PostgreSQL のデータの場所・`pg_ctl` のあるフォルダ | `server/workbench.env.example` の説明のとおり |
 | `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` | BigQuery を使うとき | 出力の場所 `<プロジェクト>.<データセット>.<表>`(ジョブのプロジェクトは `BQ_PROJECT`)。ビューなら、更新を見る元の表を `BQ_<名前>_WATCH` に | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) |
+| `BQ_AUTO_SYNC` | — | `0` なら、BigQuery の定期の取り込みを回さない(画面の設定にかかわらず)。なければ、⚙ →「データの取り込み」の設定に従う | 設定しない |
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
 | `GEMINI_CONCURRENCY` | — | AI への同時の呼び出しの上限(既定 4。AI の出口を使うときも効く) | 設定しない |

@@ -496,7 +496,11 @@
     ["data_as_of", "timestamptz"],
     ["row_count", "int"],
     ["message", "text"],
-    ["imported_at", "timestamptz"]
+    ["imported_at", "timestamptz"],
+    ["trigger", "text"],
+    ["actor", "text"],
+    ["checked_at", "timestamptz"],
+    ["repeat_count", "int"]
    ],
    "lookups": [
    ]
