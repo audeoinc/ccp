@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-03 UI 1: X103 開発用の画面(`/dev/`・`/api/dev/`)は、ログインしていれば開発者(`users.is_developer`)だけ(main.py が `identity.developer_denied` で 403)。ログインがなければいまのまま開き、健康診断に注意の行。次は X104(`dev.tools.pg`)
 - 2026-11-03 UI 1: W2 の抜け道を直した: 入口の認証がないとき、中継の印(X-Forwarded-*・Forwarded・X-Real-IP)がある依頼は「中から」とみなさず 503(同じ機械の nginx から通っていた)。**Workbench は `workbench.env` に `CCP_AUTH=none` が要る**(example に入れた・`workbench.sh` が起動の前に注意・check は「足りない」)
 - 2026-11-03 UI 1: W2 Entra の SSO のサーバー側は main(`identity.py`・`oidc.py`・`test_auth_port.py`。手順は WORKBENCH.md 7.2)。**画面(ログアウト・切れたときの案内)は見本の ui1-sso で利用者の確認待ち**
 - 2026-11-03 W6 AWS 版の ZIP: `release.mjs`(`npm run release:aws`)・`docs/AWS.md` は main。Releases に公開済み(5 章)

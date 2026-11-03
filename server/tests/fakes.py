@@ -215,6 +215,12 @@ def _find_user(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Result:
     return Result([Row({k: r.get(k) for k in ("id", "name", "email", "role", "status")}) for r in found[:1]])
 
 
+def _is_developer(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Result:
+    found = [r for r in store.rows("users") if str(r.get("email") or "").lower() == p["e"] and r.get("status") in (None, "active")]
+    found.sort(key=lambda r: r["created_on"])
+    return Result([Row({"is_developer": r.get("is_developer")}) for r in found[:1]])
+
+
 def _any_admin(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Result:
     found = [r for r in store.rows("users") if (r.get("role") == "admin" or r.get("is_developer")) and r.get("status") in (None, "active")]
     return Result([Row({"one": 1}) for _ in found[:1]])
@@ -261,6 +267,7 @@ def _max_version(store: FakeStore, m: re.Match[str], p: dict[str, Any]) -> Resul
 STATEMENTS: list[tuple[str, Callable[[FakeStore, re.Match[str], dict[str, Any]], Result]]] = [
     (r"^SELECT id, name, email, role, status FROM users WHERE lower\(email\) = :e", _find_user),
     (r"^SELECT 1 FROM users WHERE \(role = 'admin' OR is_developer\)", _any_admin),
+    (r"^SELECT is_developer FROM users WHERE lower\(email\) = :e", _is_developer),
     (r"^SELECT approval_group_id FROM approval_group_members WHERE user_id = :u", _group_ids),
     (r"^SELECT user_id FROM approval_group_members WHERE approval_group_id = :g", _group_users),
     (r"^UPDATE delivery_cards SET status = :s, modified_on = now\(\) WHERE id = :id$", _card_status),

@@ -12,7 +12,7 @@ import asyncio
 import logging
 
 from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import dbready
@@ -89,6 +89,12 @@ async def entry_auth(request: Request, call_next):
     # 入口の認証(死活確認・内部の呼び出しは対象外。どの道を通すかは identity.admit が決める)
     if (denied := identity.admit(request)) is not None:
         return denied
+    # 開発用の画面は、ログインしていれば開発者だけ(X103)
+    path = request.url.path
+    if devtools.is_dev_path(path) and (why := await identity.developer_denied(request)):
+        if path.startswith("/api/"):
+            return JSONResponse({"ok": False, "error": why}, status_code=403)
+        return PlainTextResponse(why, status_code=403)
     response = await call_next(request)
     identity.after(request, response)
     return response

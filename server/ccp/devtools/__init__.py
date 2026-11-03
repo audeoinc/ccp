@@ -44,6 +44,8 @@ BigQuery に問い合わせを投げられるのは、Workbench で動くこの�
 
 決まり(DEVTOOLS.md の 6 章):
   - 環境変数 CCP_DEVTOOLS=1 のときだけ動く。それ以外は、画面(/dev/)も API も 404
+  - ログインしていれば、開発者(users.is_developer)だけ(X103。main.py が identity.developer_denied で断る)。
+    ログインがなければ、画面のパスワードと CCP_DEVTOOLS=1 だけで開く(いまの運用。健康診断が注意を出す)
   - BigQuery は読むだけ。dry-run で文の種類が SELECT のものだけを流す(DDL・DML・複数の文は流さない)
   - 読む量の上限は DEVTOOLS_MAX_GB(既定 10 GB)。超える問い合わせは BigQuery が止める
   - 作業ファイルは server/devwork/(Git に入れない。利用先の表の名前を含むため)。DB に置かないのは、import-pack で DB を置き換えても消えないように
@@ -56,7 +58,7 @@ from .. import appsettings, bq
 from . import ai_sql as _ai_sql, bq_tools as _bq_tools, gcs_policy as _gcs_policy, store as _store, tasks as _tasks_mod, work as _work
 from .ai_sql import PRIVATE, ChatIn, ChatTurn, build_context, chapters, chat_events, default_model, parse_reply, pick_models, pro_of, run_tool, tool_declarations
 from .bq_tools import CancelIn, ProfileIn, SqlIn, _running, cancel, dryrun, job_info, profile, profile_column, referenced, run, view_sources
-from .common import (blocks, cost_usd, decode_text, enabled, flatten_fields, max_bytes, only_select, plain, price_per_tib, require_enabled,
+from .common import (blocks, is_dev_path, cost_usd, decode_text, enabled, flatten_fields, max_bytes, only_select, plain, price_per_tib, require_enabled,
                      weight, xlsx_text)
 from .gcs_policy import ConvertIn, DocsIn, convert_events, gcs_extract, gcs_list, kind_of, parse_files
 from .store import (ChatSaveIn, FileIn, PinIn, _chat_path, chats, delete_chat, delete_file, files, get_chat, pin_file, pinned_names, put_file,
@@ -80,7 +82,7 @@ __all__ = [
     "PRIVATE", "ChatIn", "ChatTurn", "build_context", "chapters", "chat_events", "default_model", "parse_reply", "pick_models", "pro_of",
     "run_tool", "tool_declarations",
     "CancelIn", "ProfileIn", "SqlIn", "_running", "cancel", "dryrun", "job_info", "profile", "profile_column", "referenced", "run", "view_sources",
-    "blocks", "cost_usd", "decode_text", "enabled", "flatten_fields", "max_bytes", "only_select", "plain", "price_per_tib", "require_enabled",
+    "blocks", "is_dev_path", "cost_usd", "decode_text", "enabled", "flatten_fields", "max_bytes", "only_select", "plain", "price_per_tib", "require_enabled",
     "weight", "xlsx_text",
     "ConvertIn", "DocsIn", "convert_events", "gcs_extract", "gcs_list", "kind_of", "parse_files",
     "ChatSaveIn", "FileIn", "PinIn", "_chat_path", "chats", "delete_chat", "delete_file", "files", "get_chat", "pin_file", "pinned_names",

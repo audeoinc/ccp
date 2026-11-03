@@ -22,9 +22,14 @@ def enabled() -> bool:
     return os.getenv("CCP_DEVTOOLS", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def is_dev_path(path: str) -> bool:
+    """開発用の画面(/dev/)と、その API(/api/dev/)"""
+    return path == "/dev" or path.startswith("/dev/") or path.startswith("/api/dev/")
+
+
 def blocks(path: str) -> bool:
     """無効のとき、このパスを隠すか(画面の /dev/ と、API の /api/dev/)。main.py のミドルウェアから呼ぶ"""
-    return not enabled() and (path == "/dev" or path.startswith("/dev/") or path.startswith("/api/dev/"))
+    return not enabled() and is_dev_path(path)
 
 
 def max_bytes() -> int:

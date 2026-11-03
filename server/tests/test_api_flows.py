@@ -238,6 +238,47 @@ class PeopleAdminTest(Base):
         self.assertEqual(r.status_code, 200, r.text)
 
 
+class DevtoolsDeveloperOnlyTest(Base):
+    """開発用の画面(/dev/・/api/dev/)は、ログインしていれば開発者だけ(X103)。ログインがなければ、いまの運用のまま開く"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        from ccp import main
+
+        p = mock.patch.dict(os.environ, {"CCP_DEVTOOLS": "1", "CCP_AUTH": "", "OIDC_ISSUER": "", "APP_PASSWORD": ""})
+        p.start()
+        self.addCleanup(p.stop)
+        self.dev = self.store.add("users", name="開発する人", email="dev@example.com", status="active", is_developer=1)
+        self.main_client = TestClient(main.app)
+
+    def signed_in(self, email: str) -> None:
+        p = mock.patch.dict(os.environ, {"CCP_DEV_USER_EMAIL": email})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_signed_out_keeps_working(self) -> None:
+        self.assertNotEqual(self.main_client.get("/api/dev/status").status_code, 403)
+
+    def test_non_developer_is_refused_on_the_server(self) -> None:
+        self.signed_in("req@example.com")
+        r = self.main_client.get("/api/dev/status")
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.json()["ok"], False)
+        self.assertIn("開発者だけ", r.json()["error"])
+        self.assertEqual(self.main_client.get("/dev/").status_code, 403)
+        # 登録のない人も
+        self.signed_in("stranger@example.com")
+        self.assertEqual(self.main_client.get("/api/dev/status").status_code, 403)
+
+    def test_developer_can_open(self) -> None:
+        self.signed_in("DEV@example.com")
+        self.assertNotEqual(self.main_client.get("/api/dev/status").status_code, 403)
+
+    def test_other_pages_are_not_limited(self) -> None:
+        self.signed_in("req@example.com")
+        self.assertNotEqual(self.main_client.get("/api/me").status_code, 403)
+
+
 class BasicAuthTest(unittest.TestCase):
     def setUp(self) -> None:
         from ccp import main

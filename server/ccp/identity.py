@@ -194,6 +194,31 @@ async def resolve_user(conn: AsyncConnection, request: Request) -> tuple[Identit
     return (ident, await find_user(conn, ident.email)) if ident else (None, None)
 
 
+async def developer_denied(request: Request) -> str | None:
+    """開発用の画面(/dev/・/api/dev/)を開けない理由(X103)。開けるなら None。
+    ログインしていれば、開発者(users.is_developer)だけ。画面で隠すだけでなく、サーバーで断る(BigQuery の SQL も流せるため)。
+    ログインがなければ None(画面のパスワード + CCP_DEVTOOLS=1 のいまの運用を止めない。代わりに健康診断が注意を出す)"""
+    ident = await current_identity(request)
+    if ident is None:
+        return None
+    from .data_api import db
+
+    try:
+        async with db() as conn:
+            row = (
+                await conn.execute(
+                    text("SELECT is_developer FROM users WHERE lower(email) = :e AND (status IS NULL OR status = 'active') ORDER BY created_on LIMIT 1"),
+                    {"e": ident.email.lower()},
+                )
+            ).first()
+    except Exception as e:  # noqa: BLE001 — 確かめられなければ、開けない側に倒す
+        log.warning("開発者かを確かめられません: %s", e)
+        return "開発者かを確かめられません(データベースにつながりません)"
+    if row and row[0]:
+        return None
+    return f"開発用の画面は、開発者だけが開けます({ident.email} は開発者ではありません。⚙ →「ユーザーと承認グループ」で、開発者の印を付けてもらってください)"
+
+
 async def no_admin_yet(conn: AsyncConnection) -> bool:
     """管理する人(管理者か開発者)が、まだ 1 人もいない。
     ログインを入れたばかりの置き先で、だれもユーザーを足せない(最初の管理者を作れない)ことにならないように、そのあいだだけ、ログインした人に任せる"""

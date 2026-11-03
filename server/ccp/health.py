@@ -317,6 +317,24 @@ async def _guard(out: _Out) -> None:
             )
     else:
         out.add("guard", "missing", f"入口の認証: CCP_AUTH の値({mode})が分かりません。いまは、だれも画面を開けません", "oidc / basic / iap / none のどれかにする")
+    _devtools_guard(out, mode)
+
+
+def _devtools_guard(out: _Out, mode: str) -> None:
+    """開発用の画面(X103)。ログインがあれば開発者だけに絞れるが、なければ入れる人を見分けられない(BigQuery の SQL も流せる)"""
+    from .devtools import enabled
+
+    if not enabled():
+        return
+    if mode in ("oidc", "iap") or os.getenv("CCP_DEV_USER_EMAIL", "").strip():
+        out.add("guard", "ok", "開発用の画面: 有効。ログインした開発者(ユーザーの開発者の印)だけが開けます")
+    else:
+        out.add(
+            "guard",
+            "warn",
+            "開発用の画面: 有効・ログインなしで開けます(画面に入れる人は、だれでも開発用の画面に入れます)",
+            "使わないときは CCP_DEVTOOLS を消す。使い続けるなら、ログイン(OIDC_ISSUER など)を設定すると、開発者だけに絞れる",
+        )
 
 
 def _static(out: _Out) -> None:
