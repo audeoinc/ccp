@@ -19,6 +19,8 @@
 
 関係する機能: `settings.setup`・`settings.dataimport`・`settings.ai`([FEATURE_FLAGS.md](FEATURE_FLAGS.md))。
 
+健康診断の中身は `server/ccp/health.py` の `diagnose()` だけ(`check.py` は行にして出すだけ、画面は `GET /api/settings/health`、起動のときは `at_startup()`)。新しい設定・外とのつなぎを足したら、ここに行を足す(行には、状態・理由・直し方と、画面で直せるなら直す所(`goto`)を持たせる)。
+
 ## 1. 全体図
 
 ```

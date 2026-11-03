@@ -21,6 +21,7 @@ from . import dbready
 from .ai import router as ai_router
 from .approvals import router as approvals_router
 from .appsettings import router as appsettings_router
+from .health import router as health_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
 from . import devimages, devtools
@@ -66,9 +67,13 @@ async def start_bq_scheduler() -> None:
     BigQuery の設定がない・自動が切・BQ_AUTO_SYNC=0 なら、回っても何もしない(DB にも BigQuery にも触らない)"""
     from .bq_import import run_scheduler
 
-    task = asyncio.create_task(run_scheduler())
-    _bg.add(task)  # 参照を持っておかないと、途中で片づけられることがある
-    task.add_done_callback(_bg.discard)
+    from .health import at_startup
+
+    # 設定の健康診断も、起動を待たせずに裏で(足りない設定をログに出し、管理する人の ⚙ に赤い点)
+    for job in (run_scheduler(), at_startup()):
+        task = asyncio.create_task(job)
+        _bg.add(task)  # 参照を持っておかないと、途中で片づけられることがある
+        task.add_done_callback(_bg.discard)
 
 
 @app.on_event("shutdown")
@@ -138,6 +143,8 @@ app.include_router(assets_router)
 app.include_router(pack_router)
 app.include_router(product_images_router)
 app.include_router(bq_router)
+# 設定の状態は /api/settings/health。/api/settings/{まとめ} より先に置く(health をまとめの名前と読ませない)
+app.include_router(health_router)
 app.include_router(appsettings_router)
 app.include_router(policies_router)
 app.include_router(metrics_router)
