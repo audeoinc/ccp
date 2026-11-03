@@ -55,6 +55,7 @@ export const PeopleManager = lazy(() => loadChunk(() => import('./PeopleManager'
 export const HeroLibrary = lazy(() => loadChunk(() => import('./HeroLibrary')).then((m) => ({ default: m.HeroLibrary })))
 export const FeaturesManager = lazy(() => loadChunk(() => import('./FeaturesManager')).then((m) => ({ default: m.FeaturesManager })))
 export const AiSettingsPanel = lazy(() => loadChunk(() => import('./AiSettingsPanel')).then((m) => ({ default: m.AiSettingsPanel })))
+export const SettingsHealthPanel = lazy(() => loadChunk(() => import('./SettingsHealthPanel')).then((m) => ({ default: m.SettingsHealthPanel })))
 export const DataImportPanel = lazy(() => loadChunk(() => import('./DataImportPanel')).then((m) => ({ default: m.DataImportPanel })))
 export const HelpFaqAdmin = lazy(() => loadChunk(() => import('./help/HelpFaqAdmin')).then((m) => ({ default: m.HelpFaqAdmin })))
 export const SampleShopPanel = lazy(() => loadChunk(() => import('./SampleShopPanel')).then((m) => ({ default: m.SampleShopPanel })))

@@ -256,6 +256,8 @@ export const FEATURES: FeatureDef[] = [
   { id: 'settings.dataimport', group: 'area.settings.company', ...named('データの取り込みの管理(出力ごとの状態・記録・今すぐ取り込む・確認だけ・定期の取り込み)', 'Data import management (status per output, history, import now, check only, scheduled import)'), version: 'MVP', size: 'M' },
   // AI の設定(モデル・考える深さ・同時の上限・AI の出口の URL と待ち時間)を DB と管理画面で持つ。鍵は環境のまま。管理する人だけ(2026-11-03 利用者)
   { id: 'settings.ai', group: 'area.settings.company', ...named('AI の設定(モデル・考える深さ・同時に呼ぶ数・AI の出口)', 'AI settings (model, thinking, concurrency, AI outlet)'), version: 'MVP', size: 'S' },
+  // 設定の健康診断(⚙ →「設定の状態」)・初期設定の画面・秘密を書くだけの欄・設定の型。忘れても設定できるように(2026-11-03 利用者)
+  { id: 'settings.setup', group: 'area.settings.company', ...named('設定の状態(健康診断)・初期設定・秘密の欄・設定の型', 'Settings health check, first-time setup, secrets and settings templates'), version: 'MVP', size: 'L' },
   { id: 'settings.admin', group: 'area.settings.admin', ...named('取り込み・書き出し・見本のデータ', 'Import, export and sample data'), version: 'dev', size: 'S' },
   { id: 'settings.features', group: 'area.settings.admin', ...named('使える機能(この管理機能)', 'Features (this admin screen)'), version: 'dev' },
   { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'MVP', size: 'M' },
