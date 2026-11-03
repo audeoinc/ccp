@@ -54,8 +54,9 @@ export interface SettingsAction {
   hidden?: boolean
   /** 詳しい説明(見出しの横の ⓘ に出す。見出しの下に長い説明を並べない) */
   info?: string
-  /** 右に描く中身(国の項目には、設定の画面で決めた国のコードと名前が来る)。なければ「開く」で窓を開く */
-  render?: (country: string, countryName: string) => ReactNode
+  /** 右に描く中身(国の項目には、設定の画面で決めた国のコードと名前が来る)。なければ「開く」で窓を開く。
+   * go = ほかの項目に移る(設定の状態の「直す」から、直す所へ連れて行くため) */
+  render?: (country: string, countryName: string, go: (id: string) => void) => ReactNode
 }
 
 const useStyles = makeStyles({
@@ -183,7 +184,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
           <span className={s.heading}>{adminName[key]}</span>
           <span className={s.note}>{t('開発・管理の操作です。ふだんの作業では使いません。', 'Developer and admin operations. Not needed for everyday work.')}</span>
           {/* 中身を描く項目(開発へのリクエストの一覧など)は、そのまま描く。操作だけの項目は「行う」の行に並べる */}
-          <div className={s.pane}>{of(key).map((x) => (x.render ? <div key={x.id} className={s.pane}>{x.render(country, countryName)}</div> : actionRow(x)))}</div>
+          <div className={s.pane}>{of(key).map((x) => (x.render ? <div key={x.id} className={s.pane}>{x.render(country, countryName, setPage)}</div> : actionRow(x)))}</div>
         </>
       )
     }
@@ -213,7 +214,7 @@ export function SettingsDialog({ open, onClose, country: headerCountry, lang, on
         {a.description && <span className={s.note}>{a.description}</span>}
         {a.render ? (
           <div key={`${a.id}:${country}`} className={s.pane}>
-            {a.render(country, countryName)}
+            {a.render(country, countryName, setPage)}
           </div>
         ) : (
           <span>

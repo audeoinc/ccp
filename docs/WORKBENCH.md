@@ -364,7 +364,9 @@ cd server
 
 ### 動かす前の確認(`check`)
 
-設定・DB への接続・写真・画面のビルドを、まとめて確かめるコマンドです。パスワードは表示せず、何も変えません。困ったときは、まずこれを実行し、`[NG]` の行を直します。
+設定・DB への接続・AI・BigQuery・写真・画面のビルドを、まとめて確かめるコマンドです(設定の健康診断)。パスワードは表示せず、何も変えません。困ったときは、まずこれを実行し、`[NG]` の行の `→` を直します。
+
+画面の ⚙ → 全社 →「設定の状態」(管理する人だけ)にも、同じ行が出ます(画面で直せる行には「直す」が付き、その設定の画面に移ります)。サーバーは起動のときにも軽く確かめ、足りない設定があればターミナルに出し、管理する人の ⚙ に赤い点を付けます。
 
 ```bash
 cd ~/ccp/server
@@ -372,26 +374,30 @@ set -a; source workbench.env; set +a
 .venv/bin/python -m ccp.cli check
 ```
 
-出力の例(問題がないとき):
+出力の例(BigQuery を使わないとき):
 
 ```
 ■ DB
-  [OK  ] 接続先: DATABASE_URL(scheme=postgresql+asyncpg host=localhost port=5432 db=ccp user=ccp_app)
-  [OK  ] ホスト localhost → 127.0.0.1
-  [OK  ] つながりました(PostgreSQL 16.x …)。テーブル 32 個、配信カード 83 件
-■ AI(Vertex AI の Gemini)
-  [OK  ] GOOGLE_CLOUD_PROJECT=… / GOOGLE_CLOUD_LOCATION=global / モデル=…(DB の設定)
+  [OK  ] つながりました(PostgreSQL 16.x …)。DATABASE_URL(scheme=postgresql+asyncpg host=localhost port=5432 db=ccp user=ccp_app)
+■ Google の認証
+  [OK  ] Google の認証: …@….iam.gserviceaccount.com / プロジェクト … / 場所 global
+■ AI(Vertex AI の Gemini。出口があれば、その層)
+  [OK  ] Gemini(…) を呼べました(1.6 秒。DB の設定)
+■ BigQuery(利用先の本番のデータ。docs/BIGQUERY.md)
+  [注意] BigQuery の表の場所が 1 つもありません(BigQuery から取り込みません)
+         → 取り込むときは ⚙ →「データの取り込み」で、行を開いて表の場所を入れる
 ■ 写真
-  [OK  ] ASSET_DIR=/home/jupyter/ccp/server/images(商品 100 点・メイン画像 42 点)
+  [OK  ] 写真: ASSET_DIR=/home/jupyter/ccp/server/images(商品 100 点・メイン画像 42 点)
+■ 画面の守り
+  [注意] 画面にパスワードも、手前のログインもありません
+         → Workbench の中継など、内側からしか開けないなら、このままでよい。外から開けるなら APP_PASSWORD を設定する
 ■ 画面
-  [OK  ] ビルドがあります(/home/jupyter/ccp/dist-gcp)
-■ BigQuery(利用先の本番のデータ)
-  [注意] BigQuery の表の場所が設定されていません(BigQuery から取り込まない)
-■ その他
-  [注意] APP_PASSWORD なし(画面にパスワードをかけない)
+  [OK  ] 画面のビルドがあります(/home/jupyter/ccp/dist-gcp)
+
+問題は見つかりませんでした
 ```
 
-BigQuery を使わないなら、「■ BigQuery」の [注意] はそのままでかまいません。
+BigQuery を使わないなら、「■ BigQuery」の [注意] はそのままでかまいません。AI の行は、AI を実際に 1 回、短く呼んで確かめます(数秒かかります)。
 
 主な `[NG]` と直し方:
 
@@ -563,9 +569,9 @@ CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(
    - BigQuery の表の場所・国など、リージョンで変わる所には印が付くので、確かめる。
 8. 最後に、⚙ の「設定の状態」(健康診断)で、全部の行が「済み」になったのを見る。
    - 同じ確認は、コマンドの `python -m ccp.cli check` でもできる。
-   - 足りない行には、直し方が出る。
+   - 足りない行には、直し方が出る。画面で直せる行は「直す」で、その設定の画面に移る。
 
-(6〜8 の画面は、`settings.setup` として作っている途中。できるまでは、3.4 の手順でファイルを書き、`check` で確かめる)
+(8 の「設定の状態」はできている。6・7 の初期設定の画面と設定の型は、`settings.setup` として作っている途中。できるまでは、3.4 の手順でファイルを書き、`check` で確かめる)
 
 ---
 

@@ -33,6 +33,7 @@ import { MePicker } from './MePicker'
 import { InboxButton } from './InboxButton'
 import { isOn, useFeature } from './featureFlags'
 import { useCanManage, useImportAttention } from './dataImportState'
+import { useHealthAttention } from './healthState'
 import { FeatureBadge } from './FeatureBadge'
 import { DevPinsToggle } from './DevPinsToggle'
 import type { ApprovalInbox } from './useApprovalInbox'
@@ -252,6 +253,8 @@ export function AppToolbar({
   // 止めた・古い取り込みがあれば、管理する人の ⚙ に点(settings.dataimport)。⚙ →「データの取り込み」で中身を見る
   const canManage = useCanManage()
   const importAttention = useImportAttention(useFeature('settings.dataimport') && canManage)
+  // 足りない設定・確かめに失敗した設定があれば、同じ点を出す(settings.setup。⚙ →「設定の状態」で中身を見る)
+  const healthAttention = useHealthAttention(useFeature('settings.setup') && canManage)
   const requestsOn = useFeature('common.requests')
   const filterOn = useFeature('plan.filter')
   // 「？ 聞く」(右クリックの「ここについて聞く」・スポットライトも)と、開発へのリクエスト(一覧・ピンの切り替え)
@@ -400,10 +403,19 @@ export function AppToolbar({
       <MePicker className={styles.headerMe} ariaLabel={t('ログインしている人', 'Signed-in user')} />
       {/* 設定(ST10): ⚙ は設定の画面の入口だけ。自分・国・全社・(畳んだ)開発・管理を、左の並びから選ぶ */}
       <span className={styles.settingsWrap}>
-        <Tooltip content={importAttention ? t('設定(データの取り込みに、止めた・古いものがあります)', 'Settings (some data imports are stopped or stale)') : t('設定', 'Settings')} relationship="label">
+        <Tooltip
+          content={
+            healthAttention
+              ? t('設定(足りない設定があります。⚙ →「設定の状態」)', 'Settings (some settings are missing; see Settings health)')
+              : importAttention
+                ? t('設定(データの取り込みに、止めた・古いものがあります)', 'Settings (some data imports are stopped or stale)')
+                : t('設定', 'Settings')
+          }
+          relationship="label"
+        >
           <Button appearance="subtle" size="small" icon={<SettingsRegular />} onClick={onOpenSettings} />
         </Tooltip>
-        {importAttention && <span className={styles.settingsDot} aria-hidden />}
+        {(importAttention || healthAttention) && <span className={styles.settingsDot} aria-hidden />}
       </span>
       {settingsDialog}
     </header>

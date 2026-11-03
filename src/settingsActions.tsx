@@ -10,6 +10,7 @@ import {
   CalendarClockRegular,
   DeleteRegular,
   DocumentBulletListRegular,
+  HeartPulseRegular,
   ImageMultipleRegular,
   LayoutColumnTwoRegular,
   LightbulbFilamentRegular,
@@ -28,6 +29,7 @@ import {
   CountryPoliciesPanel,
   CountryTemplatesPanel,
   AiSettingsPanel,
+  SettingsHealthPanel,
   DataImportPanel,
   DevRequestsDialog,
   FeaturesManager,
@@ -110,6 +112,7 @@ export function useSettingsActions(ctx: {
   const learningsOn = useFeature('settings.country.learnings')
   const dataImportOn = useFeature('settings.dataimport')
   const aiSettingsOn = useFeature('settings.ai')
+  const setupOn = useFeature('settings.setup')
   const canManage = useCanManage()
   // ⚙ の「データと画像を書き出す」の様子(作っている間は何も届かないので、押したことと進み具合を、その行に出す)
   const [exportState, setExportState] = useState<{ kind: 'working'; bytes: number } | { kind: 'done'; bytes: number } | { kind: 'error'; message: string } | null>(null)
@@ -263,6 +266,20 @@ export function useSettingsActions(ctx: {
       description: t('使う人と、承認するグループ。', 'People and approval groups.'),
       icon: <PeopleTeamRegular />,
       render: () => <Later spin><PeopleManager inline /></Later>,
+    },
+    // 設定の状態(settings.setup の健康診断)。足りない設定と直し方を 1 行ずつ。管理する人だけ(⚙ の赤い点から、ここに来る)
+    {
+      id: 'health',
+      section: 'company',
+      label: t('設定の状態', 'Settings health'),
+      description: t('サーバーの設定が足りているか。足りない所と直し方を出します。', 'Whether the server settings are complete, with what is missing and how to fix it.'),
+      icon: <HeartPulseRegular />,
+      hidden: !(setupOn && canManage),
+      render: (_co, _name, go) => (
+        <Later spin>
+          <SettingsHealthPanel go={go} />
+        </Later>
+      ),
     },
     // AI の設定(settings.ai。モデル・考える深さ・同時の上限・AI の出口)。管理する人だけに見せる(ほかの人には項目ごと出さない)
     {
