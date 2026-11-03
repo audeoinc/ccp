@@ -4,6 +4,10 @@
 // 行の「記録」で、その出力の取り込みの記録(だれが・いつ・何で・結果)を開く。サーバーは server/ccp/bq_import.py
 import { useCallback, useEffect, useState } from 'react'
 import {
+  Accordion,
+  AccordionHeader,
+  AccordionItem,
+  AccordionPanel,
   Badge,
   Button,
   InfoLabel,
@@ -22,6 +26,7 @@ import { DataImportService, type ImportCheck, type ImportOutput, type ImportReco
 import { setImportStatus } from './dataImportState'
 import { bqOutputLabel } from './gcp/bq'
 import { LabeledValue } from './LabeledValue'
+import { BqLocations } from './BqLocations'
 import { typo } from './typo'
 import { locale, tr, useT } from './i18n'
 
@@ -361,7 +366,7 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
         </MessageBar>
       )}
       {!status.configured && (
-        <div className={s.note}>{t('BigQuery の出力が、まだ 1 つも設定されていません(サーバーの設定 BQ_SPU など)。', 'No BigQuery outputs are set yet (server settings such as BQ_SPU).')}</div>
+        <div className={s.note}>{t('BigQuery の表の場所が、まだ 1 つも設定されていません。下の「表の場所」で入れてください。', 'No BigQuery locations are set yet. Enter them under "Table locations" below.')}</div>
       )}
       <div className={s.list}>
         {status.outputs.map((o) => (
@@ -381,10 +386,19 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
       {status.unconfigured.length > 0 && (
         <div className={s.unconfigured}>
           <LabeledValue label={t('未設定', 'Not set')} layout="stacked">
-            {status.unconfigured.map((u) => `${outputLabel(u.name, u.label)}(${u.env})`).join(t('・', ', '))}
+            {status.unconfigured.map((u) => outputLabel(u.name, u.label)).join(t('・', ', '))}
           </LabeledValue>
         </div>
       )}
+      {/* 表の場所(DB に持つ。2026-11-03)。ふだんは変えないので畳んでおき、まだ 1 つもなければ開いておく */}
+      <Accordion collapsible defaultOpenItems={status.configured ? [] : ['locations']}>
+        <AccordionItem value="locations">
+          <AccordionHeader size="small">{t('表の場所', 'Table locations')}</AccordionHeader>
+          <AccordionPanel>
+            <BqLocations onSaved={() => void read()} />
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
     </div>
   )
 }

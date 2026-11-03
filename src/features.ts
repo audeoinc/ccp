@@ -254,6 +254,8 @@ export const FEATURES: FeatureDef[] = [
   { id: 'settings.policy', group: 'area.settings.company', ...named('方針・決まりの編集', 'Edit policies and rules'), version: 'v4', size: 'S' },
   // データの取り込みの管理(BigQuery → PostgreSQL)と、サーバーの中で回す定期の取り込み。管理する人だけ(2026-11-03 利用者)
   { id: 'settings.dataimport', group: 'area.settings.company', ...named('データの取り込みの管理(出力ごとの状態・記録・今すぐ取り込む・確認だけ・定期の取り込み)', 'Data import management (status per output, history, import now, check only, scheduled import)'), version: 'MVP', size: 'M' },
+  // AI の設定(モデル・考える深さ・同時の上限・AI の出口の URL と待ち時間)を DB と管理画面で持つ。鍵は環境のまま。管理する人だけ(2026-11-03 利用者)
+  { id: 'settings.ai', group: 'area.settings.company', ...named('AI の設定(モデル・考える深さ・同時に呼ぶ数・AI の出口)', 'AI settings (model, thinking, concurrency, AI outlet)'), version: 'MVP', size: 'S' },
   { id: 'settings.admin', group: 'area.settings.admin', ...named('取り込み・書き出し・見本のデータ', 'Import, export and sample data'), version: 'dev', size: 'S' },
   { id: 'settings.features', group: 'area.settings.admin', ...named('使える機能(この管理機能)', 'Features (this admin screen)'), version: 'dev' },
   { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'MVP', size: 'M' },

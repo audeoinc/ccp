@@ -27,6 +27,7 @@ import {
   CountryLearningsPanel,
   CountryPoliciesPanel,
   CountryTemplatesPanel,
+  AiSettingsPanel,
   DataImportPanel,
   DevRequestsDialog,
   FeaturesManager,
@@ -108,6 +109,7 @@ export function useSettingsActions(ctx: {
   const rulesOn = useFeature('settings.country.rules')
   const learningsOn = useFeature('settings.country.learnings')
   const dataImportOn = useFeature('settings.dataimport')
+  const aiSettingsOn = useFeature('settings.ai')
   const canManage = useCanManage()
   // ⚙ の「データと画像を書き出す」の様子(作っている間は何も届かないので、押したことと進み具合を、その行に出す)
   const [exportState, setExportState] = useState<{ kind: 'working'; bytes: number } | { kind: 'done'; bytes: number } | { kind: 'error'; message: string } | null>(null)
@@ -261,6 +263,20 @@ export function useSettingsActions(ctx: {
       description: t('使う人と、承認するグループ。', 'People and approval groups.'),
       icon: <PeopleTeamRegular />,
       render: () => <Later spin><PeopleManager inline /></Later>,
+    },
+    // AI の設定(settings.ai。モデル・考える深さ・同時の上限・AI の出口)。管理する人だけに見せる(ほかの人には項目ごと出さない)
+    {
+      id: 'aiSettings',
+      section: 'company',
+      label: t('AI の設定', 'AI settings'),
+      description: t('Gemini のモデル・考える深さ・同時に呼ぶ数、AI の出口。', 'Gemini model, thinking, concurrency and the AI outlet.'),
+      icon: <AiIcon size={16} />,
+      hidden: !(aiSettingsOn && canManage),
+      render: () => (
+        <Later spin>
+          <AiSettingsPanel />
+        </Later>
+      ),
     },
     // 管理する人には、出力ごとの状態・記録・確認だけ・定期の取り込みの管理の画面(settings.dataimport)。
     // ほかの人と、機能を公開していないときは、これまでどおりの「今すぐ取り込む」だけ。
