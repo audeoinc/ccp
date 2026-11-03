@@ -44,6 +44,8 @@ const mockServices = (): Plugin => ({
     if (/(?:^|\/)data\/stockCover$/.test(source)) return fileURLToPath(new URL('./src/mock/stockCover.ts', import.meta.url))
     // 開発用の画面の窓口(src/dev/api。/dev/)は、見本の表を返す身代わりに(BigQuery がなくても画面を確かめられるように)
     if (source === './api' && importer?.replace(/\\/g, '/').includes('/src/dev/')) return fileURLToPath(new URL('./src/mock/devApi.ts', import.meta.url))
+    // データの取り込みの管理(src/data/dataImport。BigQuery の取り込みの API)は、見本の状態をメモリ上に持つ身代わりに
+    if (/(?:^|\/)data\/dataImport$/.test(source)) return fileURLToPath(new URL('./src/mock/dataImport.ts', import.meta.url))
     // だれが開いているか(src/data/me)は、ログインなしの身代わりに
     if (/(?:^|\/)data\/me$/.test(source)) return fileURLToPath(new URL('./src/mock/me.ts', import.meta.url))
     // 表ごとのサービス(src/data/<名前>。書き出す名前は <名前の先頭を大文字>Service)を差し替える

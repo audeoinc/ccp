@@ -252,6 +252,8 @@ export const FEATURES: FeatureDef[] = [
   { id: 'settings.templates', group: 'area.settings.company', ...named('テンプレートの管理・編集・AI で作る', 'Manage, edit and AI-create templates'), version: 'v4', size: 'L' },
   { id: 'settings.library', group: 'area.settings.company', ...named('画像のライブラリ(メイン画像・部品の画像)', 'Image library (main images, part images)'), version: 'v1', size: 'M' },
   { id: 'settings.policy', group: 'area.settings.company', ...named('方針・決まりの編集', 'Edit policies and rules'), version: 'v4', size: 'S' },
+  // データの取り込みの管理(BigQuery → PostgreSQL)と、サーバーの中で回す定期の取り込み。管理する人だけ(2026-11-03 利用者)
+  { id: 'settings.dataimport', group: 'area.settings.company', ...named('データの取り込みの管理(出力ごとの状態・記録・今すぐ取り込む・確認だけ・定期の取り込み)', 'Data import management (status per output, history, import now, check only, scheduled import)'), version: 'MVP', size: 'M' },
   { id: 'settings.admin', group: 'area.settings.admin', ...named('取り込み・書き出し・見本のデータ', 'Import, export and sample data'), version: 'dev', size: 'S' },
   { id: 'settings.features', group: 'area.settings.admin', ...named('使える機能(この管理機能)', 'Features (this admin screen)'), version: 'dev' },
   { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'MVP', size: 'M' },

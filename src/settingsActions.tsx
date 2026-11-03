@@ -27,6 +27,7 @@ import {
   CountryLearningsPanel,
   CountryPoliciesPanel,
   CountryTemplatesPanel,
+  DataImportPanel,
   DevRequestsDialog,
   FeaturesManager,
   HelpFaqAdmin,
@@ -60,6 +61,8 @@ import { myName } from './history'
 import { confirmDialog } from './confirm'
 import { locale, tr, useT } from './i18n'
 import { useFeature } from './featureFlags'
+import { useCanManage } from './dataImportState'
+import { clearProductDataCache } from './useProductData'
 
 const useStyles = makeStyles({
   exportDone: { color: tokens.colorPaletteGreenForeground1 },
@@ -104,6 +107,8 @@ export function useSettingsActions(ctx: {
   // 国の項目の公開・非公開(X87)。使う学びは学び(v3)が前提なので、決まり・アラートの基準(v1)と別の ID
   const rulesOn = useFeature('settings.country.rules')
   const learningsOn = useFeature('settings.country.learnings')
+  const dataImportOn = useFeature('settings.dataimport')
+  const canManage = useCanManage()
   // ⚙ の「データと画像を書き出す」の様子(作っている間は何も届かないので、押したことと進み具合を、その行に出す)
   const [exportState, setExportState] = useState<{ kind: 'working'; bytes: number } | { kind: 'done'; bytes: number } | { kind: 'error'; message: string } | null>(null)
   // 見本の SKU を作っている間(X63。数千行になることがあるので、終わるまで押せなくする)
@@ -257,17 +262,39 @@ export function useSettingsActions(ctx: {
       icon: <PeopleTeamRegular />,
       render: () => <Later spin><PeopleManager inline /></Later>,
     },
-    {
-      id: 'bq',
-      section: 'data',
-      label: bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery'),
-      description: t('在庫・商品のデータを、すぐに読み直します(開いたときにも自動で確認します)。', 'Re-read stock and product data now (also checked automatically on open).'),
-      icon: <ArrowSyncRegular />,
-      disabled: bqBusy,
-      secondary: (bq && bqStockTime(bq)) ?? '',
-      hidden: !bq?.configured,
-      onOpen: () => void runBqSync(true),
-    },
+    // 管理する人には、出力ごとの状態・記録・確認だけ・定期の取り込みの管理の画面(settings.dataimport)。
+    // ほかの人と、機能を公開していないときは、これまでどおりの「今すぐ取り込む」だけ。
+    // 管理の画面は、全社の 1 項目に(⚙ の赤い点から、畳んだ開発・管理を開かずにたどれるように。中身を描く項目は、開発・管理では見出しなしで並ぶため)
+    dataImportOn && canManage
+      ? {
+          id: 'bq',
+          section: 'company',
+          label: t('データの取り込み', 'Data import'),
+          description: t('BigQuery の出力ごとの状態・記録。今すぐ取り込む・確認だけ・定期の取り込み。', 'Status and history per BigQuery output. Import now, check only, scheduled import.'),
+          icon: <ArrowSyncRegular />,
+          secondary: (bq && bqStockTime(bq)) ?? '',
+          render: () => (
+            <Later spin>
+              <DataImportPanel
+                onImported={() => {
+                  clearProductDataCache()
+                  void loadProducts()
+                }}
+              />
+            </Later>
+          ),
+        }
+      : {
+          id: 'bq',
+          section: 'data',
+          label: bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery'),
+          description: t('在庫・商品のデータを、すぐに読み直します(開いたときにも自動で確認します)。', 'Re-read stock and product data now (also checked automatically on open).'),
+          icon: <ArrowSyncRegular />,
+          disabled: bqBusy,
+          secondary: (bq && bqStockTime(bq)) ?? '',
+          hidden: !bq?.configured,
+          onOpen: () => void runBqSync(true),
+        },
     {
       id: 'metrics',
       section: 'data',

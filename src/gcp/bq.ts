@@ -7,7 +7,7 @@ import { actorHeaders } from './services'
 import { tr } from '../i18n'
 
 export interface BqOutputStatus {
-  /** spu / sku / sku_stock / weekly / forecast */
+  /** spu / sku / sku_stock / weekly / forecast / ranking */
   name: string
   label: string
   /** ok / error / never(まだ取り込んでいない) */
@@ -54,4 +54,5 @@ export const bqOutputLabel = (name: string): string =>
     sku_stock: tr('在庫', 'Stock'),
     weekly: tr('週ごとの実績', 'Weekly results'),
     forecast: tr('天気予報', 'Weather forecast'),
+    ranking: tr('販売チャネルごとの順位', 'Rank by sales channel'),
   })[name] ?? name
