@@ -177,7 +177,7 @@ flowchart TD
 | `.github/workflows/ci.yml` | GitHub の CI(スキーマの照合・型チェック・lint・ビルド・サーバーのテスト) | <!-- hosted -->
 | `index.html` | 画面の入口の HTML |
 | `vite.config.ts` / `vite.mock.config.ts` | ビルドの設定(本番 / 撮影用。1 章) |
-| `package.json` | npm のスクリプト(`dev`・`build`・`verify`<!-- hosted:begin -->・`deploy:gcp`<!-- hosted:end -->・`dev:gcp` と `build:gcp`(`dev`・`build` と同じ。Workbench の手順のため)<!-- hosted:begin -->・`screenshots`<!-- hosted:end -->・`seed:export`・`release:workbench`) |
+| `package.json` | npm のスクリプト(`dev`・`build`・`verify`<!-- hosted:begin -->・`deploy:gcp`<!-- hosted:end -->・`dev:gcp` と `build:gcp`(`dev`・`build` と同じ。Workbench の手順のため)<!-- hosted:begin -->・`screenshots`<!-- hosted:end -->・`seed:export`<!-- hosted:begin -->・`release:aws`・`release:workbench`<!-- hosted:end -->) |
 | `Dockerfile` / `.dockerignore` / `.gcloudignore` / `cloudbuild.yaml` | Cloud Run のコンテナと、そのビルド | <!-- hosted -->
 | `tsconfig*.json` / `eslint.config.js` | 型チェック・lint の設定 |
 | `CLAUDE.md` / `README.md` | AI アシスタント向けの約束事 / 全体の紹介 |
@@ -629,10 +629,10 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 役割 |
 |---|---|
-| `workbench.sh` | Workbench の操作(`setup` / `update` / `start` / `stop` / `restart` / `status` / `pg-start` / `check` / `import` / `log`) |
+| `workbench.sh` | Linux のサーバー(AWS など・Workbench)での操作(`setup` / `update` / `start` / `stop` / `restart` / `status` / `pg-start` / `check` / `import` / `log`)。足りない道具は `setup`・`update` の初めに教える。受け付けるアドレスは `CCP_HOST` |
 | `verify.mjs` | `npm run verify` の中身(表・承認・決まりの確かめのあと、型チェックと lint を同時に、ビルド。変えたのが文書だけなら重い所を飛ばす。`--full` で全部) |
 | `deploy-gcp.mjs` | 本番(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) | <!-- hosted -->
-| `release-workbench.mjs` | 利用先に渡す Workbench 版の ZIP を作り、検査する(`npm run release:workbench`。[RELEASE.md](RELEASE.md)) | <!-- hosted -->
+| `release.mjs` | 利用先に渡す ZIP(AWS 版。停止した Workbench 版も)を作り、検査する(`npm run release:aws`。[RELEASE.md](RELEASE.md)) | <!-- hosted -->
 | `check-schema.mjs` | `server/schema.json` と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
 | `check-approvals.mjs` | 承認の判定(`src/approvals.ts`)が、サーバーと同じ例(`server/tests/approval_cases.json`)で同じ結果になるかの確かめ(`npm run verify`) |
 | `check-policy.mjs` | must の決まりの確かめ(`src/policyCheck.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
@@ -668,4 +668,4 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | 週の確認の項目を足す | `src/reviewChecks.ts` と `src/weekLabels.ts` |
 | ヘッダー・ツールバー・面の切り替え | `src/App.tsx`・`src/AppToolbar.tsx` |
 | 画面の文言を日英で足す | その場で `t('日本語', 'English')`(`src/i18n.ts`) |
-| Workbench の運用を変える | `scripts/workbench.sh`・`server/ccp/check.py`・[WORKBENCH.md](WORKBENCH.md) |
+| サーバー(AWS など・Workbench)の運用を変える | `scripts/workbench.sh`・`server/ccp/check.py`・[AWS.md](AWS.md)・[WORKBENCH.md](WORKBENCH.md) |

@@ -1,7 +1,11 @@
-# Workbench 版のリリース ZIP の作り方(開発側の手引き)
+# リリース ZIP の作り方(AWS 版。開発側の手引き)
 
-利用先には、このリポジトリをそのまま渡さず、**Workbench で動くものだけ**を ZIP にして渡す。
-利用先は、ZIP を自分の Git に入れ、Vertex AI Workbench で `git pull` して使う(利用先の手順は [UPDATE.md](UPDATE.md)。**UPDATE.md は ZIP に入れず、別に渡す**(利用者の指示 2026-10-20)。ZIP に入る)。
+利用先には、このリポジトリをそのまま渡さず、**開発元の GCP の本番の仕組みを消したもの**を ZIP にして渡す。
+利用先は、ZIP を自分の Git に入れ、AWS などの Linux のサーバーで `git pull` して使う(利用先の手順は、ZIP に入る [AWS.md](AWS.md)。Git への入れ方は [UPDATE.md](UPDATE.md)。**UPDATE.md は ZIP に入れず、別に渡す**(利用者の指示 2026-10-20))。
+
+- **2026-11-03 利用者: Workbench 版の ZIP と、毎日の Releases の公開を停止し、AWS 版を作る。** 中身(入れる・外す・残してはいけない言葉)は Workbench 版と同じで、違うのは置き換えの文書(`release/aws/files`)と手順書([AWS.md](AWS.md))だけ。Workbench 版は `npm run release:workbench` で作って確かめることはできるが、`--publish` は止まる。
+- **AWS 版の公開は、利用者の確認のあと**(2026-11-03 利用者)。AWS への反映は、人が手で行う。
+- 線引きを確認中(2026-11-03、相談役が利用者に確認中): ファイルの置き場所の GCS と、IAP のログイン(どちらも GCP の上で動かすとき用)を、AWS 版から外すか。決まるまでは、どちらも入れている(外しても残りが動く作りかは、決まってから確かめる)。BigQuery と Vertex AI の Gemini は、AWS でも使うので入れる。
 
 - この文書は、ZIP に入らない(開発側だけ)。
 - **書き換えの手作業はしない。** ZIP を作るコマンド 1 つで、渡してよい形のものが出てくる。止まったら、開発側のファイルを直して、作り直す。
@@ -9,29 +13,30 @@
 ## 1. 作る
 
 ```bash
-npm run release:workbench                  # HEAD から作る。検査 → 展開した先で npm ci・npm run verify・サーバーのテスト
-npm run release:workbench -- --ref main    # 作る元を指定する(タグやコミットでもよい)
-npm run release:workbench -- --no-test     # 検査だけ(ビルドとテストを省く。途中の確認用。渡す ZIP は省かずに作る)
-npm run release:workbench -- --publish     # すべて通ったら、GitHub の Releases に公開する(渡すときはこれ)
+npm run release:aws                  # HEAD から作る。検査 → 展開した先で npm ci・npm run verify・サーバーのテスト
+npm run release:aws -- --ref main    # 作る元を指定する(タグやコミットでもよい)
+npm run release:aws -- --no-test     # 検査だけ(ビルドとテストを省く。途中の確認用。渡す ZIP は省かずに作る)
+npm run release:aws -- --publish     # すべて通ったら、GitHub の Releases に公開する(利用者の確認のあと)
 ```
 
-- できるもの: `release-out/ccp-workbench-<版>.zip`(`release-out/` は Git に入れない)。版は `<コミットの日付 YYYYMMDD>-<コミットの短い ID>`。
+- できるもの: `release-out/ccp-aws-<版>.zip`(`release-out/` は Git に入れない)。版は `<コミットの日付 YYYYMMDD>-<コミットの短い ID>`。
 - **コミット済みの内容から作る**(`git ls-tree` / `git cat-file`)。コミットしていない変更は入らない(ほかのセッションの作業中の変更が混ざらないように)。
 - 同じコミットからは、同じ中身の ZIP ができる(ZIP の中の時刻は 0)。
 - 終わりに「完了: …(検査・ビルド・サーバーのテストを通りました)」と出れば、渡してよい。展開した先のビルドとテストには、数分かかる(npm と PyPI からパッケージを取る)。
 
 ## 2. ZIP に入るもの・入らないもの
 
-スクリプト(`scripts/release-workbench.mjs`)の `RULES` で決める。上から順に見て、最初に当たった規則で決まる。
+スクリプト(`scripts/release.mjs`。版の種類は `--target aws` / `workbench`)の `RULES` で決める。上から順に見て、最初に当たった規則で決まる。
 **どの規則にも当たらないファイルがあると、止まる**(新しく足したファイルが、黙って入ったり落ちたりしないように)。ファイルを足したら、`RULES` にも足す。
+あわせて、**必ず入っているべきファイル**(版の種類ごとの `required`。AWS 版は手順書 `docs/AWS.md`・操作のスクリプト・設定の見本など)がなければ止まる(規則の書き違いで、立ち上げに要る物が黙って落ちないように)。
 
 | 入る | 入らない |
 |---|---|
 | `src/`・`public/`・画面のビルドの設定・`package.json`(本番用のスクリプトを消したもの)・`package-lock.json` | `Dockerfile`・`.dockerignore`・`.gcloudignore`・`cloudbuild.yaml`・`.github/` |
 | `server/ccp/`(`hosted/` を除く)・`server/tests/`(`test_hosted_*` を除く)・`schema.json`・`seed.json`・`requirements.txt`・`workbench.env.example` | `server/ccp/hosted/`・`server/requirements-hosted.txt` |
-| `scripts/workbench.sh`・`check-*.mjs`・`export-seed.mjs`・`feature-reasons.py`・`flows-sheet.py` | `scripts/deploy-gcp.mjs`・`gcp-smoke.mjs`・`screenshots.mjs`・`release-workbench.mjs` |
-| `docs/` の Workbench の手引き・設計・機能・開発の理由(FEATURE_REASONS)・BACKLOG・SOURCE_MAP・BigQuery・承認・方針・スクリーンショット・ワイヤーフレーム | `docs/GCP.md`・`HANDOVER.md`・`handover-archive/`(作業の記録)・`CLOUD.md`・`ONBOARDING.md`・`RELEASE.md`(この文書)・`UPDATE.md`(利用先の Git への入れ方。別に渡す)・`font-compare.html` |
-| `release/workbench/files/` の中身(Workbench 版の `README.md`・`CLAUDE.md`)を、ルートに置く | 開発側の `README.md`・`CLAUDE.md` |
+| `scripts/workbench.sh`・`check-*.mjs`・`export-seed.mjs`・`feature-reasons.py`・`flows-sheet.py` | `scripts/deploy-gcp.mjs`・`gcp-smoke.mjs`・`screenshots.mjs`・`release.mjs` |
+| `docs/` の手引き(AWS・Workbench)・設計・機能・開発の理由(FEATURE_REASONS)・BACKLOG・SOURCE_MAP・BigQuery・承認・方針・スクリーンショット・ワイヤーフレーム | `docs/GCP.md`・`HANDOVER.md`・`handover-archive/`(作業の記録)・`CLOUD.md`・`ONBOARDING.md`・`RELEASE.md`(この文書)・`UPDATE.md`(利用先の Git への入れ方。別に渡す)・`font-compare.html` |
+| `release/aws/files/` の中身(AWS 版の `README.md`・`CLAUDE.md`)を、ルートに置く(Workbench 版は `release/workbench/files/`) | 開発側の `README.md`・`CLAUDE.md` |
 | `VERSION.txt`(スクリプトが作る。版・元のコミット・日付) | Git の履歴(`.git`) |
 | | 当面入れない(2026-10-23 利用者の指示): 商品ページの画像を、リストを渡してまとめてダウンロードする道具(B11)の `scripts/collect-product-images.py` と、その手順書 `docs/PRODUCT_IMAGES.md`。ほかの文書のこの道具の行は `<!-- hosted -->` で消す。取り込み(`ccp.cli import-images`・`server/ccp/product_images.py`)・表 `product_images`・画像を選ぶ窓は入る |
 
@@ -62,7 +67,7 @@ ZIP の中のすべてのテキストのファイル(とファイル名)を、�
 
 あわせて、文書の中の相対リンク(`[…](パス)`)の先が ZIP にあるかも確かめる(外した文書へのリンクが残らないように)。
 
-「GCP」「Google Cloud」「Vertex AI」「BigQuery」「GCS」、`src/gcp/` のような名前は、残してよい(利用先の Workbench も GCP の上で動くため)。
+「GCP」「Google Cloud」「Vertex AI」「BigQuery」「GCS」、`src/gcp/` のような名前は、残してよい(AWS でも BigQuery と Vertex AI の Gemini を使うため)。
 
 Power Apps・Power Automate・Power Platform・Dataverse・Copilot(Copilot Studio も)は、2026-10-30 から残してよい(利用者の指示。Copilot・Power Platform を使った検証の文書を ZIP に入れるため)。それまでは「Power Platform 版」として禁止していた。開発元の名前は、これまでどおり禁止。
 
@@ -84,17 +89,18 @@ Power Apps・Power Automate・Power Platform・Dataverse・Copilot(Copilot Studi
 
 ## 6. 渡す
 
-- **`--publish` で、GitHub の Releases に公開する。** 元のコミットにタグ `workbench-<版>` を付け、`CCP Workbench 版 <版>` のリリースに ZIP を添付する(`gh` のサインインが要る)。ZIP はリポジトリの履歴に入れない(版ごとに約 19 MB あるため)。
+- **`--publish` で、GitHub の Releases に公開する(利用者の確認のあと)。** 元のコミットにタグ `aws-<版>` を付け、`CCP AWS 版 <版>` のリリースに ZIP を添付する(`gh` のサインインが要る)。ZIP はリポジトリの履歴に入れない(版ごとに約 19 MB あるため)。
 - 元のコミットが push 済みでないと止まる。`--no-test` とは一緒に使えない(確かめを通った ZIP だけを公開する)。
 - 利用先は、Releases の版のページから ZIP をダウンロードする。公開リポジトリなので、だれでもダウンロードできる(中身は、リポジトリで公開しているソースの一部)。
 - 公開した版は、HANDOVER に書く(版・元のコミット)。
-- 利用先は、ZIP を Git に入れ、`CCP Workbench 版 <版>` でコミットする([UPDATE.md](UPDATE.md))。Workbench の `scripts/workbench.sh status` に、その版が出る。
+- 利用先は、ZIP を Git に入れ、`CCP AWS 版 <版>` でコミットする([UPDATE.md](UPDATE.md))。サーバーの `scripts/workbench.sh status` に、その版が出る。
+- これまでに公開した Workbench 版(タグ `workbench-<版>`)は、Releases に残してある。
 
-## 7. 毎日の終わりの手順(文書の更新 + ZIP の公開)
+## 7. 毎日の終わりの手順(文書の更新)
 
 利用者が「今日の作業を終える」「1 日の終わりの手順を」などと言ったら、どのセッションでも、この手順を行う。
 言われなかった日は、21:00 に予約したタスク(Claude のアプリの「スケジュール」の `ccp-end-of-day`)が、同じ手順を行う。
-**その日にもう公開してあれば、何もしない**(Releases に、今日作られた `workbench-*` があるか: `gh release list --limit 5`)。
+**2026-11-03 から、ZIP の公開はしない**(Workbench 版の公開は停止。AWS 版の公開は、利用者の確認のあとに、人の指示で行う)。
 
 1. **作業の場所**: ほかのセッションの作業中の変更に触らないよう、`main` の最新を、専用の作業ツリーで扱う。
    ```bash
@@ -103,15 +109,14 @@ Power Apps・Power Automate・Power Platform・Dataverse・Copilot(Copilot Studi
    git worktree add --detach ../ccp-eod origin/main   # 2 回目からは: cd ../ccp-eod && git checkout --detach origin/main
    cd ../ccp-eod && npm ci                             # 初回は時間がかかる(Windows で 15 分ほど)
    ```
-2. **今日の変更を知る**: 前に公開した版から後のコミット(`git log --oneline <最新の workbench-* タグ>..origin/main`)と、`docs/HANDOVER.md` の「最近の作業」の、その日の行を読む(詳しくは `docs/handover-archive/` の、その日の節)。変更がなければ、ここで終わる。
+2. **今日の変更を知る**: 前に文書を直したところから後のコミット(`git log --oneline` で、前の「1 日の終わりの文書の更新」のコミットから `origin/main` まで)と、`docs/HANDOVER.md` の「最近の作業」の、その日の行を読む(詳しくは `docs/handover-archive/` の、その日の節)。変更がなければ、ここで終わる。
 3. **文書を直す**(変わったところだけ。言い換えの約束は 4 章・5 章):
    - [FEATURES.md](FEATURES.md): 足した・変えた機能、「未実装・制限」。
    - [SOURCE_MAP.md](SOURCE_MAP.md)(と `source-map.drawio`): 足したファイル・役割の変わったファイル、図、「最終更新」の日付。
    - [FEATURE_REASONS.md](FEATURE_REASONS.md): `scripts/feature-reasons.py` の機能(F)・対応づけ(M)を直して、`python scripts/feature-reasons.py` で作り直す(食い違いがあれば止まる)。[USER_STORIES.md](USER_STORIES.md) の実装の状態も合わせる。
    - [BACKLOG.md](BACKLOG.md): 済んだもの・始めたものの状態。済んだ・外した行は [backlog-archive/DONE.md](backlog-archive/DONE.md) へ移す。
    - [FLOWS.md](FLOWS.md): 画面の入り口・移り方や前提の決まりが変わったら、2 章を直す。2 章・5.3・6 章の表を変えたら、`python scripts/flows-sheet.py` で記入用のシート [FLOWS_SHEET.md](FLOWS_SHEET.md) を作り直す。
-   - 新しいファイルがあれば、`scripts/release-workbench.mjs` の `RULES` に足す。
-4. **確かめる**: `npm run verify`、サーバーのテスト(`cd server && python -m unittest discover tests`)、`npm run release:workbench -- --no-test`(言葉の検査)。
+   - 新しいファイルがあれば、`scripts/release.mjs` の `RULES` に足す。
+4. **確かめる**: `npm run verify`、サーバーのテスト(`cd server && python -m unittest discover tests`)、`npm run release:aws -- --no-test`(言葉の検査。公開はしない)。
 5. **コミット・push**: `docs: 1 日の終わりの文書の更新(<日付>)` で、`git pull --rebase` のあと `main` に push する。
-6. **公開する**: `npm run release:workbench -- --publish`(確かめをすべて通ったら、Releases に公開する。同じコミットを公開済みなら、何もしない)。
-7. **記録と報告**: HANDOVER の「公開した Workbench 版」の章に版を足して push する(この変更は ZIP に入らないので、版は作り直さない)。利用者には、版・Releases の URL・直した文書・確かめていないことを報告する。
+6. **報告**: 利用者には、直した文書・確かめていないことを報告する。

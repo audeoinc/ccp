@@ -528,6 +528,8 @@ PY
 
 ## 7. Workbench 以外の Linux のサーバー(AWS など)で動かすとき
 
+**AWS で動かすときの手順は [AWS.md](AWS.md) にまとめました(2026-11-03)。** この章は、Workbench との違いの一覧として残しています。
+
 この手順書の「Workbench」は、**CCP を動かしているそのサーバー**と読み替えれば、そのまま使えます。
 仕組みは同じです。サーバーが PostgreSQL につなぎ、BigQuery と Gemini(Vertex AI)を呼びます。
 違うのは、次の 4 点だけです。

@@ -10,15 +10,16 @@
 
 ## 1. いまどこにいるか
 
-- 開発・運用は、Cloud Run で動く 1 つの版だけ([GCP.md](GCP.md))。Power Apps 版は 2026-10-16 に廃止。利用先には Workbench 版の ZIP だけを渡す([RELEASE.md](RELEASE.md))。
+- 開発・運用は、Cloud Run で動く 1 つの版だけ([GCP.md](GCP.md))。Power Apps 版は 2026-10-16 に廃止。利用先には AWS 版の ZIP を渡す(`npm run release:aws`。Workbench 版の ZIP は 2026-11-03 に停止。[RELEASE.md](RELEASE.md))。
 - 何人か・何セッションかが、同じ `main` に push している(UI・結果・承認プロセス・BigQuery・文書などのセッション)。
 - 済んだ範囲: 一覧(L)・制作指示(P)・週(W。W8 は保留)・アラート(A)・結果(R)・承認(U1〜U6)・制作の依頼(PR)・X の多く(AB テスト・案から選ぶ・素材・画像のライブラリ・テンプレートの版・表示の大きさ・件名など)。状態の正は [BACKLOG.md](BACKLOG.md)。
 - 本番: どこまで反映したかは、印のタグ `deployed-gcp/*` で見る。本番の画面での操作・表と列の追加は、多くが未確認。
-- Workbench 版: 最新の公開は 5 章。
+- リリース ZIP: AWS 版は作れるが、まだ公開していない(利用者の確認のあと)。Workbench 版の最後の公開は 5 章。
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
 - 2026-11-03 UI 1: W2 Entra の SSO のサーバー側を main に。入口の認証の差し込み口 `identity.py`(`admit`・`current_identity`。`CCP_AUTH` かある設定で oidc / basic / iap / none)と OIDC のアダプター `oidc.py`(認可コード + PKCE・署名つきクッキーで 2 台でも切れない)。設定がなければ localhost からだけ開ける。管理者がまだいなければ、ログインした人がユーザーを足せる。契約テスト `test_auth_port.py`。手順は WORKBENCH.md 7.2。画面(ログアウト・切れたときの案内)は見本の ui1-sso で
+- 2026-11-03 W6 AWS 版の ZIP: `scripts/release-workbench.mjs` → `release.mjs`(`--target aws` / `workbench`。`npm run release:aws`)。置き換えの文書 `release/aws/files`・手順書 `docs/AWS.md`・必ず入っているべきファイルの検査。Workbench 版の `--publish` は止まる。`workbench.sh` に `CCP_HOST`(既定 127.0.0.1)と、足りない道具を最初に教える `need_tools`。**公開は利用者の確認待ち。GCS・IAP は残す(11-03 決定)**
 - 2026-11-03 最適化(optimize-survey の 1〜6)が済んだ: 89675b8・c472ad1・83a4795・2b96f67・adcd6f3・f063157。X95 も本番済み(3250961・c8104ee)。
 - 2026-11-02 UI 1: X90 の塊 A(面の枠)・E(P40・G1/G2)・F(K1〜K3。「制作に渡す」はシンプルな制作の画面が渡す)を main に。**K5: 詳しい制作のページ(`ProductionPage.tsx`・`ProductionInfoPane.tsx`)を消した**(⋯ の入口・`PREF.productionSimple` も)。詳しくはアーカイブ 2026-10-28_ の末尾。X93(開いたときの表示の大きさを自動で決める。`settings.me.autoscale`)も main に。X94(メイン画像を URL のページから選ぶ。`content.hero.fromurl`・`UrlImagePicker`)も main に。続けて、ページの画像の小さいもの(短い辺 100px 未満)を並びから外し、色見本をサーバーで外す(`simple/smallImages.tsx`・`product_pages.py` の `SWATCH`)。プレビューの倍率のバーは、真ん中がいつも実際の倍率で、「全体を表示」は別のボタン(`PreviewZoomBar`)。X87 段 ② の UI 1 の残りは続き
 - 2026-11-02 UI 3: X86 シンプルな制作の画面の追加分を main に(b046f54。AI の手直し・制作した HTML の版・要素を直す・ピン・左のバーの HTML の欄 `prod.htmlcode`(v1)・保存の流れを計画にそろえた: 打てば入る・自動で保存・↶)。未決: `prod.htmlcode` は FEATURE_FLAGS では「プレビューの切り替え・試す → 確定」、作ったのは「左のバー・自動で保存」(連絡係が確認中)。次は D(面の枠に載せる・AbHandoffSection・MaterialRows / ProductionChanges / PaneCrumbs・「渡されたもの」・件名とプリヘッダー・「企画が変わりました」・simple-finish.md の制作の穴)
@@ -60,9 +61,9 @@ BACKLOG の ☐ / ❓ / ▶ の行が正。
 - **本番のビルドは `cloudbuild.yaml`(層のキャッシュ)。** 画面のビルドがほかの場所のファイルを読むようにしたら、Dockerfile の COPY に足す。ほかの人の Cloud Build が動いていれば、終わってから反映する。
 - BigQuery の取り込みを手元で試すときの PGlite の手順は、記録の 2026-10-20_21.md の末尾(7 章)。
 
-## 5. 公開した Workbench 版
+## 5. 公開した Workbench 版(2026-11-03 に停止)
 
-最新は `20261030-dfd1abf`(10-30 の締め。X87 の版の付け替え・X86 段 ①・X79 (e)(f)・X80 段 ①・X88・ZIP の言葉の緩和(Power Platform・Copilot 可)など。Releases のタグ `workbench-<版>`)。その前は `20261029-6d1baab`・`20261028-777505c`・`20261021-8f3dbca`。それより前の版と経緯は記録の 6.23 と末尾。**2026-11-03: Workbench 版の ZIP と毎日の Releases の公開は停止した(AWS 版は BACKLOG の X102)。** 新しく公開したら、ここを書き換える。
+最後は `20261030-dfd1abf`(10-30 の締め。X87 の版の付け替え・X86 段 ①・X79 (e)(f)・X80 段 ①・X88・ZIP の言葉の緩和(Power Platform・Copilot 可)など。Releases のタグ `workbench-<版>`)。その前は `20261029-6d1baab`・`20261028-777505c`・`20261021-8f3dbca`。それより前の版と経緯は記録の 6.23 と末尾。AWS 版は BACKLOG の X102。新しく公開したら、ここを書き換える。
 
 ## 6. 動かし方・確かめ方
 

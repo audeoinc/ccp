@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vertex AI Workbench で CCP を動かすためのスクリプト(手順の詳細は docs/WORKBENCH.md)。
+# Linux のサーバー(AWS など・Vertex AI Workbench)で CCP を動かすためのスクリプト(手順の詳細は docs/AWS.md・docs/WORKBENCH.md)。
 #
 #   scripts/workbench.sh setup          初回の準備(Python の環境・パッケージ・画面のビルド・設定ファイルの用意)
 #   scripts/workbench.sh update         コードを最新にして(git pull → ビルド)、サーバーを起動し直す ← いちばんよく使う
@@ -14,6 +14,7 @@
 #
 # 設定は server/workbench.env から、毎回読み込む(見本は server/workbench.env.example)。
 # ポートは CCP_PORT(既定 8082。server/workbench.env に書いても、コマンドの前に CCP_PORT=8081 と付けてもよい)。画面は https://<ノートブックの URL>/proxy/<ポート>/ で開く(末尾の / を付ける)。
+# 受け付けるアドレスは CCP_HOST(既定 127.0.0.1 = この機械の中からだけ)。ロードバランサーなど、別の機械から届けるときは 0.0.0.0 にする。
 # PostgreSQL が Workbench の中(DATABASE_URL のホストが localhost)なら、サーバーを起動する前に、止まっていれば起動する。
 #   データのフォルダは CCP_PGDATA(なければ PGDATA、それもなければホームの下から探す)。pg_ctl の場所は CCP_PG_BIN(なければ PATH と conda の環境から探す)。
 set -euo pipefail
@@ -46,6 +47,8 @@ load_env() {
 # ポートは、設定(workbench.env の CCP_PORT)を読んでから決める(stop・status のように設定を読まないコマンドでも、同じポートを見るように)
 load_env > /dev/null
 PORT="${CCP_PORT:-8082}"
+# 既定は、この機械の中からだけ受け付ける(Workbench の中継・同じ機械の手前の仕組みはこれで届く。外から開けてしまわないように)
+HOST="${CCP_HOST:-127.0.0.1}"
 
 need_venv() {
   [ -x "$PY" ] || die "Python の環境がありません。先に scripts/workbench.sh setup を実行してください"
@@ -56,8 +59,25 @@ server_pid() {
     cat "$PID_FILE"
   else
     # 前の起動の記録がないときは、動いているサーバーを探す(pgrep がない環境では、探さない)
-    if command -v pgrep > /dev/null; then pgrep -f "uvicorn ccp.main:app --port $PORT" | head -n 1 || true; fi
+    if command -v pgrep > /dev/null; then pgrep -f "uvicorn ccp.main:app .*--port $PORT" | head -n 1 || true; fi
   fi
+}
+
+# 足りない道具を、作業を始める前にまとめて教える(めったにしない立ち上げで、途中の分かりにくいエラーで止まらないように)
+need_tools() {
+  local missing=() py node
+  for c in git curl npm; do command -v "$c" > /dev/null || missing+=("$c"); done
+  if py="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2> /dev/null)"; then
+    python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' || missing+=("Python 3.12 以上(いまは $py)")
+  else
+    missing+=("Python 3.12 以上(python3)")
+  fi
+  if node="$(node -v 2> /dev/null)"; then
+    node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit((a === 20 && b >= 19) || (a === 22 && b >= 12) || a > 22 ? 0 : 1)' || missing+=("Node.js 20.19 以上か 22.12 以上(いまは $node)")
+  else
+    missing+=("Node.js 20.19 以上か 22.12 以上(node)")
+  fi
+  [ ${#missing[@]} -eq 0 ] || die "足りないものがあります。入れてから、もう一度実行してください: ${missing[*]}"
 }
 
 build() {
@@ -92,6 +112,7 @@ pip_install() {
 }
 
 cmd_setup() {
+  need_tools
   say "Python の環境を作る(server/.venv)"
   if [ ! -x "$PY" ]; then
     (cd "$SERVER" && python3 -m venv .venv)
@@ -208,12 +229,17 @@ cmd_start() {
   ensure_pg
   [ -f "$ROOT/dist-gcp/index.html" ] || die "画面のビルドがありません。scripts/workbench.sh update(または setup)を実行してください"
   say "サーバーを起動する(ポート $PORT)"
-  (cd "$SERVER" && nohup "$PY" -m uvicorn ccp.main:app --port "$PORT" < /dev/null > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE")
+  (cd "$SERVER" && nohup "$PY" -m uvicorn ccp.main:app --host "$HOST" --port "$PORT" < /dev/null > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE")
   # 起動を待つ(最大 30 秒)
   for _ in $(seq 1 30); do
     if curl -s -o /dev/null "http://127.0.0.1:$PORT/ping"; then
       echo "起動しました(pid $(cat "$PID_FILE"))。"
-      echo "  画面: https://<ノートブックの URL>/proxy/$PORT/   ← 末尾の / を付ける"
+      if [ "$HOST" = "127.0.0.1" ]; then
+        echo "  画面: https://<ノートブックの URL>/proxy/$PORT/   ← Workbench のとき。末尾の / を付ける"
+        echo "        この機械の中からは http://127.0.0.1:$PORT/(別の機械のロードバランサーから届けるなら、workbench.env に CCP_HOST=0.0.0.0)"
+      else
+        echo "  画面: http://<このサーバーのアドレス>:$PORT/(受け付けるアドレス $HOST。外から開くなら、手前に HTTPS とログインを置く: docs/AWS.md)"
+      fi
       # 開発用の画面(docs/DEVTOOLS.md)は、CCP_DEVTOOLS=1 のときだけ出る
       case "${CCP_DEVTOOLS:-}" in 1|true|yes|on) echo "  開発用: https://<ノートブックの URL>/proxy/$PORT/dev/" ;; esac
       echo "  ログ: scripts/workbench.sh log"
@@ -240,7 +266,7 @@ cmd_stop() {
   rm -f "$PID_FILE"
   # 念のため: まだ応答があれば、名前で探して止める
   if curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$PORT/ping" && command -v pkill > /dev/null; then
-    pkill -f "uvicorn ccp.main:app --port $PORT" || true
+    pkill -f "uvicorn ccp.main:app .*--port $PORT" || true
     sleep 1
   fi
 }
@@ -271,6 +297,7 @@ cmd_status() {
 
 cmd_update() {
   need_venv
+  need_tools
   say "コードを最新にする(git pull)"
   (cd "$ROOT" && git pull --ff-only)
   pip_install

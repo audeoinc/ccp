@@ -61,9 +61,9 @@ Workbench で作業するときは、上の「作業の約束」に加えて、�
 ## 触る前に知っておくこと
 
 - **Workbench 版の ZIP は停止した**(2026-11-03 利用者)。これからは、稼働の環境に向けた **AWS 版**を、同じように、開発元の本番(Cloud Run・Cloud SQL)で動かしていることが分かるものだけを消した形で作る(BigQuery・Gemini・GCS・IAP のアダプターは残す。作っている途中。それまでは下の約束事を、AWS 版にも当てはめる)。GCP 版(開発元の本番の形)は残す(ARCHITECTURE の 0.5 章)。
-- **利用先には、ZIP だけを渡す**(作り方は、いまは Workbench 版の `npm run release:workbench`。AWS 版もこれにならう。手順・約束事は [docs/RELEASE.md](docs/RELEASE.md))。
+- **利用先には、ZIP だけを渡す**(作り方は AWS 版の `npm run release:aws`。Workbench 版の `release:workbench` は 2026-11-03 に停止。手順・約束事は [docs/RELEASE.md](docs/RELEASE.md))。
   開発元の本番(Cloud Run + Cloud SQL)だけの処理は `server/ccp/hosted/` に置き、外のコードは `hosted/` がなくても動くようにする(DB の準備中は `ccp/dbready.py` を通す)。
-  ZIP に入るファイル(`src/`・`server/ccp/`・Workbench 向けの `docs/` など)には、コメントも含めて、Cloud Run・Cloud SQL・gcloud・deploy:gcp・dbctl・開発元の名前などを書かない(検査で止まる)。文書に本番の話を残すときは `<!-- hosted -->` などの印を付ける。新しいファイルを足したら、`scripts/release-workbench.mjs` の `RULES` にも足す。
+  ZIP に入るファイル(`src/`・`server/ccp/`・`docs/` の多く)には、コメントも含めて、Cloud Run・Cloud SQL・開発元の名前を書かない(検査で止まる。BigQuery・Vertex AI・GCS・IAP などは書いてよい。2026-11-03 利用者)。文書に本番の話を残すときは `<!-- hosted -->` などの印を付ける。新しいファイルを足したら、`scripts/release.mjs` の `RULES` にも足す。
 - **1 日の終わり**(利用者が「今日の作業を終える」などと言ったとき。言われなければ 21:00 の予約が行う): 文書(FEATURES・SOURCE_MAP・FEATURE_REASONS・BACKLOG)を直して push する。Workbench 版の Releases への公開は停止した(2026-11-03)。AWS 版ができたら、それを公開する。手順は [docs/RELEASE.md](docs/RELEASE.md) の 7 章。
 
 - 標準のテンプレート 10 種はコードに持ち、ユーザーが作ったものはテーブル `layout_templates`。`getTemplate(id)` で求める(`EMAIL_TEMPLATES` のような固定の一覧はない)。以前からある標準の 6 種は、**コードの定義のセクションの構成(種類・枠の数・順番)を変えない**(保存済みのカードの、見出し・商品の位置がずれるため。見た目の設定だけ変えてよい)。テンプレートは**版で持つ**(表 `layout_template_versions`。保存するたびに新しい版。配信カードは `layout_key` と、使った版の番号 `layout_version` を持ち、描画は `templateKeyOfCard` の鍵「ID@v版」で、その版の中身を引く)ので、画面から構成を変えても、すでにある配信は崩れない。

@@ -1,6 +1,6 @@
 """開発元の本番(Cloud Run + Cloud SQL)だけで使う仕組み。
 
-Workbench 版のリリース(npm run release:workbench)には、このフォルダを入れない。
+利用先に渡すリリース(npm run release:aws)には、このフォルダを入れない。
 ここの外のコードは、このフォルダがなくても動くようにする(import は try / except ImportError で囲む)。
 """
 
