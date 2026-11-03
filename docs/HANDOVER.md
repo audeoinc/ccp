@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-03 UI 1: W2 の抜け道を直した: 入口の認証がないとき、中継の印(X-Forwarded-*・Forwarded・X-Real-IP)がある依頼は「中から」とみなさず 503(同じ機械の nginx から通っていた)。**Workbench は `workbench.env` に `CCP_AUTH=none` が要る**(example に入れた・`workbench.sh` が起動の前に注意・check は「足りない」)
 - 2026-11-03 UI 1: W2 Entra の SSO のサーバー側は main(`identity.py`・`oidc.py`・`test_auth_port.py`。手順は WORKBENCH.md 7.2)。**画面(ログアウト・切れたときの案内)は見本の ui1-sso で利用者の確認待ち**
 - 2026-11-03 W6 AWS 版の ZIP: `release.mjs`(`npm run release:aws`)・`docs/AWS.md` は main。**公開は利用者の確認待ち**。GCS・IAP は残す(11-03 決定)
 - 2026-11-03 最適化(optimize-survey の 1〜6)が済んだ: 89675b8・c472ad1・83a4795・2b96f67・adcd6f3・f063157。X95 も本番済み(3250961・c8104ee)。

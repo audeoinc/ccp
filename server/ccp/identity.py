@@ -6,8 +6,8 @@
   basic  画面のパスワード(APP_PASSWORD)。人は分からない(下の IAP・手元の人があれば、それ)
   iap    手前の IAP がログインを行う。IAP が付ける見出し X-Goog-IAP-JWT-Assertion を、Google の公開鍵で検証して人を知る
          (CCP_IAP_AUDIENCE に IAP の宛先を設定したときだけ。X-Goog-Authenticated-User-Email は、検証なしでは信じない)
-  none   守りなし。外から開ける状態で黙って動き出さないように、CCP_AUTH=none と書いたとき以外は、このサーバーの中(localhost)からだけ開ける
-         (外から届いた依頼には、設定の案内を返す。docs/ARCHITECTURE.md の 0 章の 1)
+  none   守りなし。外から開ける状態で黙って動き出さないように、CCP_AUTH=none と書いたとき以外は、このサーバーの中(localhost)から直に届いた依頼だけを通す
+         (中継(nginx・Jupyter など)を通った依頼と、外から届いた依頼には、設定の案内を返す。docs/ARCHITECTURE.md の 0 章の 1)
 手元では CCP_DEV_USER_EMAIL で、その人がログインしたことにできる(oidc 以外)。人がいなければ、これまでどおり画面で「あなた」を選ぶ。
 
   GET /api/me   ログインしている人(メールアドレス)と、それに当たるユーザー(users。なければ null)
@@ -55,6 +55,8 @@ OPEN_PATHS = ("/ping",)
 OPEN_PREFIXES = ("/internal/",)
 # このサーバーの中からの依頼(testclient は、テストの部品が付ける名前。ネットワークの相手には付かない)
 LOCAL_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
+# 中継が付ける印。付いていれば、元の相手は外にいるかもしれない
+FORWARD_HEADERS = ("forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip")
 
 
 def auth_mode() -> str:
@@ -75,13 +77,17 @@ def _loopback(host: str) -> bool:
     return host in LOCAL_HOSTS or host.startswith("127.")
 
 
+def _forwarded(request: Request) -> bool:
+    return any(request.headers.get(h) for h in FORWARD_HEADERS)
+
+
 def _is_local(request: Request) -> bool:
-    """このサーバーの中からの依頼か。相手が localhost のときと、サーバーが localhost でだけ待っているとき
-    (中継(Jupyter など)が、元の相手のアドレスを X-Forwarded-For で渡すと、相手は外のアドレスに見える。
-    サーバーが localhost でだけ待っていれば、外から直には届かないので、中継の内側として通す)"""
-    client = request.client.host if request.client else ""
-    server = request.scope.get("server") or ("", 0)
-    return _loopback(client) or _loopback(str(server[0] or ""))
+    """このサーバーの中から、直に届いた依頼か。
+    中継の印があれば、相手が localhost でも中からとみなさない(同じ機械の nginx・Jupyter などの中継は、相手が localhost に見えるが、
+    その先は外かもしれない。黙って開くより、止めて CCP_AUTH=none かログインを書いてもらう。2026-11-03 利用者)"""
+    if _forwarded(request):
+        return False
+    return _loopback(request.client.host if request.client else "")
 
 
 def _blocked(request: Request, title: str, fix: str) -> Response:
@@ -136,9 +142,9 @@ def admit(request: Request) -> Response | None:
             return None
         return _blocked(
             request,
-            "入口の認証が設定されていないため、外からは開けません",
+            "入口の認証が設定されていないため、外と中継(nginx・Jupyter の /proxy/ など)からは開けません",
             "ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か、画面のパスワード(APP_PASSWORD)を設定してください。"
-            "中継の内側など、外から開けない置き先で、守りなしで動かすと決めたなら、CCP_AUTH=none を設定してください",
+            "中継の手前でログインしている(Workbench の Jupyter の中継など)ので、CCP では守らないと決めたなら、CCP_AUTH=none を設定して、サーバーを起動し直してください",
         )
     return _blocked(request, f"CCP_AUTH の値({mode})が分かりません", f"{' / '.join(AUTH_MODES)} のどれかにしてください")
 

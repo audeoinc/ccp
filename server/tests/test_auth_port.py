@@ -148,10 +148,32 @@ class AdmitTest(unittest.TestCase):
             blocked = identity.admit(req("/", client="203.0.113.9"))
             self.assertEqual(blocked.status_code, 503)
             self.assertEqual(identity.admit(req("/api/x", client="203.0.113.9")).status_code, 503)
-            # 中継の内側(サーバーが localhost でだけ待つ)。中継が元の相手のアドレスを渡しても通す
-            self.assertIsNone(identity.admit(req("/", client="203.0.113.9", server="127.0.0.1")))
         with mock.patch.dict(os.environ, {"CCP_AUTH": "none"}, clear=True):
             self.assertIsNone(identity.admit(req("/", client="203.0.113.9")))
+
+    def test_no_auth_stops_requests_through_a_relay(self) -> None:
+        # 同じ機械の nginx・Jupyter などの中継: 相手も待ち受けも localhost に見えるが、その先は外かもしれない(抜け道だった。2026-11-03)
+        relayed = [
+            {"x-forwarded-for": "203.0.113.9"},
+            {"x-real-ip": "203.0.113.9"},
+            {"forwarded": "for=203.0.113.9;proto=https"},
+            {"x-forwarded-host": "ccp.example.com"},
+            {"x-forwarded-proto": "https"},
+        ]
+        with mock.patch.dict(os.environ, {}, clear=True):
+            for h in relayed:
+                with self.subTest(h):
+                    r = identity.admit(req("/", headers=h, client="127.0.0.1", server="127.0.0.1"))
+                    self.assertIsNotNone(r)
+                    self.assertEqual(r.status_code, 503)
+                    self.assertIn("CCP_AUTH=none", r.body.decode())
+                    self.assertEqual(identity.admit(req("/api/x", headers=h, client="127.0.0.1", server="127.0.0.1")).status_code, 503)
+            # 中継の印がなければ、これまでどおり中から
+            self.assertIsNone(identity.admit(req("/", client="127.0.0.1", server="127.0.0.1")))
+        # 中継の手前でログインしていると決めた置き先(Workbench の Jupyter の中継など)は、CCP_AUTH=none で開く
+        with mock.patch.dict(os.environ, {"CCP_AUTH": "none"}, clear=True):
+            for h in relayed:
+                self.assertIsNone(identity.admit(req("/", headers=h, client="127.0.0.1", server="127.0.0.1")))
 
     def test_basic(self) -> None:
         with mock.patch.dict(os.environ, {"APP_PASSWORD": "pw"}, clear=True):

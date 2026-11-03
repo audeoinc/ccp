@@ -308,8 +308,13 @@ async def _guard(out: _Out) -> None:
         if os.getenv("CCP_AUTH", "").strip().lower() == "none":
             out.add("guard", "warn", "入口の認証: なし(CCP_AUTH=none)。だれでも画面を開けます", "外から開ける置き先なら、ログイン(OIDC_ISSUER など)か APP_PASSWORD を設定して、CCP_AUTH を消す")
         else:
-            # 外から開ける状態で黙って動き出さないように、このサーバーの中からだけ開ける(identity.admit)
-            out.add("guard", "warn", "入口の認証がありません。このサーバーの中(localhost・中継)からだけ開けます", "外から開くなら、ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か APP_PASSWORD を設定する。守りなしで外から開くと決めたなら CCP_AUTH=none")
+            # 外から開ける状態で黙って動き出さないように、このサーバーの中から直に届いた依頼だけを通す(identity.admit)。中継を通ると開けない
+            out.add(
+                "guard",
+                "missing",
+                "入口の認証がありません。このサーバーの中から直に(http://127.0.0.1:…)しか開けず、中継(Jupyter の /proxy/・nginx など)や外からは開けません",
+                "ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か APP_PASSWORD を設定する。中継の手前でログインしている(Workbench の Jupyter など)ので CCP では守らないなら、CCP_AUTH=none",
+            )
     else:
         out.add("guard", "missing", f"入口の認証: CCP_AUTH の値({mode})が分かりません。いまは、だれも画面を開けません", "oidc / basic / iap / none のどれかにする")
 

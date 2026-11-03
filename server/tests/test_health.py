@@ -46,7 +46,9 @@ class DiagnoseTest(Base):
         self.assertTrue(db[0].fix)
         self.assertEqual(by_area(items, "google")[0].status, "missing")
         self.assertEqual(by_area(items, "bq")[0].goto, "dataimport")
-        self.assertEqual(by_area(items, "guard")[0].status, "warn")
+        # 入口の認証がなければ、中継からは開けないので「足りない」(⚙ の赤い点で気づけるように)
+        self.assertEqual(by_area(items, "guard")[0].status, "missing")
+        self.assertIn("CCP_AUTH=none", by_area(items, "guard")[0].fix)
 
     def test_bad_url_shape(self) -> None:
         with mock.patch.dict(os.environ, {"DATABASE_URL": "postgresql://u:p@ss@host/db"}):

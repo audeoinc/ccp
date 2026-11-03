@@ -38,6 +38,11 @@ load_env() {
   else
     echo "(server/workbench.env がありません。環境変数は、いまのシェルのものを使います)"
   fi
+  # 入口の認証が何もなければ、中継(Jupyter の /proxy/・nginx など)からは開けない(server/ccp/identity.py)。起動の前に知らせる
+  if [ -z "${CCP_AUTH:-}" ] && [ -z "${OIDC_ISSUER:-}" ] && [ -z "${APP_PASSWORD:-}" ] && [ -z "${CCP_IAP_AUDIENCE:-}" ]; then
+    echo "[注意] 入口の認証の設定がありません。このままでは、中継(Jupyter の /proxy/ など)から開くと「設定の案内」(503)になります。"
+    echo "       Workbench なら workbench.env に CCP_AUTH=none(Jupyter が Google のログインで守るため)。外から開くなら、ログインか APP_PASSWORD(docs/AWS.md の 7 章)"
+  fi
   # 写真のフォルダ: 設定がなく、パックを展開したフォルダがあれば、それを使う
   if [ -z "${ASSET_DIR:-}" ] && [ -d "$SERVER/images" ]; then
     export ASSET_DIR="$SERVER/images"

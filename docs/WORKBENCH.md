@@ -349,6 +349,7 @@ cd server
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8082/` のように `/` を付ける |
+| 画面に「**入口の認証が設定されていないため、外と中継…からは開けません**」(503) | `workbench.env` に入口の認証の設定がない(2026-11-03 から、中継を通った依頼は、設定がないと止める) | `workbench.env` に `CCP_AUTH=none` を書き、`scripts/workbench.sh restart`(Jupyter の中継が Google のログインで守るので、CCP では守らない) |
 | 画面に「**データベースにつながりません**」(以前の版では「データベースを起動しています」のまま進まない) | **サーバーを起動したターミナル**に、DB の設定が読み込まれていない(`check` を実行したターミナルとは別のターミナルで起動した、`conda activate` していない など)。画面の赤い文字が、つながらない理由 | サーバーを止め、**同じターミナルで** `set -a; source workbench.env; set +a`(必要なら `conda activate`)→ `check` → 起動 の順に実行する。サーバーのターミナルにも「DB につながりません: …」と理由が出る |
 | `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる) | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
@@ -539,7 +540,7 @@ PY
 | **Google Cloud への入り方** | ノートブックに付いたサービスアカウントが、自動で使われる(設定は要らない) | その機械には Google のサービスアカウントがない。**環境変数や秘密の置き場所(Secrets など)から、Google の認証情報を渡す**。方法は 2 つ: <br>① AWS から Google Cloud への鍵なしのつなぎ(Workload Identity 連携) <br>② サービスアカウントの鍵のファイル(`GOOGLE_APPLICATION_CREDENTIALS`) <br>CCP は、その機械の標準の認証(`google.auth.default`)で入るので、どちらでも動く |
 | **サービスアカウントの権限** | 同じ | BigQuery を読む権限と、Vertex AI を使う権限が要る |
 | **外への通信** | 外のサイトを読めないことがある(6 章) | 外に出られれば、**商品ページを読む・URL の画像から選ぶ機能が、そのまま動く**。6 章の試しは要らない |
-| **画面の開き方** | Jupyter の中継 `https://<ノートブックの URL>/proxy/<ポート>/` | ロードバランサーなどで直接開く。CCP は置かれた場所に合わせて動くので、パスの設定は要らない。**外から開けるなら、HTTPS と、ログイン(Entra ID などの SSO。7.2)か画面のパスワード(`APP_PASSWORD`)を、必ず付ける**(Workbench は Jupyter の認証の内側にあった)。何も付けないと、CCP はそのサーバーの中(localhost)からしか開けず、外からの依頼には設定の案内を返す |
+| **画面の開き方** | Jupyter の中継 `https://<ノートブックの URL>/proxy/<ポート>/` | ロードバランサーなどで直接開く。CCP は置かれた場所に合わせて動くので、パスの設定は要らない。**外から開けるなら、HTTPS と、ログイン(Entra ID などの SSO。7.2)か画面のパスワード(`APP_PASSWORD`)を、必ず付ける**(Workbench は Jupyter の認証の内側にあった)。何も付けないと、CCP はそのサーバーの中から直に(`http://127.0.0.1:…`)しか開けず、中継(nginx など)や外からの依頼には設定の案内を返す。**Workbench の Jupyter の中継も「中継」なので、Workbench では `CCP_AUTH=none` を書く**(`workbench.env.example` に入っている) |
 
 そのほかの点:
 
@@ -614,7 +615,7 @@ CCP の中に、標準の OIDC のログインがある(`server/ccp/oidc.py`)。
 | `ASSET_DIR` | 写真を出すとき | 写真のフォルダ(パックの展開先) | `<server の絶対パス>/images` |
 | `APP_PASSWORD` | — | 画面のパスワード(Basic 認証)。空なら、かけない | 空でよい(中継が Google のログインで守られている) |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `CCP_PUBLIC_URL` / `CCP_SESSION_HOURS` / `CCP_SESSION_SECRET` | ログインを使うとき | ログイン(Entra ID などの SSO。7.2)。`OIDC_ISSUER` があれば、`APP_PASSWORD` より先に使う | 設定しない |
-| `CCP_AUTH` | — | 入口の認証を名指しする(`oidc` / `basic` / `iap` / `none`)。なければ、ある設定から選ぶ。**どれもないと、そのサーバーの中(localhost・中継)からしか開けない**。外から開ける所で守りなしにすると決めたときだけ `none` | 設定しない(中継は localhost から届く) |
+| `CCP_AUTH` | — | 入口の認証を名指しする(`oidc` / `basic` / `iap` / `none`)。なければ、ある設定から選ぶ。**どれもないと、そのサーバーの中から直に(`http://127.0.0.1:…`)しか開けず、中継(Jupyter の /proxy/・nginx など)からも開けない**。中継の手前で守っている・守りなしにすると決めたときだけ `none` | **`none`**(Jupyter の中継が Google のログインで守る。`workbench.env.example` に入っている) |
 | `STATIC_DIR` | — | 画面のビルドの場所(既定 `<リポジトリ>/dist-gcp`) | 設定しない |
 | `CCP_PORT` | — | サーバーのポート(`scripts/workbench.sh`) | 既定 8082 |
 | `CCP_PYTHON` / `CCP_PGDATA` / `CCP_PG_BIN` | — | スクリプトが使う Python・Workbench の中の PostgreSQL のデータの場所・`pg_ctl` のあるフォルダ | `server/workbench.env.example` の説明のとおり |
