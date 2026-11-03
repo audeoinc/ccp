@@ -2,6 +2,7 @@ import { findViolations, retryNote, type Violation } from './policyCheck'
 import { ProductCategory } from './models/products'
 import { AiRequestsService } from './data/aiRequests'
 import { AiRunsService } from './data/aiRuns'
+import { fingerprintOf, isContentTask } from './aiAdoption'
 import { policyUsableIn } from './countryApply'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
@@ -224,18 +225,26 @@ let activeChat: ChatTurn[] | null = null
 // 開いている配信カードの「これまでの学び」(同じ条件の過去の配信の、次に生かすメモ)。
 // 案を作る依頼(suggest_ / select_)に、askAgent が加える。配信カードの「これまでの学び」の帯が、開いている間だけ入れる
 let activeLearnings: string[] = []
-// 学びの id(配信結果の id)と、開いている配信カード。AI の依頼ごとに、どの学びを渡したかを記録する(ai_runs。結果の面の「効果」で、学びあり / なしを比べるため)
+// 学びの id(配信結果の id)。AI の依頼ごとに、どの学びを渡したかを記録する(ai_runs。結果の面の「効果」で、学びあり / なしを比べるため)
 let activeLearningIds: string[] = []
-let activeCardId: string | null = null
-export function setActiveLearnings(lines: string[], ids: string[] = [], cardId: string | null = null) {
+export function setActiveLearnings(lines: string[], ids: string[] = []) {
   activeLearnings = lines
   activeLearningIds = ids
+}
+// 開いている配信カード。依頼の記録(ai_runs)を、どの配信のものとして残すか。配信カードの画面が開いている間だけ入れる
+// (学びの帯が閉じていても記録するため、学びとは別に持つ。X56 の (b))
+let activeCardId: string | null = null
+export function setActiveAiCard(cardId: string | null) {
   activeCardId = cardId
 }
-/** 案を作る依頼の記録を残す(学びを渡さなかった依頼も残す。比べる相手になるため)。記録に失敗しても、AI の依頼は止めない */
-function recordRun(task: unknown, learningIds: string[]) {
+/**
+ * 案を作る依頼の記録を残す(学びを渡さなかった依頼も残す。比べる相手になるため)。記録に失敗しても、AI の依頼は止めない。
+ * 配信カードの中身になる案には、比べるための指紋を付ける(案そのものは残さない。案の扱いは、承認・制作に渡したときに aiAdoption が決める)
+ */
+function recordRun(task: unknown, learningIds: string[], out: Record<string, unknown>) {
   if (!activeCardId || typeof task !== 'string') return
-  AiRunsService.create({ delivery_card_id: activeCardId, task, learning_ids: JSON.stringify(learningIds) }).catch(() => undefined)
+  if (!usesLearnings(task) && !isContentTask(task)) return
+  AiRunsService.create({ delivery_card_id: activeCardId, task, learning_ids: JSON.stringify(learningIds), fingerprint: fingerprintOf(task, out) }).catch(() => undefined)
 }
 // 下書きに学びを渡すのを公開していなければ(ai.learnings。X87)、どの依頼にも渡さない。学びの帯は、参考に読むものとして出したまま
 const usesLearnings = (task: unknown) => isOn('ai.learnings') && typeof task === 'string' && (task.startsWith('suggest_') || task.startsWith('select_')) && task !== 'suggest_tasks'
@@ -483,7 +492,6 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
   const task = (payload as { task?: unknown })?.task
   const ctx = inputs.get()
   const mustRules = rulesFor(task, cardOf(payload), ctx.rules).filter((r) => r.strength === 'must' && r.checkSpec)
-  if (usesLearnings(task)) recordRun(task, activeLearnings.length > 0 ? activeLearningIds : [])
   for (let attempt = 0; attempt < PARSE_ATTEMPTS; attempt++) {
     const chat = activeChat
     const learnings = usesLearnings((payload as { task?: unknown })?.task) && activeLearnings.length > 0 ? activeLearnings : null
@@ -514,6 +522,8 @@ export async function askAgent(prompt: string, payload: unknown): Promise<Record
         }
         if (violations.length) for (const fn of policyListeners) fn({ task: String(task ?? ''), violations })
       }
+      // 記録は、案が返ってきたときだけ(失敗した依頼は、案がないので比べられない)
+      recordRun(task, learnings ? activeLearningIds : [], parsed)
       return parsed
     } catch (e) {
       if (!(e instanceof SyntaxError)) throw e

@@ -2,6 +2,7 @@
 // 表(approval_requests・approval_reviewers)を画面から直接書かないのは、本人の確かめと、まとめての更新をサーバーで行うため(docs/APPROVAL.md 4 章)。
 // 読むだけなら、表ごとのサービス(ApprovalRequestsService・ApprovalReviewersService)でよい。
 // 撮影・デモ用のビルド(vite.mock.config.ts)では、src/mock/approvals.ts(同じ判定をメモリ上で行う)に差し替える。
+import { settleAiRuns } from '../aiAdoption'
 import { callApi } from '../gcp/services'
 import type { ApprovalRequest, ApprovalRequestRule } from '../models/approvalRequests'
 import type { ApprovalReviewer } from '../models/approvalReviewers'
@@ -48,7 +49,12 @@ const post = <T>(path: string, body: unknown) => callApi<T>('POST', `/api/approv
 
 export const ApprovalsService = {
   request: (input: RequestInput) => post<ApprovalView>('/requests', input),
-  decide: (requestId: string, input: DecideInput) => post<ApprovalView>(`/requests/${encodeURIComponent(requestId)}/decide`, input),
+  /** 承認がそろったら、AI の案の扱い(ai_runs.adoption)を、承認された中身で決める(X56 の (b)。止めない) */
+  decide: async (requestId: string, input: DecideInput) => {
+    const r = await post<ApprovalView>(`/requests/${encodeURIComponent(requestId)}/decide`, input)
+    if (r.success && r.data?.request.status === 'approved' && r.data.request.delivery_card_id) void settleAiRuns(String(r.data.request.delivery_card_id))
+    return r
+  },
   withdraw: (requestId: string, input: { actor: Actor; note?: string; week_start?: string }) => post<ApprovalView>(`/requests/${encodeURIComponent(requestId)}/withdraw`, input),
   /** 内容が変わったので、いまの依頼を古いものにする(配信のステータス・履歴は、保存の側で書く) */
   reset: (input: { delivery_card_id: string }) => post<{ stale: number }>('/reset', input),

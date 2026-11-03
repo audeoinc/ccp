@@ -874,7 +874,8 @@
     ["task", "text"],
     ["learning_ids", "text"],
     ["adoption", "choice"],
-    ["sample", "int"]
+    ["sample", "int"],
+    ["fingerprint", "text"]
    ],
    "lookups": [
     ["delivery_card_id", "delivery_cards", {"onDelete": "CASCADE"}]

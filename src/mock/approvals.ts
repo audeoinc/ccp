@@ -1,5 +1,6 @@
 // 撮影・デモ用の、承認の窓口(/api/approvals)の身代わり。src/data/approvals.ts と同じ形で呼べる(vite.mock.config.ts が差し替える)。
 // 判定は、本番のサーバー(server/ccp/approvals.py)と同じ src/approvals.ts を使う。表はメモリ上(src/mock/db.ts の tables)
+import { settleAiRuns } from '../aiAdoption'
 import { eligibleReviewers, requestOutcome } from '../approvals'
 import type { Actor, ApprovalView, DecideInput, RequestInput } from '../data/approvals'
 import type { ApprovalRequest } from '../models/approvalRequests'
@@ -127,6 +128,8 @@ export const ApprovalsService = {
     if (outcome === 'approved') {
       Object.assign(req, { status: 'approved', closed_at: at })
       setCardStatus(card, 'approved')
+      // 本物の窓口(src/data/approvals)と同じく、承認がそろったら AI の案の扱いを決める(X56 の (b))
+      void settleAiRuns(String(card.id))
       logEvent('approve', input.actor, card, input.week_start, before, 'approved', `${slot} — これで承認がそろった`)
       notify([String(req.requested_by ?? '')], input.actor.id, 'approved', `承認されました: ${card.name}`, `${input.actor.name}(${slot})の承認で、「${card.name}」の承認がそろいました。`, card.id as string, requestId)
     } else if (outcome === 'changes_requested') {

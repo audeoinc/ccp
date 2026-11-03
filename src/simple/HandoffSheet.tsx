@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { settleAiRuns } from '../aiAdoption'
 import { filled } from '../slots'
 import { Button, Field, Input, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBar, MessageBarBody, Spinner, makeStyles, tokens } from '@fluentui/react-components'
 import { AttachRegular, ChevronDownRegular, ChevronUpRegular, OpenRegular, SendRegular } from '@fluentui/react-icons'
@@ -164,6 +165,8 @@ export function HandoffSheet({ editor: e, onCommit, onRequest, assetsVersion = 0
         const r = await DeliveryCardsService.update(e.card.id, { handed_off_at: at })
         if (r.success) e.setHandoff('handedOffAt', at)
       }
+      // 渡した中身で、AI の案の扱い(ai_runs.adoption)を決める(X56 の (b)。承認がそろったときにも決める。止めない)
+      void settleAiRuns(e.card.id)
       e.openProduction?.({ request: !requested })
       setPoll(1)
     } finally {

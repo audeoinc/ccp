@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { setActiveAiCard } from './aiSelect'
 import { filled, insertAt, joinSections, replaceSection } from './slots'
 import { useStableCallback } from './useStableCallback'
 import {
@@ -208,6 +209,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const linkVariant = ab ? active : null
   // utm_campaign の既定値は、配信日 + 配信カードの ID(links.ts の「UTM の決まり」)。リンク先のページの名前(linkCampaign)とは分ける
   const utmCampaign = campaignId(card?.id, form.scheduledAt)
+  // AI の依頼の記録(ai_runs)を、この配信のものとして残す(開いている間だけ。X56 の (b))
+  const cardId = card?.id ?? null
+  useEffect(() => {
+    setActiveAiCard(cardId)
+    return () => setActiveAiCard(null)
+  }, [cardId])
   // utm_source・utm_medium は、設定(店の見せ方)の国・チャネルの値。配信カードに上書きがあれば、そちら(設定を変えたら描き直す)
   useCountrySettings()
   const linkUtm = utmFor(links, utmCampaign, linkVariant, utmFixedFor(form.country, form.channel))
