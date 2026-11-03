@@ -208,6 +208,7 @@ WRITE_LOCKED = {
     "help_faqs": "よく聞かれる質問は、/api/help で書きます",
     "help_faq_builds": "まとめ直しの記録は、/api/help が書きます",
     "bq_imports": "BigQuery の取り込みの記録は、取り込みが書きます",
+    "app_settings": "仕事の設定は、設定の窓口(/api/settings)で書きます(管理する人だけ)",
     "policy_rule_edits": "決まりの直しの記録は、決まりの窓口(/api/policies)が書きます",
     "notifications": "通知は、承認・制作の窓口が書きます",
 }

@@ -775,6 +775,18 @@
     ["dev_request_id", "dev_requests", {"onDelete": "CASCADE"}]
    ]
   },
+  "app_settings": {
+   "_comment": "仕事の設定(BigQuery の出力の場所・AI のモデルなど。settings.dataimport・settings.ai)。name = まとめ(bq / ai / bq.sync)、value = JSON。変えるたびに 1 行足す(いちばん新しい行が、いまの値。前の行は、だれ・いつ・どの項目を変えたかの記録)。source = screen(画面で変えた)/ env(起動したときに、環境変数から一度だけ写した)。changes = 変えた項目の名前の JSON の配列。読み書きは /api/settings と /api/bq/settings(server/ccp/appsettings.py)だけ。環境ごとに持つ(引っ越し用のパックに入れず、入れ替えでも消さない。pack.py の ENV_ONLY)",
+   "columns": [
+    ["name", "text", {"required": true, "index": true}],
+    ["value", "text"],
+    ["changed_by", "text"],
+    ["source", "text"],
+    ["changes", "text"]
+   ],
+   "lookups": [
+   ]
+  },
   "help_faqs": {
    "_comment": "「？ 聞く」のよく聞かれる質問(X82 段 ④)。AI が質問(help_questions)を束ねて作った行で、消さない(回数・日付はここに残る)。AI の文を保存して見せる例外(CLAUDE.md)。人は選ばず、まちがったものを hidden_at で隠せるだけ。読み書きは /api/help(server/ccp/help.py)だけ。import-pack の入れ替えでも消さない(pack.py の KEEP_ON_REPLACE)",
    "columns": [

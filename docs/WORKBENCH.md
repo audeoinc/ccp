@@ -85,6 +85,7 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 
 **本物の BigQuery のデータの始め方**(2026-11-03。くわしくは [BIGQUERY.md](BIGQUERY.md) の 5 章):
 
+0. 表の場所を入れる: ⚙ →「データの取り込み」の「表の場所」に、出力ごとの場所を入れ、「接続を確認」が通ったら保存します(前の版で `workbench.env` に `BQ_SPU` などを書いてあれば、最初に一度だけ写されています)。
 1. 値を確かめる: `bq-check`、または ⚙ →「データの取り込み」の「確認だけ」(管理する人だけ。読んで確かめるだけで、DB には書きません)。NG があれば、出力(ビュー)を直してからやり直します。
 2. 取り込む: 同じ画面の「今すぐ取り込む」。画面で、商品・在庫・実績が正しく見えるかを確かめます。
 3. 定期の取り込みを「入」にする: 同じ画面の上のスイッチ(既定は「切」)。在庫は 5 分ごと、ほかは 60 分ごとに更新を確かめ、変わっていれば取り込みます(間隔は出力ごとに変えられます)。止まった・古い出力があれば、管理する人の ⚙ に赤い点が付きます。
@@ -189,7 +190,10 @@ ASSET_DIR=/home/jupyter/ccp/server/images    # 実際のパスに合わせる
 | 用途 | CCP が読む名前 |
 |---|---|
 | DB | `DATABASE_URL` |
-| AI | `GOOGLE_CLOUD_PROJECT`(必須)、`GOOGLE_CLOUD_LOCATION`(省略時 `global`)、`GEMINI_MODEL`(省略時 `gemini-3.5-flash`) |
+| AI | `GOOGLE_CLOUD_PROJECT`(必須)、`GOOGLE_CLOUD_LOCATION`(省略時 `global`) |
+
+AI のモデル(前の版の `GEMINI_MODEL`)・考える量などと、BigQuery の表の場所(前の版の `BQ_SPU` など)は、2026-11-03 から **⚙ の画面で変え、DB に持ちます**(管理する人だけ。⚙ →「AI の設定」・「データの取り込み」)。
+すでに環境変数に書いてあれば、サーバーが最初に設定を読むときに**一度だけ DB に写します**(画面に「環境変数から写しました」と出ます)。写したあとは、環境変数が残っていても DB の値が効くので、消してかまいません([付録 A](#付録-a-環境変数の一覧))。
 
 CCP は、Gemini を **Vertex AI の形**(Workbench のサービスアカウントの権限)で呼びます。Gemini の **API キー**(`GEMINI_API_KEY` など)では動かないので、その形で接続しているときは、`GOOGLE_CLOUD_PROJECT` の設定と、Vertex AI の権限が別に要ります。
 
@@ -350,7 +354,7 @@ cd server
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
 | 画面やサーバーのログに「設定がありません: 'DATABASE_URL'」 | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
 | 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli check` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
-| AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。`GEMINI_MODEL` をその環境で使えるモデルに変える |
+| AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。⚙ →「AI の設定」で、その環境で使えるモデルに変える |
 | `import-pack` で「形式に対応していません」 | パックが新しく、コードが古い | 4.1 でコードを最新にしてから取り込む |
 | `npm ci` / `pip install` が止まる | パッケージの取得先(インターネット)にアクセスできない | 2 の「パッケージの取得について」 |
 | 8082 が使えない(`address already in use`) | 前に起動したサーバーが残っている | `pkill -f "uvicorn ccp.main:app"` で止めてから起動 |
@@ -376,13 +380,13 @@ set -a; source workbench.env; set +a
   [OK  ] ホスト localhost → 127.0.0.1
   [OK  ] つながりました(PostgreSQL 16.x …)。テーブル 32 個、配信カード 83 件
 ■ AI(Vertex AI の Gemini)
-  [OK  ] GOOGLE_CLOUD_PROJECT=… / GOOGLE_CLOUD_LOCATION=global / GEMINI_MODEL=…
+  [OK  ] GOOGLE_CLOUD_PROJECT=… / GOOGLE_CLOUD_LOCATION=global / モデル=…(DB の設定)
 ■ 写真
   [OK  ] ASSET_DIR=/home/jupyter/ccp/server/images(商品 100 点・メイン画像 42 点)
 ■ 画面
   [OK  ] ビルドがあります(/home/jupyter/ccp/dist-gcp)
 ■ BigQuery(利用先の本番のデータ)
-  [注意] BQ_SPU などの設定がありません(BigQuery から取り込まない)
+  [注意] BigQuery の表の場所が設定されていません(BigQuery から取り込まない)
 ■ その他
   [注意] APP_PASSWORD なし(画面にパスワードをかけない)
 ```
@@ -572,19 +576,24 @@ CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(
 | `DATABASE_URL` | ○ | `postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` | **利用先の環境の PostgreSQL** |
 | `GOOGLE_CLOUD_PROJECT` | AI を使うとき | Vertex AI のプロジェクト | その環境のプロジェクト |
 | `GOOGLE_CLOUD_LOCATION` | — | Vertex AI の場所(既定 `global`) | `global` |
-| `GEMINI_MODEL` / `GEMINI_THINKING` | — | AI のモデル・考える量 | 本番と同じなら `gemini-3.8-flash` / `low` |
 | `ASSET_DIR` | 写真を出すとき | 写真のフォルダ(パックの展開先) | `<server の絶対パス>/images` |
 | `APP_PASSWORD` | — | 画面のパスワード(Basic 認証)。空なら、かけない | 空でよい(中継が Google のログインで守られている) |
 | `STATIC_DIR` | — | 画面のビルドの場所(既定 `<リポジトリ>/dist-gcp`) | 設定しない |
 | `CCP_PORT` | — | サーバーのポート(`scripts/workbench.sh`) | 既定 8082 |
 | `CCP_PYTHON` / `CCP_PGDATA` / `CCP_PG_BIN` | — | スクリプトが使う Python・Workbench の中の PostgreSQL のデータの場所・`pg_ctl` のあるフォルダ | `server/workbench.env.example` の説明のとおり |
-| `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` | BigQuery を使うとき | 出力の場所 `<プロジェクト>.<データセット>.<表>`(ジョブのプロジェクトは `BQ_PROJECT`)。ビューなら、更新を見る元の表を `BQ_<名前>_WATCH` に | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) |
 | `BQ_AUTO_SYNC` | — | `0` なら、BigQuery の定期の取り込みを回さない(画面の設定にかかわらず)。なければ、⚙ →「データの取り込み」の設定に従う | 設定しない |
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
-| `GEMINI_CONCURRENCY` | — | AI への同時の呼び出しの上限(既定 4。AI の出口を使うときも効く) | 設定しない |
-| `AI_OUTLET_URL` / `AI_OUTLET_TOKEN` / `AI_OUTLET_TIMEOUT` | ほかの AI を使うとき | AI の出口: 入っていれば、AI をすべて外の層に頼む(空なら Gemini)。層に送る合言葉・1 回の待ち時間(既定 120 秒)。約束と見本の層は [AI_OUTLET.md](AI_OUTLET.md) | 使わないなら設定しない |
+| `AI_OUTLET_TOKEN` | ほかの AI を使うとき | AI の出口の層に送る合言葉(秘密なので環境変数のまま。出口の URL は ⚙ →「AI の設定」)。約束と見本の層は [AI_OUTLET.md](AI_OUTLET.md) | 使わないなら設定しない |
 | `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` / `DEVTOOLS_GEMINI_MODEL` / `DEVTOOLS_THINKING` / `DEVTOOLS_PRICE_PER_TIB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/<ポート>/dev/`。ポートは CCP の画面と同じ `CCP_PORT`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。AI のモデル(既定は一覧でいちばん賢い Gemini)・考える量(既定 high)・料金の概算の単価(既定 $6.25/TiB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
+
+**DB に移した設定**(2026-11-03 から。⚙ の画面で変える。管理する人だけ)。前の版で、下の環境変数を書いてあれば、サーバーが最初に設定を読むときに一度だけ DB に写します。写したあとは、環境変数が残っていても DB の値が効くので、`workbench.env` から消してかまいません。
+
+| 前の版の環境変数 | いまの置き場所 |
+|---|---|
+| `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` / `BQ_<名前>_WATCH` | ⚙ →「データの取り込み」の「表の場所」(場所の形は [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)。「接続を確認」で、保存の前に確かめられる) |
+| `GEMINI_MODEL` / `GEMINI_THINKING` / `GEMINI_CONCURRENCY` | ⚙ →「AI の設定」(モデル・考える量・同時の上限。既定 `gemini-3.5-flash` / `low` / 4) |
+| `AI_OUTLET_URL` / `AI_OUTLET_TIMEOUT` | ⚙ →「AI の設定」(AI の出口の URL・待ち時間。合言葉 `AI_OUTLET_TOKEN` は環境変数のまま) |
 
 ## 付録 B. 引っ越し用のパックの中身
 

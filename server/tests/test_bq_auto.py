@@ -81,6 +81,8 @@ class TickTest(unittest.TestCase):
             mock.patch.object(bq_import, "latest", mock.AsyncMock(return_value={})),
             mock.patch.object(bq_import, "_now", return_value=NOW),
             mock.patch.object(bq_import, "sync", self.sync),
+            # 表の場所は DB から読む(appsettings)。ここでは DB を使わない
+            mock.patch.object(bq_import.appsettings, "ensure", mock.AsyncMock()),
         ]
         for p in patches:
             p.__enter__()

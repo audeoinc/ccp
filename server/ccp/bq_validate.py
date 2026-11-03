@@ -237,9 +237,15 @@ def fetch(o: bq.Output, client: Any) -> list[dict[str, Any]]:
 
 def run_cli() -> int:
     """python -m ccp.cli bq-check: 設定された出力を読み、値まで確かめて表示する。NG の数を返す(何も変えない)"""
+    import asyncio
+
+    from . import appsettings
+
+    # 表の場所は DB にある(⚙ →「データの取り込み」)。DB を読めなければ、環境変数の場所で確かめる
+    asyncio.run(appsettings.ensure_cli())
     outputs = bq.configured()
     if not outputs:
-        print("BQ_SPU などの設定がありません(server/workbench.env.example を見て、出力の場所を設定してください)")
+        print("BigQuery の表の場所が設定されていません(⚙ →「データの取り込み」で、出力の場所を入れてください)")
         return 1
     client = bq.client()
     print(f"接続のアカウント: {bq.account()} / ジョブのプロジェクト: {bq.job_project() or '(なし)'}")

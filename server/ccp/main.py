@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from . import dbready
 from .ai import router as ai_router
 from .approvals import router as approvals_router
+from .appsettings import router as appsettings_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
 from . import devimages, devtools
@@ -137,6 +138,7 @@ app.include_router(assets_router)
 app.include_router(pack_router)
 app.include_router(product_images_router)
 app.include_router(bq_router)
+app.include_router(appsettings_router)
 app.include_router(policies_router)
 app.include_router(metrics_router)
 app.include_router(stock_cover_router)

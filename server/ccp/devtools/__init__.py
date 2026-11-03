@@ -52,7 +52,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from .. import bq
+from .. import appsettings, bq
 from . import ai_sql as _ai_sql, bq_tools as _bq_tools, gcs_policy as _gcs_policy, store as _store, tasks as _tasks_mod, work as _work
 from .ai_sql import PRIVATE, ChatIn, ChatTurn, build_context, chapters, chat_events, default_model, parse_reply, pick_models, pro_of, run_tool, tool_declarations
 from .bq_tools import CancelIn, ProfileIn, SqlIn, _running, cancel, dryrun, job_info, profile, profile_column, referenced, run, view_sources
@@ -64,7 +64,12 @@ from .store import (ChatSaveIn, FileIn, PinIn, _chat_path, chats, delete_chat, d
 from .tasks import CallIn, start_call, start_events, task_call, task_status
 from .work import AdoptIn, CheckIn, VersionIn, _adopted_sql, adopt, check, check_output, get_version, save_version, work
 
-router = APIRouter(prefix="/api/dev", dependencies=[Depends(require_enabled)])
+async def _settings() -> None:
+    """BigQuery の場所・AI のモデルは DB にある(appsettings)。覚えた値が古ければ、先に読み直す(DB を読めなければ前の値か環境変数)"""
+    await appsettings.ensure()
+
+
+router = APIRouter(prefix="/api/dev", dependencies=[Depends(require_enabled), Depends(_settings)])
 # パスの形はモジュールの間で重ならないので、並べる順は結果を変えない
 for _m in (_store, _bq_tools, _ai_sql, _work, _gcs_policy, _tasks_mod):
     router.include_router(_m.router)

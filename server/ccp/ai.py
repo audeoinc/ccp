@@ -2,20 +2,22 @@
 AI を呼ぶ所(/api/ask・メイン画像の説明・部品の画像の説明・商品ページの画像の提案)は、すべて generate() を通す。
 
 AI の出口(docs/AI_OUTLET.md):
-  AI_OUTLET_URL          入っていれば、AI をすべて、外の層(この URL)に頼む。空なら Gemini(いまどおり)
-  AI_OUTLET_TOKEN        層に送る合言葉(Authorization: Bearer)。空なら送らない
-  AI_OUTLET_TIMEOUT      1 回の待ち時間(秒)。既定 120
+  出口の URL             入っていれば、AI をすべて、外の層(この URL)に頼む。空なら Gemini(いまどおり)
+  AI_OUTLET_TOKEN        層に送る合言葉(Authorization: Bearer)。空なら送らない(秘密なので、環境変数のまま)
+  出口の待ち時間         1 回の待ち時間(秒)。既定 120
   層が失敗しても、自動で Gemini には回さない(どちらの AI が書いたか分からなくなる・データを Google に出したくない場合に困るため)。
 
 プロンプトの作り方・返答の JSON の解釈・やり直しは、画面側(src/aiSelect.ts)にあり。
 ここは「文字列を渡して、文字列を受け取る」だけにして、2 つのビルドで AI の動きがずれないようにする。
 
-設定(環境変数。営業支援システムと同じ Vertex AI):
-  GOOGLE_CLOUD_PROJECT   プロジェクト ID(コードには書かない)
-  GOOGLE_CLOUD_LOCATION  既定 global
-  GEMINI_MODEL           既定 gemini-3.5-flash
-  GEMINI_THINKING        思考の深さ(minimal / low / medium / high)。既定 low(1 回の下書きで 6〜9 回呼ぶため、速さを優先)
-  GEMINI_CONCURRENCY     AI への同時の呼び出しの上限。既定 4(混み合いによる 429 を減らす)。出口を使うときも効く
+設定(営業支援システムと同じ Vertex AI):
+  GOOGLE_CLOUD_PROJECT   プロジェクト ID(環境変数。コードには書かない)
+  GOOGLE_CLOUD_LOCATION  既定 global(環境変数)
+  ⚙ →「AI の設定」(DB。appsettings.py のまとめ ai。2026-11-03 までは環境変数で、DB にまだなければ一度だけ写す):
+  モデル(GEMINI_MODEL)          既定 gemini-3.5-flash
+  考える深さ(GEMINI_THINKING)   minimal / low / medium / high。既定 low(1 回の下書きで 6〜9 回呼ぶため、速さを優先)
+  同時の上限(GEMINI_CONCURRENCY) AI への同時の呼び出しの上限。既定 4(混み合いによる 429 を減らす)。出口を使うときも効く
+  出口の URL・待ち時間(AI_OUTLET_URL・AI_OUTLET_TIMEOUT)
 
 混み合い(429 RESOURCE_EXHAUSTED)や一時的なサーバーエラー(500/503/504)は、SDK が間隔を空けて、最大 5 回まで自動でやり直す。
 """
@@ -35,7 +37,7 @@ from google.genai import types
 import requests
 from pydantic import BaseModel, Field
 
-from . import dbready
+from . import appsettings, dbready
 from .creds import get_credentials
 
 log = logging.getLogger("ccp.ai")
@@ -52,6 +54,7 @@ router = APIRouter(prefix="/api", dependencies=[Depends(note_activity)])
 
 _client: genai.Client | None = None
 _gate: asyncio.Semaphore | None = None
+_gate_size = 0
 RETRY = types.HttpRetryOptions(attempts=5, initial_delay=2.0, max_delay=30.0, exp_base=2.0, jitter=1.0, http_status_codes=[429, 500, 503, 504])
 
 
@@ -90,13 +93,15 @@ class OutletError(Exception):
 
 
 def outlet_url() -> str:
-    return os.getenv("AI_OUTLET_URL", "").strip()
+    return str(appsettings.get("ai", "outlet_url") or "").strip()
 
 
 def _gate_() -> asyncio.Semaphore:
-    global _gate
-    if _gate is None:
-        _gate = asyncio.Semaphore(int(os.getenv("GEMINI_CONCURRENCY", "4")))
+    global _gate, _gate_size
+    size = int(appsettings.get("ai", "concurrency"))
+    # 画面で上限を変えたら、作り直す(いま呼んでいる分は、前の上限のまま終わる)
+    if _gate is None or _gate_size != size:
+        _gate, _gate_size = asyncio.Semaphore(size), size
     return _gate
 
 
@@ -104,12 +109,13 @@ async def generate(purpose: str, parts: list[Part], *, effort: str | None = None
     """AI に parts(文と画像。並んだ順に渡す)を見せ、返答の文(JSON の文)を返す。失敗したら例外を投げる。
     purpose は使う所(ask / hero_describe / part_describe / product_image_suggest)。effort は考える深さ(minimal / low / medium / high)。
     出口(AI_OUTLET_URL)が入っていれば層に、空なら Gemini に頼む。同時に呼ぶ数の上限は、どちらにも効かせる"""
+    await appsettings.ensure()
     async with _gate_():
         if outlet_url():
             return await asyncio.to_thread(_ask_outlet, purpose, parts, effort)
         contents = [p if isinstance(p, str) else types.Part.from_bytes(data=p.data, mime_type=p.mime_type) for p in parts]
         resp = await get_client().aio.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+            model=str(appsettings.get("ai", "model")),
             contents=contents[0] if len(contents) == 1 else contents,
             config=types.GenerateContentConfig(
                 # 返答は JSON だけ(プロンプトでも指示しているが、形式の崩れを減らす)
@@ -135,9 +141,9 @@ def _ask_outlet(purpose: str, parts: list[Part], effort: str | None) -> str:
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
-        r = requests.post(outlet_url(), json=body, headers=headers, timeout=float(os.getenv("AI_OUTLET_TIMEOUT") or 120))
+        r = requests.post(outlet_url(), json=body, headers=headers, timeout=float(appsettings.get("ai", "outlet_timeout")))
     except requests.RequestException as e:
-        raise OutletError(f"AI の出口(AI_OUTLET_URL)に届きませんでした: {type(e).__name__}") from e
+        raise OutletError(f"AI の出口(⚙ →「AI の設定」の URL)に届きませんでした: {type(e).__name__}") from e
     try:
         got = r.json()
     except ValueError:
@@ -163,7 +169,8 @@ class AskIn(BaseModel):
 @router.post("/ask")
 async def ask(body: AskIn):
     try:
-        text = await generate("ask", [body.prompt], effort=os.getenv("GEMINI_THINKING", "low"))
+        await appsettings.ensure()
+        text = await generate("ask", [body.prompt], effort=str(appsettings.get("ai", "thinking")))
     except OutletError as e:
         log.warning("AI の出口が失敗しました: %s(HTTP %s)", e.message, e.status)
         hint = "AI が混み合っています。しばらくしてから、もう一度お試しください。" if e.status == 429 else ""

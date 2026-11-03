@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import bq, bq_validate as bv, dbready, schema as sc
+from . import appsettings, bq, bq_validate as bv, dbready, schema as sc
 from .data_api import db, require_db
 from .identity import admin_denied
 
@@ -63,7 +63,7 @@ TRIGGERS = ("open", "manual", "auto", "startup")
 TICK_S = 60
 DEFAULT_INTERVALS = {"spu": 60, "sku": 60, "sku_stock": 5, "weekly": 60, "forecast": 60, "ranking": 60}
 INTERVAL_CHOICES = (2, 5, 15, 30, 60, 180, 360, 1440)
-# 設定の置き場所(country_settings の name。国なし = 全体)
+# 設定の置き場所(app_settings のまとめ。環境ごとに持つ。appsettings.py)
 SETTINGS_NAME = "bq.sync"
 
 
@@ -98,20 +98,17 @@ def parse_settings(raw: Any) -> dict[str, Any]:
 
 
 async def load_settings() -> dict[str, Any]:
-    """いまの設定(country_settings の最新の行。なければ既定 = 切)"""
-    async with db() as conn:
-        row = (await conn.execute(text(
-            "SELECT value FROM country_settings WHERE name = :name AND (country IS NULL OR country = '') ORDER BY created_on DESC LIMIT 1"
-        ), {"name": SETTINGS_NAME})).mappings().first()
-    return parse_settings(row["value"] if row else None)
+    """いまの設定(app_settings の最新の行。なければ既定 = 切)。appsettings が覚えた値を使うので、呼ぶたびには DB を読まない"""
+    await appsettings.ensure()
+    return parse_settings(appsettings.raw(SETTINGS_NAME))
 
 
 async def save_settings(value: dict[str, Any], by: str) -> dict[str, Any]:
-    """設定を残す(country_settings は、変えるたびに 1 行足す。前の行は変更の履歴)"""
+    """設定を残す(app_settings は、変えるたびに 1 行足す。前の行は変更の記録)"""
     clean = parse_settings(value)
-    async with db(write=True) as conn:
-        await conn.execute(text("INSERT INTO country_settings (name, country, value, changed_by) VALUES (:name, :country, :value, :changed_by)"),
-                           {"name": SETTINGS_NAME, "country": "", "value": json.dumps(clean), "changed_by": by[:100]})
+    before = await load_settings()
+    changes = (["enabled"] if before["enabled"] != clean["enabled"] else []) + sorted(f"interval:{k}" for k, v in clean["intervals"].items() if before["intervals"].get(k) != v)
+    await appsettings.save(SETTINGS_NAME, clean, by, changes)
     return clean
 
 
@@ -521,16 +518,32 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
 
 
 async def history(source: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-    """取り込みの記録(新しい順)"""
+    """取り込みの記録(新しい順)。表の場所を変えた記録(app_settings のまとめ bq)も、その出力の記録にまぜる(status = settings)"""
     limit = max(1, min(int(limit), 300))
     where = "WHERE source = :source " if source else ""
     async with db() as conn:
         rows = (await conn.execute(text(
             f"SELECT source, status, source_modified, data_as_of, row_count, message, imported_at, checked_at, repeat_count, trigger, actor FROM bq_imports {where}ORDER BY imported_at DESC LIMIT {limit}"
         ), {"source": source} if source else {})).mappings().all()
-    return [{"source": r["source"], "status": r["status"], "sourceModified": _iso(r["source_modified"]), "dataAsOf": _iso(r["data_as_of"]),
+    out = [{"source": r["source"], "status": r["status"], "sourceModified": _iso(r["source_modified"]), "dataAsOf": _iso(r["data_as_of"]),
              "rows": r["row_count"], "message": r["message"] or "", "importedAt": _iso(r["imported_at"]), "checkedAt": _iso(r["checked_at"]),
-             "repeat": r["repeat_count"] or 1, "trigger": r["trigger"], "actor": r["actor"]} for r in rows]
+             "repeat": r["repeat_count"] or 1, "trigger": r["trigger"], "actor": r["actor"]} for r in rows] + await _settings_changes(source, limit)
+    out.sort(key=lambda r: r["importedAt"] or "", reverse=True)
+    return out[:limit]
+
+
+async def _settings_changes(source: str | None, limit: int) -> list[dict[str, Any]]:
+    """表の場所を変えた・環境変数から写した記録を、取り込みの記録の形に"""
+    out = []
+    for h in await appsettings.history("bq", limit):
+        names = sorted({k.removesuffix("_watch") for k in h["changes"] if k != "project"})
+        for name in names:
+            if source and name != source:
+                continue
+            what = "環境変数から、表の場所を写しました" if h["source"] == "env" else "表の場所を変えました"
+            out.append({"source": name, "status": "settings", "sourceModified": None, "dataAsOf": None, "rows": None, "message": what,
+                        "importedAt": h["at"], "checkedAt": None, "repeat": 1, "trigger": "settings", "actor": h["by"]})
+    return out
 
 
 # ---- 定期の取り込み
@@ -538,7 +551,11 @@ async def history(source: str | None = None, limit: int = 50) -> list[dict[str, 
 
 async def tick(trigger: str = "auto") -> list[str]:
     """1 回分の定期の取り込み。間隔がたった出力を確かめ、変わっていれば取り込む。確かめた出力の名前を返す(何もしなければ空)"""
-    if env_disabled() or not bq.configured():
+    if env_disabled():
+        return []
+    # 表の場所は DB にある(appsettings)。覚えた値が古ければ読み直す(TTL ごと。毎回は読まない)
+    await appsettings.ensure()
+    if not bq.configured():
         return []
     settings = await load_settings()
     if not settings["enabled"]:
@@ -597,6 +614,7 @@ def _bq_error(e: Exception, what: str) -> dict[str, Any]:
 
 @router.get("/status")
 async def get_status() -> dict[str, Any]:
+    await appsettings.ensure()
     return {"success": True, "data": await status()}
 
 
@@ -604,6 +622,7 @@ async def get_status() -> dict[str, Any]:
 async def post_sync(request: Request, force: bool = False, only: str | None = None, trigger: str | None = None) -> dict[str, Any]:
     # 出力を絞った取り込みは、管理する人だけ。力ずく(force)は、管理する人でなければ、変わった出力だけの取り込みにする
     # (⚙ の「今すぐ取り込む」は、だれでも押せる。管理の画面がない人も、いまどおり使えるように)
+    await appsettings.ensure()
     t = trigger if trigger in ("open", "manual") else ("manual" if force else "open")
     if force or only:
         why = await _admin(request)
@@ -623,6 +642,7 @@ async def post_sync(request: Request, force: bool = False, only: str | None = No
 async def post_check(request: Request, only: str | None = None) -> dict[str, Any]:
     if (why := await _admin(request)):
         return _denied(why)
+    await appsettings.ensure()
     try:
         return {"success": True, "data": await check(_only(only))}
     except dbready.DbNotReady:

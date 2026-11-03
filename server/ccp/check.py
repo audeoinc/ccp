@@ -10,6 +10,8 @@ import os
 import socket
 from pathlib import Path
 
+from . import appsettings
+
 OK, NG, WARN = "OK  ", "NG  ", "注意"
 
 
@@ -32,17 +34,21 @@ def _db_target() -> tuple[str, str | None, int | None]:
     return "なし", None, None
 
 
+def _where(group: str) -> str:
+    return "DB の設定" if appsettings.source(group) == "db" else "環境変数。サーバーを起動すると DB に写ります"
+
+
 def check_outlet() -> int:
-    """AI の出口(AI_OUTLET_URL)。入っていれば、その URL の窓口に届くかを見る(つなぐだけ。AI は呼ばない。合言葉は出さない)。NG の数を返す"""
+    """AI の出口(⚙ →「AI の設定」の URL)。入っていれば、その URL の窓口に届くかを見る(つなぐだけ。AI は呼ばない。合言葉は出さない)。NG の数を返す"""
     from urllib.parse import urlsplit
 
-    url = os.getenv("AI_OUTLET_URL", "").strip()
+    url = str(appsettings.get("ai", "outlet_url") or "").strip()
     if not url:
-        _line(OK, "AI_OUTLET_URL なし(AI は Gemini を使う)")
+        _line(OK, "AI の出口なし(AI は Gemini を使う)")
         return 0
     u = urlsplit(url)
     if u.scheme not in ("http", "https") or not u.hostname:
-        _line(NG, "AI_OUTLET_URL は http:// か https:// で始まる URL にしてください")
+        _line(NG, "AI の出口の URL は http:// か https:// で始まる URL にしてください(⚙ →「AI の設定」)")
         return 1
     # 表示は、URL の中の利用者名・パスワード・問い合わせの部分を除く
     shown = f"{u.scheme}://{u.hostname}{f':{u.port}' if u.port else ''}{u.path}"
@@ -51,9 +57,9 @@ def check_outlet() -> int:
     try:
         socket.create_connection((u.hostname, port), timeout=3).close()
     except OSError as e:
-        _line(NG, f"AI の出口 {shown} に届きません({type(e).__name__})。層が動いているか、URL とポートを確かめてください。Gemini に戻すなら、AI_OUTLET_URL を空にして起動し直す")
+        _line(NG, f"AI の出口 {shown} に届きません({type(e).__name__})。層が動いているか、URL とポートを確かめてください。Gemini に戻すなら、⚙ →「AI の設定」で出口の URL を空にする")
         return 1
-    _line(OK, f"AI の出口 {shown} に届きます(合言葉: {token}、待ち時間 {os.getenv('AI_OUTLET_TIMEOUT') or 120} 秒)。AI はすべて、この層に頼みます")
+    _line(OK, f"AI の出口 {shown} に届きます(合言葉: {token}、待ち時間 {appsettings.get('ai', 'outlet_timeout')} 秒)。AI はすべて、この層に頼みます")
     return 0
 
 
@@ -72,6 +78,12 @@ async def _db_query() -> tuple[bool, str]:
                 cards = (await conn.execute(text("SELECT count(*) FROM delivery_cards"))).scalar_one()
             except Exception:  # noqa: BLE001 — テーブルがまだないだけ
                 pass
+        # 仕事の設定(BigQuery の場所・AI のモデル)は DB にある。読めなければ(表がまだない など)、環境変数で確かめる
+        async with engine.connect() as conn:
+            try:
+                await appsettings.load_from(conn)
+            except Exception:  # noqa: BLE001
+                pass
         await engine.dispose()
         detail = f"つながりました({str(version).split(',')[0]})。テーブル {tables} 個"
         detail += f"、配信カード {cards} 件" if cards is not None else "(CCP のテーブルはまだありません。import-pack か migrate で作られます)"
@@ -86,8 +98,9 @@ def _check_bigquery() -> int:
 
     outputs = bq.configured()
     if not outputs:
-        _line(WARN, "BQ_SPU などの設定がありません(BigQuery から取り込まない。取り込むときは workbench.env に場所を書く)")
+        _line(WARN, "BigQuery の表の場所が設定されていません(BigQuery から取り込まない。取り込むときは ⚙ →「データの取り込み」で場所を入れる)")
         return 0
+    _line(OK, f"表の場所: {len(outputs)} 個({_where('bq')})")
     try:
         client = bq.client()
     except ImportError:
@@ -156,7 +169,7 @@ def run() -> int:
     ng += check_outlet()
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     if project:
-        _line(OK, f"GOOGLE_CLOUD_PROJECT={project} / GOOGLE_CLOUD_LOCATION={os.getenv('GOOGLE_CLOUD_LOCATION', 'global')} / GEMINI_MODEL={os.getenv('GEMINI_MODEL', 'gemini-3.5-flash')}")
+        _line(OK, f"GOOGLE_CLOUD_PROJECT={project} / GOOGLE_CLOUD_LOCATION={os.getenv('GOOGLE_CLOUD_LOCATION', 'global')} / モデル={appsettings.get('ai', 'model')}({_where('ai')})")
     else:
         _line(WARN, "GOOGLE_CLOUD_PROJECT がありません(AI のボタンが使えません。AI を使わないなら、このままでもよい)")
     if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):

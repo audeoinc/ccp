@@ -4,11 +4,13 @@
 取り込み(B2 以降)は、これを土台に足す。
 
 接続は、Workbench のサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
-出力の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)は、利用先の名前を含むので、コードにもリポジトリにも書かず、環境変数で渡す:
+出力の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)は、利用先の名前を含むので、コードにもリポジトリにも書かず、
+⚙ →「データの取り込み」で DB に持つ(appsettings.py のまとめ bq。2026-11-03 までは環境変数。DB にまだなければ、一度だけ写す):
   BQ_SPU / BQ_SKU / BQ_SKU_STOCK / BQ_WEEKLY / BQ_FORECAST   5 つの出力(BIGQUERY_EXPORT.md の 2〜6 章)
   BQ_RANKING   販売チャネルごとの販売順位(BIGQUERY_EXPORT.md の 9 章。結果の画面で使う)
   BQ_<名前>_WATCH   出力がビューのとき、更新を見る元のテーブル(ビューの最終更新の日時は、元のデータが変わっても変わらないため)
   BQ_PROJECT       問い合わせ(ジョブ)を走らせるプロジェクト。なければ GOOGLE_CLOUD_PROJECT
+値は appsettings.get を通して読む(呼ぶ側の窓口・定期の取り込みが、先に appsettings.ensure で DB から読んでおく)。
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from . import appsettings
 from .creds import get_credentials
 
 
@@ -50,12 +53,12 @@ OUTPUTS: tuple[Output, ...] = (
 
 def location(o: Output) -> str | None:
     """出力の場所(設定がなければ None)。`project.dataset.table` の形。バッククォートは外す"""
-    v = (os.getenv(o.env) or "").strip().strip("`")
+    v = str(appsettings.get("bq", o.name) or "").strip().strip("`")
     return v or None
 
 
 def watch_location(o: Output) -> str | None:
-    v = (os.getenv(f"{o.env}_WATCH") or "").strip().strip("`")
+    v = str(appsettings.get("bq", f"{o.name}_watch") or "").strip().strip("`")
     return v or None
 
 
@@ -64,7 +67,7 @@ def configured() -> list[Output]:
 
 
 def job_project() -> str | None:
-    return os.getenv("BQ_PROJECT") or os.getenv("GOOGLE_CLOUD_PROJECT") or None
+    return appsettings.get("bq", "project") or os.getenv("GOOGLE_CLOUD_PROJECT") or None
 
 
 def client() -> Any:

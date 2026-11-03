@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from .. import bq
+from .. import appsettings, bq
 from .bq_tools import profile_column, view_sources
 from .common import DOCS, doc, dry_run, error_result, flatten_fields, max_bytes, only_select, plain, schema_columns
 from .store import list_work_files, pinned_context, read_work_file, record_run, write_work_file
@@ -367,7 +367,7 @@ async def available_models() -> list[str]:
         except Exception:  # noqa: BLE001 — 一覧を出せない環境でも、設定のモデルで動く
             log.info("Vertex AI のモデルの一覧を読めませんでした", exc_info=True)
         _models_cache = pick_models(names)
-    pinned = [m for m in (os.getenv("DEVTOOLS_GEMINI_MODEL"), _pro_guess or None, os.getenv("GEMINI_MODEL")) if m]
+    pinned = [m for m in (os.getenv("DEVTOOLS_GEMINI_MODEL"), _pro_guess or None, str(appsettings.get("ai", "model"))) if m]
     return list(dict.fromkeys(pinned[:-1] + _models_cache + pinned[-1:]))
 
 
@@ -381,8 +381,9 @@ async def default_model() -> str:
     pros = [m for m in (_models_cache or []) if "-pro" in m]
     if pros:
         return pros[0]
-    # 一覧を読めない環境: CCP のモデル(GEMINI_MODEL)の Flash を Pro に置き換えた名前が、使えるかを 1 度だけ聞く
-    base = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    # 一覧を読めない環境: CCP のモデル(⚙ →「AI の設定」)の Flash を Pro に置き換えた名前が、使えるかを 1 度だけ聞く
+    await appsettings.ensure()
+    base = str(appsettings.get("ai", "model"))
     if _pro_guess is None:
         _pro_guess = ""
         guess = pro_of(base)
