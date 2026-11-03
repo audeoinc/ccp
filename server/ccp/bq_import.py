@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import appsettings, bq, bq_validate as bv, dbready, schema as sc
+from . import appsettings, bq, bq_validate as bv, dbready, schema as sc, seeddata
 from .data_api import db, require_db
 from .identity import admin_denied
 
@@ -213,9 +213,15 @@ def spu_mismatch(rows: list[dict[str, Any]], existing: list[dict[str, Any]]) -> 
     if not have:
         return None
     coming = {r["product_code"] for r in rows}
-    missing = len(have - coming)
+    gone = have - coming
+    missing = len(gone)
     if missing * 2 > len(have):
-        return f"BigQuery の SPU に、いまの商品 {len(have)} 点のうち {missing} 点がありません(出力が、この環境の商品と合っていません)。取り込みを止めました"
+        why = f"BigQuery の SPU に、いまの商品 {len(have)} 点のうち {missing} 点がありません(出力が、この環境の商品と合っていません)。取り込みを止めました"
+        # 合わない商品の多くが見本(cli seed で入るもの)なら、そう言って消し方を出す(人が覚えていなくても、次にやることが分かるように)
+        sample = gone & seeddata.product_codes()
+        if sample and len(sample) * 2 >= missing:
+            why += f"。合わない商品のうち {len(sample)} 点は見本の商品(server/seed.json)です。見本を消すと、次の取り込みで BigQuery の商品が入ります: {seeddata.REMOVE_HINT}"
+        return why
     return None
 
 

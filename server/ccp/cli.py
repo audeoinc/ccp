@@ -1,7 +1,13 @@
 """運用用のコマンド。
 
   python -m ccp.cli migrate          テーブルを作る(なければ作り、足りない列は足す)
-  python -m ccp.cli seed [--reset]   初期データ(server/seed.json)を入れる。--reset は、中身を消してから
+  python -m ccp.cli seed [--reset] [--with-bq]
+                                     見本のデータ(server/seed.json)を入れる(開発の手元・試しの環境用)。--reset は、中身を消してから。
+                                     BigQuery の出力が設定してある環境では止まる(見本の商品が BigQuery の商品と合わず、取り込みが止まるため)。
+                                     それでも入れるときだけ --with-bq
+  python -m ccp.cli remove-seed [--yes]
+                                     入れた見本(server/seed.json の ID の行)を消す。--yes がなければ、数えるだけで何も変えない。
+                                     見本でない行が見本を使っていれば、消さずに止まる
   python -m ccp.cli counts           各テーブルの件数
   python -m ccp.cli check            動かす前の確認(設定・DB への接続・写真・画面のビルド。パスワードは出さない。何も変えない)
   python -m ccp.cli import-pack <ZIP> [--images <フォルダ>] [--add] [--yes]
@@ -30,16 +36,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import sys
 from pathlib import Path
 
 from sqlalchemy import text
 
-from . import repo, schema as sc
+from . import repo, schema as sc, seeddata
 from .db import cli_conn
 
-SEED_PATH = Path(__file__).resolve().parent.parent / "seed.json"
 DEFAULT_IMAGES = Path(__file__).resolve().parent.parent / "images"
 
 
@@ -52,9 +56,17 @@ async def migrate() -> None:
     print("テーブルを作成・更新しました")
 
 
-async def seed(reset: bool) -> None:
+async def seed(reset: bool, with_bq: bool = False) -> None:
+    from . import appsettings, bq
+
+    await appsettings.ensure_cli()
+    if bq.configured() and not with_bq:
+        # 見本の商品は BigQuery の商品と合わないので、入れると取り込みが止まる(bq_import.spu_mismatch)。手順書に沿って流しても困らないよう、ここで止める
+        print("BigQuery の出力が設定してあるので、見本のデータは入れません(見本の商品が BigQuery の商品と合わず、取り込みが止まるため)。")
+        print("商品は BigQuery の取り込みで入ります。それでも見本を入れるときだけ --with-bq を付けてください")
+        sys.exit(1)
     schema = sc.load()
-    data = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    data = seeddata.load()
     async with cli_conn() as conn:
         order = schema.creation_order()
         if reset:
@@ -67,6 +79,56 @@ async def seed(reset: bool) -> None:
                 values["id"] = sc.coerce("uuid", rec["id"])
                 await conn.execute(text(repo.insert_sql(t, list(values), " ON CONFLICT (id) DO NOTHING")), values)
             print(f"{t.pg}: {len(rows)} 件")
+
+
+def _seed_ids(t: sc.Table) -> list:
+    return [sc.coerce("uuid", r["id"]) for r in seeddata.load().get(t.name, [])]
+
+
+async def remove_seed(yes: bool) -> None:
+    """見本の行(seed.json の ID)を消す。見本でない行が見本を参照していれば、消さない(参照の消し方しだいで、本物の行も消えるか、途中で止まるため)"""
+    schema = sc.load()
+    order = schema.creation_order()
+    async with cli_conn(write=yes) as conn:
+        found: dict[str, int] = {}
+        for t in order:
+            ids = _seed_ids(t)
+            if ids:
+                n = (await conn.execute(text(f"SELECT count(*) FROM {t.pg} WHERE id = ANY(:ids)"), {"ids": ids})).scalar_one()
+                if n:
+                    found[t.name] = n
+        if not found:
+            print("見本の行はありません")
+            return
+        print("見本の行(server/seed.json の ID):")
+        for name, n in found.items():
+            print(f"  {schema.tables[name].pg}: {n} 件")
+        used = []
+        for t in order:
+            for lk in t.lookups:
+                ref_ids = _seed_ids(schema.tables[lk.ref])
+                if lk.ref not in found or not ref_ids:
+                    continue
+                n = (await conn.execute(
+                    text(f"SELECT count(*) FROM {t.pg} WHERE {lk.pg} = ANY(:ref) AND NOT (id = ANY(:own))"),
+                    {"ref": ref_ids, "own": _seed_ids(t)},
+                )).scalar_one()
+                if n:
+                    used.append(f"  {t.pg}.{lk.pg}: {n} 件が見本の {schema.tables[lk.ref].pg} を使っています")
+        if used:
+            print()
+            print("見本でない行が、見本を使っています。消すと、その行も消えるか、途中で止まるので、消しません:")
+            print("\n".join(used))
+            print("画面で、その行から見本を外す(配信の商品を入れ替える など)か、その行を消してから、もう一度実行してください")
+            sys.exit(1)
+        if not yes:
+            print()
+            print("数えただけです。消すときは --yes を付けて実行してください")
+            return
+        for t in reversed(order):
+            if t.name in found:
+                await conn.execute(text(f"DELETE FROM {t.pg} WHERE id = ANY(:ids)"), {"ids": _seed_ids(t)})
+    print("見本の行を消しました。BigQuery の出力が設定してあれば、次の取り込み(または ⚙ の「いま取り込む」)で商品が入ります")
 
 
 async def counts() -> None:
@@ -139,6 +201,9 @@ def main() -> None:
     sub.add_parser("migrate")
     s = sub.add_parser("seed")
     s.add_argument("--reset", action="store_true")
+    s.add_argument("--with-bq", action="store_true")
+    rs = sub.add_parser("remove-seed")
+    rs.add_argument("--yes", action="store_true")
     sub.add_parser("counts")
     sub.add_parser("check")
     ip = sub.add_parser("import-pack")
@@ -170,7 +235,9 @@ def main() -> None:
     if args.cmd == "migrate":
         asyncio.run(migrate())
     elif args.cmd == "seed":
-        asyncio.run(seed(args.reset))
+        asyncio.run(seed(args.reset, args.with_bq))
+    elif args.cmd == "remove-seed":
+        asyncio.run(remove_seed(args.yes))
     elif args.cmd == "check":
         from .check import run
 

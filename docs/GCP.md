@@ -101,7 +101,9 @@ cd server && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r 
 
 # 3. テーブルの作成と初期データ(DB が起動している間に)
 .venv/Scripts/python.exe -m ccp.cli migrate
-.venv/Scripts/python.exe -m ccp.cli seed --reset      # server/seed.json を入れる
+# 見本のデータ(server/seed.json)は、開発の手元・試しの環境だけ。BigQuery から商品を入れる環境では入れない
+# (見本の商品が合わず取り込みが止まる。BigQuery の出力を設定してあれば seed は止まる。入れてしまったら remove-seed)
+.venv/Scripts/python.exe -m ccp.cli seed --reset
 .venv/Scripts/python.exe -m ccp.cli counts
 
 # 4. 画面をビルドして、サーバーを起動(http://localhost:8080 。Basic 認証のユーザー名は何でもよい)
