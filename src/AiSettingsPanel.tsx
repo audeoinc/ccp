@@ -13,10 +13,13 @@ import { typo } from './typo'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalM, maxWidth: '640px', minWidth: 0 },
-  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: tokens.spacingHorizontalM, rowGap: tokens.spacingVerticalM },
+  group: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalS },
+  // 欄の上をそろえる(片方の下に補足が付いても、もう片方が下がらないように)
+  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: tokens.spacingHorizontalM, rowGap: tokens.spacingVerticalS, alignItems: 'start' },
+  outlet: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 160px', columnGap: tokens.spacingHorizontalM, alignItems: 'start' },
+  narrow: { maxWidth: '160px' },
   actions: { display: 'flex', alignItems: 'center', columnGap: tokens.spacingHorizontalS, flexWrap: 'wrap' },
   sub: { ...typo.heading },
-  model: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalXS },
   note: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, display: 'flex', alignItems: 'center', columnGap: tokens.spacingHorizontalXS, flexWrap: 'wrap' },
 })
 
@@ -122,9 +125,12 @@ export function AiSettingsPanel() {
   return (
     <div className={s.root}>
       <CopiedFromEnv view={view} />
-      <div className={s.row}>
-        <Field label={<InfoLabel info={t('Vertex AI の Gemini のモデルの名前。その環境で使えるものにします。', 'The Vertex AI Gemini model name. Use one available in this environment.')}>{label('model')}</InfoLabel>}>
-          <div className={s.model}>
+      {/* 組ごとに見出しを付けて分ける(2026-11-03 利用者「レイアウトが変」: 2 列に組の違う欄が並び、補足の行で片方の列だけが下がっていた)。
+          2 列にするのは組の中だけで、欄の上をそろえる。補足(一覧を読んだ時刻・読み直す)は、欄の下に 1 行で */}
+      <section className={s.group}>
+        <span className={s.sub}>{t('使うモデル', 'Model')}</span>
+        <div className={s.row}>
+          <Field label={<InfoLabel info={t('Vertex AI の Gemini のモデル。一覧は、いまこの環境で使えるもの。一覧にないものは「そのほか」で名前を書きます。', 'The Vertex AI Gemini model. The list shows models available in this environment now. Choose "Other" to type a name.')}>{label('model')}</InfoLabel>}>
             <Select
               value={showOther ? OTHER : model}
               onChange={(_, d) => {
@@ -139,49 +145,58 @@ export function AiSettingsPanel() {
               ))}
               <option value={OTHER}>{t('そのほか(名前を書く)', 'Other (type a name)')}</option>
             </Select>
-            {showOther && <Input value={model} placeholder={String(view.defaults.model)} aria-label={t('モデルの名前', 'Model name')} onChange={(_, d) => set('model', d.value)} />}
-            <span className={s.note}>
-              {!models ? (
-                <Spinner size="extra-tiny" />
-              ) : models.live ? (
-                t(`いま使えるモデルの一覧(${when(models.at)} に読んだもの)`, `Models available now (read ${when(models.at)})`)
-              ) : models.builtin ? (
-                t(`いまの一覧を読めませんでした。既定の一覧を出しています(${models.error})`, `Could not read the current list; showing the built-in list (${models.error})`)
-              ) : (
-                t(`いまの一覧を読めませんでした(${when(models.at)} 時点の一覧です。${models.error})`, `Could not read the current list (showing the list as of ${when(models.at)}; ${models.error})`)
-              )}
-              <Button size="small" appearance="transparent" icon={<ArrowClockwiseRegular />} disabled={!models} onClick={() => void readModels(true)}>
-                {t('一覧を読み直す', 'Reload list')}
-              </Button>
-            </span>
-            {outlet && <span className={s.note}>{t('AI の出口を使っているあいだは、モデルは効きません(出口の向こうの AI が決めます)。', 'While the AI outlet is used, the model has no effect (the AI behind the outlet decides).')}</span>}
-          </div>
-        </Field>
-        <Field label={<InfoLabel info={t('深いほど、答えはよくなるが遅くなります。1 回の下書きで 6〜9 回呼ぶので、ふだんは「少し」。', 'Deeper is better but slower. A draft calls AI 6–9 times, so "Low" is the usual choice.')}>{label('thinking')}</InfoLabel>}>
-          <Select value={String(form.thinking ?? '')} onChange={(_, d) => set('thinking', d.value)}>
-            {(view.choices.thinking ?? []).map((v) => (
-              <option key={v} value={v}>
-                {thinkingName(v, t)}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label={<InfoLabel info={t('AI を同時に呼ぶ数の上限。混み合い(429)が出るときは減らします。AI の出口を使うときも効きます。', 'Upper limit of simultaneous AI calls. Lower it if you see 429 (busy). Also applies to the AI outlet.')}>{label('concurrency')}</InfoLabel>}>
+          </Field>
+          <Field label={<InfoLabel info={t('深いほど、答えはよくなるが遅くなります。1 回の下書きで 6〜9 回呼ぶので、ふだんは「少し」。', 'Deeper is better but slower. A draft calls AI 6–9 times, so "Low" is the usual choice.')}>{label('thinking')}</InfoLabel>}>
+            <Select value={String(form.thinking ?? '')} onChange={(_, d) => set('thinking', d.value)}>
+              {(view.choices.thinking ?? []).map((v) => (
+                <option key={v} value={v}>
+                  {thinkingName(v, t)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {showOther && (
+            <Field label={t('モデルの名前', 'Model name')}>
+              <Input value={model} placeholder={String(view.defaults.model)} onChange={(_, d) => set('model', d.value)} />
+            </Field>
+          )}
+        </div>
+        <span className={s.note}>
+          {!models ? (
+            <Spinner size="extra-tiny" />
+          ) : models.live ? (
+            t(`いま使えるモデルの一覧(${when(models.at)} に読んだもの)`, `Models available now (read ${when(models.at)})`)
+          ) : models.builtin ? (
+            t(`いまの一覧を読めませんでした。既定の一覧を出しています(${models.error})`, `Could not read the current list; showing the built-in list (${models.error})`)
+          ) : (
+            t(`いまの一覧を読めませんでした(${when(models.at)} 時点の一覧です。${models.error})`, `Could not read the current list (showing the list as of ${when(models.at)}; ${models.error})`)
+          )}
+          <Button size="small" appearance="transparent" icon={<ArrowClockwiseRegular />} disabled={!models} onClick={() => void readModels(true)}>
+            {t('一覧を読み直す', 'Reload list')}
+          </Button>
+        </span>
+        {outlet && <span className={s.note}>{t('AI の出口を使っているあいだは、モデルは効きません(出口の向こうの AI が決めます)。', 'While the AI outlet is used, the model has no effect (the AI behind the outlet decides).')}</span>}
+      </section>
+      <section className={s.group}>
+        <InfoLabel
+          className={s.sub}
+          info={t('入れると、AI をすべて、この URL の層(ほかの AI)に頼みます。層に送る合言葉は、サーバーの環境変数(AI_OUTLET_TOKEN)に置きます。', 'When set, all AI calls go to the layer at this URL (another AI). The token for the layer stays in the server environment (AI_OUTLET_TOKEN).')}
+        >
+          {t('AI の出口(空なら Gemini)', 'AI outlet (blank = Gemini)')}
+        </InfoLabel>
+        <div className={s.outlet}>
+          <Field label={t('URL', 'URL')}>
+            <Input value={String(form.outlet_url ?? '')} placeholder="http://127.0.0.1:8090/ask" onChange={(_, d) => set('outlet_url', d.value)} />
+          </Field>
+          <Field label={t('待ち時間(秒)', 'Timeout (seconds)')}>{num('outlet_timeout', 5, 600)}</Field>
+        </div>
+      </section>
+      <section className={s.group}>
+        <span className={s.sub}>{t('呼び方', 'Calls')}</span>
+        <Field className={s.narrow} label={<InfoLabel info={t('AI を同時に呼ぶ数の上限。混み合い(429)が出るときは減らします。AI の出口を使うときも効きます。', 'Upper limit of simultaneous AI calls. Lower it if you see 429 (busy). Also applies to the AI outlet.')}>{label('concurrency')}</InfoLabel>}>
           {num('concurrency', 1, 32)}
         </Field>
-      </div>
-      <div className={s.row}>
-        <Field
-          label={
-            <InfoLabel info={t('入れると、AI をすべて、この URL の層(ほかの AI)に頼みます。空なら Gemini。層に送る合言葉は、サーバーの環境変数(AI_OUTLET_TOKEN)に置きます。', 'When set, all AI calls go to the layer at this URL (another AI). Blank = Gemini. The token for the layer stays in the server environment (AI_OUTLET_TOKEN).')}>
-              {t('AI の出口の URL(空なら Gemini)', 'AI outlet URL (blank = Gemini)')}
-            </InfoLabel>
-          }
-        >
-          <Input value={String(form.outlet_url ?? '')} placeholder="http://127.0.0.1:8090/ask" onChange={(_, d) => set('outlet_url', d.value)} />
-        </Field>
-        <Field label={t('出口の待ち時間(秒)', 'Outlet timeout (seconds)')}>{num('outlet_timeout', 5, 600)}</Field>
-      </div>
+      </section>
       {error && (
         <MessageBar intent="error" layout="multiline">
           <MessageBarBody>{error}</MessageBarBody>
