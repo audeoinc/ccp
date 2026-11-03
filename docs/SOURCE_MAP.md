@@ -618,7 +618,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/stock_cover.py` | 61 | 在庫の持ちの材料を、商品コードの一覧から 1 回でまとめて返す(読むだけ) |
 | `ccp/product_images.py` | 300 | 商品の画像の ZIP を取り込み、商品につなぐ(表 `product_images`。`/api/product-images/import` と `ccp.cli import-images`) |
 | `ccp/model_expiry.py` | 61 | 見本の画像に、写っているモデル(人物)の使用期限を入れる(X77 の確かめ用。`ccp.cli sample-model-expiry`) |
-| `ccp/devtools/` | — | 開発用の画面(`/dev/`)の API(B10。`CCP_DEVTOOLS=1` のときだけ)。`ai_sql.py`(Gemini と会話して SQL を組む)・`bq_tools.py`(BigQuery を見る・流す)・`work.py`(出力ごとの版と答え合わせ)・`store.py`(作業フォルダ `server/devwork/`)・`gcs_policy.py`(ポリシーの文書の取り込み)・`tasks.py`(時間のかかる処理を裏で)・`common.py` |
+| `ccp/devtools/` | — | 開発用の画面(`/dev/`)の API(B10。`CCP_DEVTOOLS=1` のときだけ)。`ai_sql.py`(Gemini と会話して SQL を組む)・`bq_tools.py`(BigQuery を見る・流す)・`work.py`(出力ごとの版と答え合わせ)・`store.py`(作業フォルダ `server/devwork/`)・`gcs_policy.py`(ポリシーの文書の取り込み)・`pg_tools.py`(CCP の DB を読むだけ。開発者だけ。X104)・`tasks.py`(時間のかかる処理を裏で)・`common.py` |
 | `ccp/devimages.py` | 175 | 開発用の画面の「画像の一覧」(読むだけ) |
 | `tests/` | — | サーバーのテスト(`python -m unittest discover server/tests`。CI でも実行) |
 | `requirements.txt` / `requirements-tools.txt` | — | Python のパッケージ(サーバー / 運用ツール) |

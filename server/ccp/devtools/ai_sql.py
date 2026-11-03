@@ -116,6 +116,8 @@ class ChatIn(BaseModel):
     notes: str = Field("", max_length=200_000)
     sql: str = Field("", max_length=200_000)
     last: str = Field("", max_length=50_000)
+    # SQL の欄の流す先(bigquery / pg = CCP の DB。X104)。pg なら、表と列の形(schema.json)だけを前提に足す
+    target: str = Field("bigquery", max_length=20)
 
 
 def _sample(c: Any, t: Any) -> list[str]:
@@ -164,6 +166,24 @@ def describe(c: Any, ref: str, with_rows: bool) -> str:
     return "\n".join(lines)
 
 
+def pg_context() -> str:
+    """CCP の DB(PostgreSQL)の表と列の形(X104)。中身(行)は渡さない(ユーザーのメールアドレスなどが入っているため)。
+    人が流した結果を、人が会話に貼ったときだけ見る。AI の道具は BigQuery だけに向いているので、CCP の DB には流させない"""
+    from .pg_tools import catalog
+
+    lines = []
+    for t in catalog():
+        cols = ", ".join(f"{c['name']} {c['type']}" + (f" ({'/'.join(c['choices'])})" if c.get("choices") else "") for c in t["columns"])
+        lines.append(f"- `{t['name']}`: {cols}")
+    return (
+        "## いまの SQL の流す先: CCP の DB(PostgreSQL)\n\n"
+        "利用者は、CCP のアプリの DB を読む SQL を書いている。PostgreSQL の書き方で、読むだけの SELECT を書く(書き込み・複数の文は流せない。1 回 200 行まで)。\n"
+        "あなたの道具(SQL を流す・試す・列を調べる)は BigQuery にしか向いていないので、CCP の DB の SQL は道具で流さず、書いて返すだけにする(流すのは人)。\n"
+        "表と列は次のとおり(中身は渡していない。結果を見たいときは、人に貼ってもらう)。\n\n"
+        + "\n".join(lines)
+    )
+
+
 def build_context(body: ChatIn, client: Any | None) -> str:
     """Gemini に渡す前提(DEVTOOLS.md の 4 章の順。上ほど変わらない内容)"""
     parts = [ROLE, TABLE_POLICY]
@@ -188,6 +208,8 @@ def build_context(body: ChatIn, client: Any | None) -> str:
         parts.append("## 利用者が選んで渡した表\n\n" + "\n\n".join(describe(client, r, body.sample_rows) for r in body.tables))
     if body.notes.strip():
         parts.append("## 仕様のまとめ(利用先の資料から、利用者がまとめたもの)\n\n" + body.notes.strip())
+    if body.target == "pg":
+        parts.append(pg_context())
     if body.sql.strip():
         parts.append("## いまの SQL(画面のエディタの中身)\n\n```sql\n" + body.sql.strip() + "\n```")
     if body.last.strip():

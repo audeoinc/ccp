@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from contextvars import ContextVar
 import logging
 import os
 import secrets
@@ -194,11 +195,16 @@ async def resolve_user(conn: AsyncConnection, request: Request) -> tuple[Identit
     return (ident, await find_user(conn, ident.email)) if ident else (None, None)
 
 
+# 開発用の画面の依頼を出した人(ログインしていれば。実行の履歴に残すため。developer_denied が依頼のはじめに入れる)
+request_email: ContextVar[str] = ContextVar("request_email", default="")
+
+
 async def developer_denied(request: Request) -> str | None:
     """開発用の画面(/dev/・/api/dev/)を開けない理由(X103)。開けるなら None。
     ログインしていれば、開発者(users.is_developer)だけ。画面で隠すだけでなく、サーバーで断る(BigQuery の SQL も流せるため)。
     ログインがなければ None(画面のパスワード + CCP_DEVTOOLS=1 のいまの運用を止めない。代わりに健康診断が注意を出す)"""
     ident = await current_identity(request)
+    request_email.set(ident.email if ident else "")
     if ident is None:
         return None
     from .data_api import db

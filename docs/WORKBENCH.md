@@ -623,6 +623,7 @@ CCP の中に、標準の OIDC のログインがある(`server/ccp/oidc.py`)。
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
 | `AI_OUTLET_TOKEN` | ほかの AI を使うとき | AI の出口の層に送る合言葉(秘密なので環境変数のまま。出口の URL は ⚙ →「AI の設定」)。約束と見本の層は [AI_OUTLET.md](AI_OUTLET.md) | 使わないなら設定しない |
+| `CCP_DB_READONLY_URL` / `DEVTOOLS_PG_TIMEOUT_S` | 開発用の画面から CCP の DB を読むとき(ログインした開発者だけ) | 読むだけの DB のユーザーのつなぎ先(書き方は `DATABASE_URL` と同じ。なければアプリと同じ)・1 回の時間の上限(既定 15 秒) | なくてよい([DEVTOOLS.md](DEVTOOLS.md) の 11 章) |
 | `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` / `DEVTOOLS_GEMINI_MODEL` / `DEVTOOLS_THINKING` / `DEVTOOLS_PRICE_PER_TIB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/<ポート>/dev/`。ポートは CCP の画面と同じ `CCP_PORT`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。AI のモデル(既定は一覧でいちばん賢い Gemini)・考える量(既定 high)・料金の概算の単価(既定 $6.25/TiB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
 
 **DB に移した設定**(2026-11-03 から。⚙ の画面で変える。管理する人だけ)。前の版で、下の環境変数を書いてあれば、サーバーが最初に設定を読むときに一度だけ DB に写します。写したあとは、環境変数が残っていても DB の値が効くので、`workbench.env` から消してかまいません。

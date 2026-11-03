@@ -78,6 +78,11 @@ export function HistoryDialog({ open, onClose, onUseSql }: { open: boolean; onCl
                         <Badge size="small" appearance="tint" color={SOURCE_COLOR[r.source as keyof typeof SOURCE_COLOR] ?? 'informative'}>
                           {r.source}
                         </Badge>
+                        {r.target === 'pg' && (
+                          <Badge size="small" appearance="outline" color="important" title={r.actor ? `流した人: ${r.actor}` : undefined}>
+                            CCP の DB
+                          </Badge>
+                        )}
                         {!r.ok && (
                           <Badge size="small" appearance="filled" color="danger">
                             エラー

@@ -263,4 +263,5 @@ export const FEATURES: FeatureDef[] = [
   { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'MVP', size: 'M' },
   { id: 'dev.ask', group: 'area.devtools.ask', ...named('「？ 聞く」(使い方を AI に聞く・右クリックの「ここについて聞く」・スポットライト)', '"? Ask" (ask AI how to use CCP, "Ask about this" on right-click, spotlight)'), version: 'v1', size: 'M' },
   { id: 'dev.tools', group: 'area.devtools.devscreen', ...named('`/dev/`', 'Developer screen (/dev/)'), version: 'dev', size: 'S' },
+  { id: 'dev.tools.pg', group: 'area.devtools.devscreen', ...named('CCP の DB(PostgreSQL)に SQL を投げる(読むだけ。AI には表と列の形だけ)', 'Query the CCP DB (PostgreSQL, read-only; AI sees only tables and columns)'), version: 'dev', size: 'M' },
 ]
