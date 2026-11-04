@@ -14,25 +14,20 @@
 - 何人か・何セッションかが、同じ `main` に push している(UI・結果・承認プロセス・BigQuery・文書などのセッション)。
 - 済んだ範囲: 一覧(L)・制作指示(P)・週(W。W8 は保留)・アラート(A)・結果(R)・承認(U1〜U6)・制作の依頼(PR)・X の多く(AB テスト・案から選ぶ・素材・画像のライブラリ・テンプレートの版・表示の大きさ・件名など)。状態の正は [BACKLOG.md](BACKLOG.md)。
 - 本番: どこまで反映したかは、印のタグ `deployed-gcp/*` で見る。本番の画面での操作・表と列の追加は、多くが未確認。
-- リリース ZIP: AWS 版の最新の公開は `20261103-661ce14`(Releases のタグ `aws-<版>`。見本のデータの直し 17165a3・remove-seed を含む)。Workbench 版の最後の公開は 5 章。
+- リリース ZIP: AWS 版の最新の公開は `20261104-ec7d58d`(Releases のタグ `aws-<版>`)。Workbench 版の最後の公開は 5 章。
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
-- 2026-11-04 UI 2: `ui2-secrets`(初期設定の画面・秘密の設定・設定の型)を main に。コンテナの対策: `CCP_ENV_FILE` の 3 つの置き方(既定は注意・パス指定・`off` で欄を閉じる)、健康診断の組 `file`、docs/AWS.md の「コンテナで動かすとき」。
-- 2026-11-04 UI 2: X108 差分の一覧を main に(`npm run client:diff`。AWS_CUSTOMIZE の 5.2 の最初に置いた)。X109 は 11dfee51 で入れたが、利用者の指示で戻した(着手しない。どう作るかは利用者と決める。AWS 側で変わるのは 3 列だけでなく、データと設定のすべて)。B7 も閉じる前に戻した。
-- 2026-11-04 UI 2: X107 書き出さない変更を止める確認を main に(`scripts/check-client-changes.mjs`。ZIP に入る `server/schema.base.json` と比べる。開発側にはこのファイルがないので何もしない)。
-- 2026-11-04 UI 2: X106 スキーマの重ね読みを main に(`server/ccp/client/schema.json`。足すだけ。ぶつかれば verify・起動・check が理由を出して止める。ファイルがなければ今までと同じ)。
-- 2026-11-04 要件の相談役: AWS 版の取り込みを、総入れ替えからマージ(`vendor` → `main`。CCP はリポジトリの中の `ccp/`)に変えると決めた。AWS 側はデータに合わせてスキーマ・表・画面を変える。文書は [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md)。**開発側の新機能は、AWS 側の追加がなくても動くように作る。** スキーマの重ね読みなどの仕組みは未着手(その文書の 7 章)
-- 2026-11-04 連絡係: Copilot Studio の検証(docs/MS_AI_VERIFY.md・道具 tools/ms-verify/)。方式 1 Direct Line は文・画像とも使える(1 回 4MB まで)。方式 3 AI Builder は Power Automate の流れを窓口にすると文・画像とも通った(画像は 1 回 1 枚まで。流れの Image の欄を base64ToBinary にする)。方式 2 Agents SDK は利用者ごとのサインインが要る。残り: AI Builder で何枚も送る(T9)・道具をサーバーでも使える手直し
-- 2026-11-03 1 日の終わりの文書の更新(10-30〜11-03 の分): FEATURES・SOURCE_MAP・FEATURE_REASONS(F189〜F196・S15〜S18)・USER_STORIES・BACKLOG(X101 を DONE、X98 を ▶)・FLOWS 1.1・2.9。`source-map.drawio` は直していない
-- 2026-11-03 UI 1: W2 の SSO のサーバー側・入口の認証がないときの扱い(中継の印は 503。**Workbench・AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。SSO の画面(右上のメニューのログアウト・切れたときの案内 `src/gcp/loginExpired.ts`)も main に入れた(2026-11-04。**見た目は利用者が未確認**。Entra のある別の環境で利用者が確認する。ログインなしの置き先の見た目は変わらない)。残りは X104 を本物の DB で確認
-- 2026-11-04 UI 2: W1 データの入口の切れ目を main に(`ccp/datasource.py` の約束 3 つ・`bq.BigQuerySource`・契約テスト `test_contract_datasource.py`。取り込みの動きは変わらない)。W3 も main に(定期の取り込みは読む前に番を取る `TICK_LOCK_KEY`・健康診断の行「外へのつなぎ」)。詳しくはアーカイブ 2026-10-28_ の末尾
-- 2026-11-03 UI 2: settings.dataimport ①〜③・settings.ai・settings.setup の健康診断(サーバーと画面)・仕事の設定を DB に(`app_settings`)は main。次は初期設定の画面 → 設定の型。本番の `BQ_AUTO_SYNC=0` を消すかは利用者
-- 2026-11-04 UI 3: X105 取り込んだデータの一覧(`settings.datalist`)は main(利用者が見本で OK)。`src/ImportedDataList.tsx`・`src/importedData.ts`(商品のページの作り方は `productPageUrl` だけ。利用先の実データの確認しだいで、ここを差し替える)・`server/ccp/datalist.py`。見本を消す窓は `DataImportPanel` の帯(`seeddata.survey` / `remove`。`cli remove-seed` と同じ中身)
-- 2026-11-03 UI 3: X56 (b)〜(d)・W5 契約テスト・見本のデータは人が明示したときだけ(`cli remove-seed`)は main。割り当てなし。残り物は AB の案 B の「詳しく」をプレビューに(`vs.details`)と、パックの商品の消し方の相談
-- 2026-11-03 W6 AWS 版の ZIP(`npm run release:aws`・`docs/AWS.md`)は main・公開済み(5 章)。最適化(optimize-survey の 1〜6)・X95 も済み
-- 2026-11-02 X86・X89・X90(K5 で詳しい制作のページを消した)・X80・X92〜X94 は main。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)
-- 2026-11-03 UI 2: settings.setup の 1 段目(健康診断・⚙「設定の状態」)、2 段目(初期設定の画面。見本は `?setup=1`・合言葉 `sample-key`)、データの取り込みの場所の言い方を、見本のブランチ ui2-setup に(利用者の OK 待ち。最後 19badf9)。秘密の設定(`ccp/secretstore.py`)と設定の型(`ccp/settings_template.py`。読み込むと BigQuery は確認待ち)は見本 ui2-secrets(ui2-setup の上)。次は W1 データの入口の切れ目(W5 の契約テストの形にそろえる) → W3。詳しくはアーカイブ 2026-10-28_ の末尾
+- 2026-11-04 AWS 版 `20261104-ec7d58d` を公開(5 章)。X109(11dfee51)は入っていない
+- 2026-11-04 UI 2: `ui2-secrets`(初期設定・秘密の設定・設定の型)・コンテナの対策(`CCP_ENV_FILE`、docs/AWS.md「コンテナで動かすとき」)・W1・W3・X106〜X108 は main。**X109 は利用者の指示で戻した**(着手しない。どう作るかは利用者と決める。AWS 側で変わるのはデータと設定のすべて)
+- 2026-11-04 要件の相談役: AWS 版の取り込みをマージに変えると決めた([AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md)。見直し中)。**開発側の新機能は、AWS 側の追加がなくても動くように作る**
+- 2026-11-04 UI 3: X105 取り込んだデータの一覧(`settings.datalist`)は main。商品のページの作り方は `productPageUrl` だけ
+- 2026-11-04 連絡係: Copilot Studio の検証(docs/MS_AI_VERIFY.md・tools/ms-verify/)。残りは AI Builder で何枚も送る(T9)・道具をサーバーでも使える手直し
+- 2026-11-03 UI 1: W2 の SSO・入口の認証がないときの扱い(中継の印は 503。**AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。SSO の画面の見た目は利用者が未確認。残りは X104 を本物の DB で確認
+- 2026-11-03 UI 2: settings.dataimport・settings.ai・settings.setup の健康診断・`app_settings` は main。本番の `BQ_AUTO_SYNC=0` を消すかは利用者
+- 2026-11-03 UI 3: X56 (b)〜(d)・W5・`cli remove-seed` は main。残り物は AB の案 B の「詳しく」をプレビューに(`vs.details`)と、パックの商品の消し方の相談
+- 2026-11-03 1 日の終わりの文書の更新(10-30〜11-03 の分)。`source-map.drawio` は直していない
+- 2026-11-02 X86・X89・X90・X80・X92〜X94 は main。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)
 
 ## 3. 次にやること
 
@@ -63,7 +58,7 @@ BACKLOG の ☐ / ❓ / ▶ の行が正。
 
 ## 5. 公開した版
 
-- AWS 版: 最新は `20261103-661ce14`(2026-11-03。その前は 20261103-a638168)。新しく公開したら、ここを書き換える。
+- AWS 版: 最新は `20261104-ec7d58d`(2026-11-04。その前は 20261103-661ce14)。新しく公開したら、ここを書き換える。
 
 ### Workbench 版(2026-11-03 に停止)
 
