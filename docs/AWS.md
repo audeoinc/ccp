@@ -212,7 +212,7 @@ scripts/workbench.sh status
 | 使うモデル | Vertex AI の Gemini のモデル。一覧は、いまこの環境(`GOOGLE_CLOUD_PROJECT`・`GOOGLE_CLOUD_LOCATION`)で使えるもの(1 日覚える。「一覧を読み直す」で読み直す)。一覧にないものは「そのほか(名前を書く)」 |
 | 考える深さ | 最小 / 少し / ふつう / 深く(`minimal` / `low` / `medium` / `high`)。1 回の下書きで 6〜9 回呼ぶので、ふだんは「少し」 |
 | 同時に呼ぶ数 | AI を同時に呼ぶ数の上限(1〜32)。混み合い(429)が出るときは減らす。AI の出口を使うときも効く |
-| AI の出口(空なら Gemini) | URL を入れると、AI をすべて、その層(ほかの AI)に頼む。合言葉は環境変数 `AI_OUTLET_TOKEN`。待ち時間(秒)は 5〜600。層が失敗しても、自動で Gemini には戻さない([AI_OUTLET.md](AI_OUTLET.md)) |
+| AI の出口(空なら Gemini) | URL を入れると、AI をすべて、その層(ほかの AI)に頼む。合言葉は環境変数 `AI_OUTLET_TOKEN`。待ち時間(秒)は 5〜600。層が失敗しても、自動で Gemini には戻さない([AI_OUTLET.md](AI_OUTLET.md)。Microsoft の AI に替えるときは [MS_AI_SETUP.md](MS_AI_SETUP.md)) |
 
 - 「試す」で、保存の前の値で AI を短く 1 回呼びます(何も保存しない)。
 - モデル・考える深さ・出口を変えて「保存」すると、保存の前に 1 回試し、通らなければ保存しません(いまの設定のまま動き続ける)。理由を見たうえで、それでも保存するときは「それでも保存する」。
@@ -350,6 +350,8 @@ ID トークンに `email` を足す・ログインできる人を絞る、な�
 | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) | BigQuery から出してもらう出力と列の仕様(利用先のデータの担当に渡す) |
 | [BIGQUERY.md](BIGQUERY.md) | BigQuery からの取り込みの仕組み |
 | [AI_OUTLET.md](AI_OUTLET.md) | AI の出口(ほかの AI を使う層)の約束と見本 |
+| [MS_AI_SETUP.md](MS_AI_SETUP.md) | AI を Microsoft の Copilot Studio(Direct Line)・AI Builder に替えるとき: 検証で分かったこと・作るもの(層)・準備・確かめ直し・つなぎ方(0 章から読む) |
+| [MS_AI_VERIFY.md](MS_AI_VERIFY.md) | その検証の手順と、測った数字の記録 |
 | [FEATURES.md](FEATURES.md) | 機能の一覧 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 設計の約束事(0.5 章: 置き先の違いを設定で吸収する) |
 | [DATA_TABLES.md](DATA_TABLES.md) | CCP の DB の表と列の一覧 |
