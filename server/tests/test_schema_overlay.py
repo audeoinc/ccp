@@ -1,4 +1,4 @@
-"""スキーマの重ね読み(docs/AWS_CUSTOMIZE.md の 4 章): 重ねるファイルがなければ今までと同じで、あれば足すだけ。
+"""スキーマの重ね読み(docs/AWS_CUSTOMIZE.md の 4 章): 重ねるファイルがなければ今までと同じで、あれば重ねる側を採って注意を出す。
 サーバー(schema.py)と npm run verify(scripts/schema-overlay.mjs)が、同じ例で同じ結果になることも確かめる。
 重ねるファイルは、開発側のリポジトリには置かない(ここでは一時ファイル)。
 """
@@ -34,8 +34,8 @@ CASES: list[tuple[str, Any, bool]] = [
     ("同じ定義の列", {"tables": {"products": {"columns": [["name", "text", {"required": True}]]}}}, True),
     ("同じ定義の参照", {"tables": {"cards": {"lookups": [["product_id", "products", {"onDelete": "SET NULL"}]]}}}, True),
     ("足した列を止める", {"tables": {"products": {"retired": ["gone"]}}}, True),
-    ("型が違う", {"tables": {"products": {"columns": [["name", "int"]]}}}, False),
-    ("指定が違う", {"tables": {"products": {"columns": [["name", "text"]]}}}, False),
+    ("型が違う", {"tables": {"products": {"columns": [["name", "int"]]}}}, True),
+    ("指定が違う", {"tables": {"products": {"columns": [["name", "text"]]}}}, True),
     ("いつもある列", {"tables": {"products": {"columns": [["created_on", "date"]]}}}, False),
     ("知らない型", {"tables": {"products": {"columns": [["x", "json"]]}}}, False),
     ("知らない指定", {"tables": {"products": {"columns": [["x", "text", {"default": 1}]]}}}, False),
@@ -45,12 +45,12 @@ CASES: list[tuple[str, Any, bool]] = [
     ("参照先がない", {"tables": {"cards": {"lookups": [["z_id", "nothing"]]}}}, False),
     ("参照と列の名前", {"tables": {"cards": {"lookups": [["title", "products"]]}}}, False),
     ("列と参照の名前", {"tables": {"cards": {"columns": [["product_id", "text"]]}}}, False),
-    ("参照が違う", {"tables": {"cards": {"lookups": [["product_id", "products"]]}}}, False),
+    ("参照が違う", {"tables": {"cards": {"lookups": [["product_id", "products"]]}}}, True),
     ("onDelete", {"tables": {"cards": {"lookups": [["z_id", "products", {"onDelete": "RESTRICT"}]]}}}, False),
-    ("共通の選択肢", {"choices": {"products.category": ["x"]}}, False),
+    ("共通の選択肢", {"choices": {"products.category": ["x"]}}, True),
     ("選択肢なし", {"tables": {"products": {"columns": [["size", "choice"]]}}}, False),
     ("空の選択肢", {"tables": {"products": {"columns": [["size", "choice"]]}}, "choices": {"products.size": []}}, False),
-    ("共通の列を止める", {"tables": {"products": {"retired": ["old"]}}}, False),
+    ("共通の列を止める", {"tables": {"products": {"retired": ["old"]}}}, True),
     ("共通の表に一意", {"tables": {"products": {"unique": [["name"]]}}}, False),
     ("一意の列がない", {"tables": {"extras": {"columns": [["c", "text"]], "unique": [["z"]]}}}, False),
     ("列が配列でない", {"tables": {"products": {"columns": 1}}}, False),
@@ -59,6 +59,13 @@ CASES: list[tuple[str, Any, bool]] = [
     ("知らない項目", {"views": {}}, False),
     ("表の知らない項目", {"tables": {"products": {"indexes": []}}}, False),
     ("外が配列", [], False),
+    ("同じ選択肢", {"choices": {"products.category": ["a", "b"]}}, True),
+    ("ない列の選択肢", {"choices": {"products.nothing": ["x"], "nothing": ["x"]}}, True),
+    ("選択肢をやめる", {"tables": {"products": {"columns": [["category", "text"]]}}}, True),
+    ("選択肢にする", {"tables": {"products": {"columns": [["old", "choice"]]}}, "choices": {"products.old": ["x"]}}, True),
+    ("選択肢にするのに値がない", {"tables": {"products": {"columns": [["old", "choice"]]}}}, False),
+    ("一意の組の列を止める", {"tables": {"cards": {"retired": ["title"]}}}, True),
+    ("共通の選択肢の形", {"choices": {"products.category": "x"}}, False),
 ]
 
 
@@ -66,7 +73,7 @@ class MergeTest(unittest.TestCase):
     def test_cases(self) -> None:
         for name, overlay, ok in CASES:
             with self.subTest(name):
-                _, problems, _ = sc.merge_overlay(BASE, overlay)
+                problems = sc.merge_overlay(BASE, overlay)[1]
                 self.assertEqual(not problems, ok, problems)
 
     def test_base_is_not_changed(self) -> None:
@@ -75,9 +82,29 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(json.dumps(BASE), before)
 
     def test_same_definition_is_kept_once_and_noted(self) -> None:
-        merged, _, notes = sc.merge_overlay(BASE, {"tables": {"products": {"columns": [["name", "text", {"required": True}]]}}})
+        merged, _, notes, _ = sc.merge_overlay(BASE, {"tables": {"products": {"columns": [["name", "text", {"required": True}]]}}})
         self.assertEqual([c[0] for c in merged["tables"]["products"]["columns"]], ["name", "category", "old"])
         self.assertEqual(len(notes), 1)
+
+    def test_overlay_wins_and_says_so(self) -> None:
+        merged, problems, _, changes = sc.merge_overlay(BASE, {"tables": {"products": {"columns": [["name", "int"]]}}, "choices": {"products.category": ["a", "x"]}})
+        self.assertEqual(problems, [])
+        self.assertEqual(merged["tables"]["products"]["columns"][0], ["name", "int"])
+        self.assertEqual(merged["choices"]["products.category"], ["a", "x"])
+        self.assertTrue(any("products.name" in c for c in changes))
+        self.assertTrue(any("消した値: b" in c for c in changes))
+
+    def test_opening_a_choice_drops_values_and_ignores_the_label(self) -> None:
+        merged, _, _, _ = sc.merge_overlay(BASE, {"tables": {"products": {"columns": [["category", "text"]]}}})
+        self.assertNotIn("products.category", merged["choices"])
+        self.assertIn("category_name", merged["tables"]["products"]["retired"])
+
+    def test_retiring_a_column_removes_it_and_its_unique(self) -> None:
+        merged, problems, _, changes = sc.merge_overlay(BASE, {"tables": {"cards": {"retired": ["title"]}}})
+        self.assertEqual(problems, [])
+        self.assertEqual(merged["tables"]["cards"]["columns"], [])
+        self.assertEqual(merged["tables"]["cards"]["unique"], [])
+        self.assertEqual(len(changes), 2)
 
     def test_all_types_are_the_same_in_both(self) -> None:
         for t in sc.SQL_TYPES:
@@ -103,11 +130,13 @@ class SameAsVerifyTest(unittest.TestCase):
     def test_same_result_and_same_reason(self) -> None:
         for name, overlay, _ok in CASES:
             with self.subTest(name):
-                merged, problems, _ = sc.merge_overlay(BASE, overlay)
+                merged, problems, notes, changes = sc.merge_overlay(BASE, overlay)
                 out = _node(BASE, overlay)
                 self.assertEqual(out["problems"], problems)
+                self.assertEqual(out["notes"], notes)
+                self.assertEqual(out["changes"], changes)
                 if not problems:
-                    self.assertEqual(out["merged"], {**merged, "choices": merged.get("choices", {})})
+                    self.assertEqual(out["merged"], merged)
 
 
 class LoadTest(unittest.TestCase):
@@ -161,7 +190,7 @@ class LoadTest(unittest.TestCase):
         self.assertIn(("client_notes", "body"), s.expected_columns())
 
     def test_bad_file_stops_with_reason_and_next_step(self) -> None:
-        self._write({"tables": {"products": {"columns": [["name", "int"]]}}})
+        self._write({"tables": {"products": {"columns": [["name", "json"]]}}})
         with self.assertRaises(sc.SchemaOverlayError) as e:
             sc.load()
         self.assertIn("products.name", str(e.exception))
@@ -172,8 +201,27 @@ class LoadTest(unittest.TestCase):
         with self.assertRaises(sc.SchemaOverlayError):
             sc.load()
 
+    def test_changed_common_definitions_work_and_warn(self) -> None:
+        self._write({"tables": {"products": {"columns": [["category", "text"]], "retired": ["stock"]}}, "choices": {"products.market": ["JP", "US", "EU"]}})
+        t = sc.load().table("products")
+        self.assertEqual(t.to_db({"category": "Knitwear", "category_name": "x", "market": "EU", "stock": 1}), {"category": "Knitwear", "market": "EU"})
+        self.assertIn("ALTER TABLE products ADD COLUMN IF NOT EXISTS category text", "\n".join(sc.load().ddl()))
+        out = health._Out()
+        self.assertTrue(health._schema_overlay(out))
+        self.assertEqual([i.status for i in out], ["ok", "warn", "warn", "warn"])
+        self.assertIn("CHANGES.md", out[1].fix)
+
+    def test_import_side_survives_changed_common_columns(self) -> None:
+        from ccp import bq_import, bq_validate
+
+        self._write({"tables": {"products": {"columns": [["category", "text"]], "retired": ["season"]}}})
+        self.assertNotIn("season", bq_import._values("products", {"name": "n", "season": "x"}, ["name", "season"]))
+        row = {"market": "JP", "product_code": "A", "name": "n", "category": "Knitwear"}
+        issues = bq_validate.validate("spu", [row])
+        self.assertFalse(any("Knitwear" in i.message for i in issues))
+
     def test_health_shows_failed_and_stops_there(self) -> None:
-        self._write({"tables": {"products": {"columns": [["name", "int"]]}}})
+        self._write({"tables": {"products": {"columns": [["name", "json"]]}}})
         out = health._Out()
         self.assertFalse(health._schema_overlay(out))
         self.assertEqual([i.status for i in out], ["failed"])

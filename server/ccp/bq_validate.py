@@ -107,6 +107,12 @@ class _Collector:
             self.issues.append(Issue(level, self.output, f"{col} に、決まった値({' / '.join(sorted(ok))})にない値があります: {', '.join(found[:8])}{note}", len(hits), [_key(r, self.key) for r in hits[:3]]))
 
 
+def _allowed(col: str) -> list[str] | None:
+    """products の列の選択肢。AWS 側が列をやめた・選択肢をやめたなら None(確かめない)"""
+    column = sc.load().table("products").by_name.get(col)
+    return column.choices if column else None
+
+
 def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict[str, Any]]] | None = None, now: datetime | None = None) -> list[Issue]:
     """出力 name(spu / sku / sku_stock / weekly / forecast / ranking)の行を確かめる。
     context には、結びつきを確かめる相手の行を入れる(sku なら spu、sku_stock なら sku。なければ、結びつきは確かめない)"""
@@ -130,8 +136,8 @@ def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict
     if dup:
         c.issues.append(Issue(NG, name, f"キー({', '.join(key)})が重なっている組があります: {len(dup)} 組", 0, dup[:3]))
     c.check(NG, "market が大文字の 2 文字(JP / US など)ではありません", rows, lambda r: r.get("market") not in (None, "") and not MARKET.match(str(r.get("market"))))
-    markets = sc.load().table("products").by_name["market"].choices or []
-    c.values(rows, "market", markets, WARN, "(CCP の配信カードの国にない市場は、AI の選定に使われません)")
+    if markets := _allowed("market"):
+        c.values(rows, "market", markets, WARN, "(CCP の配信カードの国にない市場は、AI の選定に使われません)")
 
     # 共通: データの時点が古すぎない・先すぎない
     stamp = "issued_at" if name == "forecast" else "as_of"
@@ -156,8 +162,8 @@ def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict
             c.range(rows, col, None, 5, WARN)  # 売上 +500% を超える反応は、計算の誤り(日数が少ない など)を疑う
         c.check(WARN, "description が 500 字を超えています(AI に渡すときに長すぎる)", rows, lambda r: len(str(r.get("description") or "")) > 500)
         for col in ("category", "season"):
-            allowed = sc.load().table("products").by_name[col].choices or []
-            c.values(rows, col, allowed, WARN, "(いまの CCP は決まった選択肢で持つ。BACKLOG の B7)")
+            if allowed := _allowed(col):
+                c.values(rows, col, allowed, WARN, "(いまの選択肢にない値です。変えるなら、重ねるファイルの choices に足します)")
         c.check(WARN, "category_path の区切りが ' > ' ではありません", rows, lambda r: bool(r.get("category_path")) and ">" in str(r["category_path"]) and " > " not in str(r["category_path"]))
         c.check(WARN, "review_count があるのに rating が空です", rows, lambda r: (_num(r.get("review_count")) or 0) > 0 and r.get("rating") is None)
 

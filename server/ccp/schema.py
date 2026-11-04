@@ -234,15 +234,23 @@ def _items(t: dict[str, Any], key: str) -> list[Any]:
     return v if isinstance(v, list) else []
 
 
-def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], list[str], list[str]]:
-    """schema.json の中身に、重ねるファイルの中身を重ねる。返すのは (重ねた形, 重ねられない理由, 消してよい行)。
-    足すだけ: 共通の列を変える・消す形は受けない(それは共通の変更で、CHANGES.md に書くもの)。
+def _retire(target: dict[str, Any], name: str) -> None:
+    have = target.setdefault("retired", [])
+    if name not in have:
+        have.append(name)
+
+
+def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
+    """schema.json の中身に、重ねるファイルの中身を重ねる。返すのは (重ねた形, 重ねられない理由, 直してよい行, 共通を変えた行)。
+    AWS 側はデータに合わせて共通の列も変える(2026-11-04 利用者)ので、重ねる側を採り、変えたことを注意で出す。
+    止めるのは、サーバーが動けない定義(読めない形・知らない型・SQL に入れられない名前)と、データが消える共通の表の unique だけ。
     同じ決まりを scripts/schema-overlay.mjs(npm run verify)も持つ。食い違いは test_schema_overlay.py が見つける"""
     merged = json.loads(json.dumps(base))
     problems: list[str] = []
     notes: list[str] = []
+    changes: list[str] = []
     if not isinstance(overlay, dict):
-        return merged, ["いちばん外は { } にしてください"], notes
+        return merged, ["いちばん外は { } にしてください"], notes, changes
     for key in overlay:
         if key not in ("tables", "choices") and not key.startswith("_"):
             problems.append(f"{key}: 使えない項目です(使えるのは tables と choices)")
@@ -250,7 +258,8 @@ def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], l
     over_tables = overlay.get("tables", {})
     over_choices = overlay.get("choices", {})
     if not isinstance(over_tables, dict) or not isinstance(over_choices, dict):
-        return merged, ["tables と choices は { } にしてください"], notes
+        return merged, ["tables と choices は { } にしてください"], notes, changes
+    choices = merged.setdefault("choices", {})
     added_tables = {n for n in over_tables if n not in tables}
     own_choice_columns: set[str] = set()
 
@@ -294,7 +303,16 @@ def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], l
             elif c[0] in have_cols:
                 old = have_cols[c[0]]
                 if old[1] != c[1] or (old[2] if len(old) > 2 else {}) != opts:
-                    problems.append(f"{col}: すでにある列と定義が違います(いま: {_j(old)}、重ね: {_j(c)})。別の名前にするか、いまの定義に合わせてください")
+                    new = [c[0], c[1], opts] if opts else [c[0], c[1]]
+                    target["columns"][target["columns"].index(old)] = new
+                    have_cols[c[0]] = new
+                    changes.append(f"{col}: 共通の列の定義を変えました(いま: {_j(old)}、重ね: {_j(c)})")
+                    if c[1] == "choice" and old[1] != "choice":
+                        own_choice_columns.add(col)
+                    elif old[1] == "choice" and c[1] != "choice":
+                        # 選択肢をやめた列。前の画面が送る表示名(○○_name)は、保存せずに無視する
+                        choices.pop(col, None)
+                        _retire(target, f"{c[0]}_name")
                 else:
                     notes.append(f"{col}: すでに同じ定義の列があります。重ねるファイルから消してかまいません")
             else:
@@ -320,7 +338,10 @@ def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], l
             elif lk[0] in have_lks:
                 old = have_lks[lk[0]]
                 if old[1] != lk[1] or (old[2] if len(old) > 2 else {}) != opts:
-                    problems.append(f"{col}: すでにある参照と定義が違います。別の名前にするか、いまの定義に合わせてください")
+                    new = [lk[0], lk[1], opts] if opts else [lk[0], lk[1]]
+                    target["lookups"][target["lookups"].index(old)] = new
+                    have_lks[lk[0]] = new
+                    changes.append(f"{col}: 共通の参照の定義を変えました(いま: {_j(old)}、重ね: {_j(lk)})。DB にある外部キーは、そのまま残ります")
                 else:
                     notes.append(f"{col}: すでに同じ定義の参照があります。重ねるファイルから消してかまいません")
             else:
@@ -332,16 +353,22 @@ def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], l
         if name not in tables or not isinstance(t, dict):
             continue
         target = tables[name]
-        names = {c[0] for c in target["columns"]} | {lk[0] for lk in target["lookups"]}
-        retired = _items(t, "retired")
-        for r in retired:
+        for r in _items(t, "retired"):
             if not isinstance(r, str):
                 problems.append(f"{name}: retired には列の名前を並べてください({_j(r)})")
-            elif r in names:
-                problems.append(f"{name}.{r}: 使っている列を retired にはできません。共通の列を止めるなら、共通の変更として CHANGES.md に書いてください")
-        if retired and not problems:
-            have = target.get("retired", [])
-            target["retired"] = [*have, *[r for r in retired if r not in have]]
+                continue
+            if any(c[0] == r for c in target["columns"]) or any(lk[0] == r for lk in target["lookups"]):
+                target["columns"] = [c for c in target["columns"] if c[0] != r]
+                target["lookups"] = [lk for lk in target["lookups"] if lk[0] != r]
+                choices.pop(f"{name}.{r}", None)
+                own_choice_columns.discard(f"{name}.{r}")
+                changes.append(f"{name}.{r}: 使わない列にしました。読み書きしなくなります(DB の列は残ります)")
+                # 一意の組に残すと、表を作る SQL が作れない
+                if any(r in u for u in target.get("unique", [])):
+                    target["unique"] = [u for u in target["unique"] if r not in u]
+                    changes.append(f"{name}.{r}: この列を含む一意の組を外しました(DB の索引は残ります)")
+            _retire(target, r)
+        names = {c[0] for c in target["columns"]} | {lk[0] for lk in target["lookups"]}
         unique = _items(t, "unique")
         if unique and name not in added_tables:
             # 一意にする SQL は、重なった行を消す。共通の表の行を、重ねるファイルだけで消させない
@@ -352,17 +379,26 @@ def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], l
                     problems.append(f"{name}: unique の列がありません: {_j(u)}")
             target["unique"] = unique
 
-    choices = merged.setdefault("choices", {})
     for col, values in over_choices.items():
-        if col not in own_choice_columns:
-            problems.append(f"{col}: 重ねるファイルで足した choice の列にだけ、選択肢を書けます")
-        elif not isinstance(values, list) or not values or any(not isinstance(v, str) for v in values):
+        if not isinstance(values, list) or not values or any(not isinstance(v, str) for v in values):
             problems.append(f"{col}: 選択肢は、文字の値を 1 つ以上並べてください")
-        else:
-            choices[col] = values
+            continue
+        table, _, column = col.partition(".")
+        found = next((c for c in tables.get(table, {}).get("columns", []) if c[0] == column), None)
+        if found is None or found[1] != "choice":
+            notes.append(f"{col}: choice の列がないので、この選択肢は使いません。重ねるファイルのこの行を直すか消してください")
+            continue
+        if col not in own_choice_columns:
+            old = choices.get(col, [])
+            if old == values:
+                notes.append(f"{col}: すでに同じ選択肢です。重ねるファイルから消してかまいません")
+            else:
+                gone = [v for v in old if v not in values]
+                changes.append(f"{col}: 共通の選択肢を変えました" + (f"(消した値: {', '.join(gone)})" if gone else ""))
+        choices[col] = values
     for col in sorted(own_choice_columns - set(over_choices)):
         problems.append(f"{col}: choice の列には、choices に選択肢を書いてください")
-    return merged, problems, notes
+    return merged, problems, notes, changes
 
 
 def overlay_status() -> dict[str, Any] | None:
@@ -372,14 +408,19 @@ def overlay_status() -> dict[str, Any] | None:
     try:
         overlay = json.loads(OVERLAY_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
-        return {"problems": [f"読めません({type(e).__name__}: {e})"], "notes": [], "tables": 0, "columns": 0}
+        return {"problems": [f"読めません({type(e).__name__}: {e})"], "notes": [], "changes": [], "tables": 0, "columns": 0}
     base = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    merged, problems, notes = merge_overlay(base, overlay)
+    merged, problems, notes, changes = merge_overlay(base, overlay)
+
+    def names(tables: dict[str, Any]) -> set[tuple[str, str]]:
+        return {(n, c[0]) for n, t in tables.items() for c in [*t["columns"], *t["lookups"]]}
+
     return {
         "problems": problems,
         "notes": notes,
+        "changes": changes,
         "tables": len(merged["tables"]) - len(base["tables"]),
-        "columns": sum(len(t["columns"]) + len(t["lookups"]) for t in merged["tables"].values()) - sum(len(t["columns"]) + len(t["lookups"]) for t in base["tables"].values()),
+        "columns": len(names(merged["tables"]) - names(base["tables"])),
     }
 
 
@@ -391,7 +432,7 @@ def _read_raw() -> dict[str, Any]:
         overlay = json.loads(OVERLAY_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         raise SchemaOverlayError([f"読めません({type(e).__name__}: {e})"]) from e
-    merged, problems, _notes = merge_overlay(raw, overlay)
+    merged, problems, _notes, _changes = merge_overlay(raw, overlay)
     if problems:
         raise SchemaOverlayError(problems)
     return merged

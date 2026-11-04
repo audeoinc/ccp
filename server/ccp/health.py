@@ -404,8 +404,10 @@ def _schema_overlay(out: _Out) -> bool:
         out.add("schema", "failed", "重ねるファイル(server/ccp/client/schema.json)を重ねられません: " + " / ".join(st["problems"][:5]), "この行を直して、サーバーを起動し直してください(docs/AWS_CUSTOMIZE.md の 4 章)")
         return False
     out.add("schema", "ok", f"重ねるファイルを読みました(足した表 {st['tables']}、足した列と参照 {st['columns']})")
+    for change in st["changes"][:20]:
+        out.add("schema", "warn", change, "docs/client/CHANGES.md に、この名前と理由を書いてください。コードがこの値や列に頼っている所は、AWS 側で合わせます")
     for note in st["notes"][:5]:
-        out.add("schema", "warn", note, "新しい版で同じ定義が入りました。重ねるファイルのこの行を消してください")
+        out.add("schema", "warn", note)
     return True
 
 

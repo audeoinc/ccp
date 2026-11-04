@@ -45,12 +45,12 @@ export function targetText(a: { gender?: string | null; ages?: string | null; au
   return parts.length > 0 ? parts.join(tr('・', ', ')) : undefined
 }
 
-/** 商品の性別(BigQuery の gender。mens / womens / unisex)。ない商品は、どちらにも出す */
+/** 商品の性別(BigQuery の gender。mens / womens / unisex)。ない商品・知らない値の商品は、どちらにも出す(黙って候補から消さない) */
 export function fitsTarget(p: Pick<Product, 'gender'>, g?: string | null): boolean {
   if (g !== 'women' && g !== 'men') return true
-  if (!p.gender || p.gender === 'unisex') return true
+  if (p.gender !== 'mens' && p.gender !== 'womens') return true
   return g === 'women' ? p.gender === 'womens' : p.gender === 'mens'
 }
 
 export const productGenderLabel = (v?: string | null): string =>
-  v === 'womens' ? tr('ウィメンズ', 'Womens') : v === 'mens' ? tr('メンズ', 'Mens') : v === 'unisex' ? tr('ユニセックス', 'Unisex') : ''
+  v === 'womens' ? tr('ウィメンズ', 'Womens') : v === 'mens' ? tr('メンズ', 'Mens') : v === 'unisex' ? tr('ユニセックス', 'Unisex') : (v ?? '')

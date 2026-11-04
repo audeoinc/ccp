@@ -172,7 +172,8 @@ def gender_of(v: Any) -> str | None:
 
 def _values(table: str, row: dict[str, Any], cols: list[str]) -> dict[str, Any]:
     t = sc.load().table(table)
-    return {c: sc.coerce(t.by_name[c].type, row.get(c)) for c in cols}
+    # AWS 側が使わない列にしたものは、書かない(取り込み全体を止めない)
+    return {c: sc.coerce(t.by_name[c].type, row.get(c)) for c in cols if c in t.by_name}
 
 
 SPU_COLS = ["name", "product_code", "market", "category", "category_path", "page_url", "season", "price", "description", "sales_trend", "rating",
@@ -187,13 +188,15 @@ async def _write_spu(conn: AsyncConnection, rows: list[dict[str, Any]]) -> str:
     by_key = {(r["market"], r["product_code"]): r["id"] for r in existing}
     by_code = {r["product_code"]: r["id"] for r in existing if r["market"] is None}
     updates, inserts = [], []
+    known = sc.load().table("products").by_name
     for r in rows:
         v = _values("products", r, SPU_COLS)
         v["weather"] = _weather_choice(r)
         v["gender"] = gender_of(r.get("gender"))
+        v = {c: x for c, x in v.items() if c in known}
         pid = by_key.get((r["market"], r["product_code"])) or by_code.get(r["product_code"])
         (updates if pid else inserts).append({**v, "id": pid} if pid else v)
-    cols = SPU_COLS + ["weather", "gender"]
+    cols = [c for c in [*SPU_COLS, "weather", "gender"] if c in known]
     if updates:
         await conn.execute(text(f"UPDATE products SET {', '.join(f'{c} = :{c}' for c in cols)}, modified_on = now() WHERE id = :id"), updates)
     if inserts:

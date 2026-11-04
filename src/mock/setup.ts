@@ -33,7 +33,7 @@ export const setSetupKey = (k: string) => {
 export const SetupService: typeof Real = {
   state: async () => {
     if (!wanted || finished) return { data: { needed: false } }
-    return entered === 'sample-key' ? { data: view() } : { data: { needed: true, reason: view().reason, keyRequired: true } }
+    return entered === 'sample-key' ? { data: view() } : { data: { needed: true, reason: view().reason, fileMode: 'default', keyRequired: true } }
   },
   test: async (step, values) => {
     await wait()

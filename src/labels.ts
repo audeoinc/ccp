@@ -7,8 +7,8 @@ import {
 } from './models/products'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 
-// 選択肢の表示名(○○_name の項目)は、値から求める
-const pick = (map: Record<string, string>, value?: string, name?: string) => name || (value === undefined ? undefined : map[value])
+// 選択肢の表示名(○○_name の項目)は、値から求める。AWS 側が選択肢を変えると知らない値が来るので、そのまま出す
+const pick = (map: Record<string, string>, value?: string, name?: string) => name || (value === undefined ? undefined : (map[value] ?? value))
 
 export function withProductLabels(p: Product): Product {
   return {

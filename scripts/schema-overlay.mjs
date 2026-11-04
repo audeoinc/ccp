@@ -2,8 +2,8 @@
 // サーバーの merge_overlay(server/ccp/schema.py)と同じ決まり。npm run verify が、起動より前に同じ理由で止められるように持つ。
 // 2 つの食い違いは、server/tests/test_schema_overlay.py が同じ例を両方に流して見つける。
 //   node scripts/schema-overlay.mjs <schema.json> <重ねるファイル>   ← 結果を JSON で出す(そのテストのため)
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const NAME = /^[a-z][a-z0-9_]*$/
@@ -20,18 +20,38 @@ const entryOk = (e) =>
 
 const items = (t, key) => (Array.isArray(t[key]) ? t[key] : [])
 
+const retire = (target, name) => {
+  target.retired ??= []
+  if (!target.retired.includes(name)) target.retired.push(name)
+}
+
 export function mergeOverlay(base, overlay) {
   const merged = JSON.parse(JSON.stringify(base))
   const problems = []
-  if (!isObject(overlay)) return { merged, problems: ['いちばん外は { } にしてください'] }
+  const notes = []
+  const changes = []
+  // 重ねて変えた共通の選択肢の列(check-schema が、型の定数と比べない)・消した値・重ねて足した列と表
+  const changedChoices = new Set()
+  const removedValues = []
+  const addedColumns = new Set()
+  const done = () => ({ merged, problems, notes, changes, changedChoices, removedValues, addedColumns, addedTables: added })
+  let added = new Set()
+  if (!isObject(overlay)) {
+    problems.push('いちばん外は { } にしてください')
+    return done()
+  }
   for (const key of Object.keys(overlay)) {
     if (key !== 'tables' && key !== 'choices' && !key.startsWith('_')) problems.push(`${key}: 使えない項目です(使えるのは tables と choices)`)
   }
   const tables = merged.tables
   const overTables = overlay.tables ?? {}
   const overChoices = overlay.choices ?? {}
-  if (!isObject(overTables) || !isObject(overChoices)) return { merged, problems: ['tables と choices は { } にしてください'] }
-  const added = new Set(Object.keys(overTables).filter((n) => !(n in tables)))
+  if (!isObject(overTables) || !isObject(overChoices)) {
+    problems.push('tables と choices は { } にしてください')
+    return done()
+  }
+  const choices = (merged.choices ??= {})
+  added = new Set(Object.keys(overTables).filter((n) => !(n in tables)))
   const ownChoice = new Set()
 
   for (const [name, t] of Object.entries(overTables)) {
@@ -69,11 +89,24 @@ export function mergeOverlay(base, overlay) {
       else if (lks.has(c[0])) problems.push(`${col}: 同じ名前の参照が、すでにあります。別の名前にしてください`)
       else if (cols.has(c[0])) {
         const old = cols.get(c[0])
-        if (old[1] !== c[1] || !same(old[2] ?? {}, opts)) problems.push(`${col}: すでにある列と定義が違います(いま: ${JSON.stringify(old)}、重ね: ${JSON.stringify(c)})。別の名前にするか、いまの定義に合わせてください`)
+        if (old[1] !== c[1] || !same(old[2] ?? {}, opts)) {
+          const next = Object.keys(opts).length ? [c[0], c[1], opts] : [c[0], c[1]]
+          target.columns[target.columns.indexOf(old)] = next
+          cols.set(c[0], next)
+          changes.push(`${col}: 共通の列の定義を変えました(いま: ${JSON.stringify(old)}、重ね: ${JSON.stringify(c)})`)
+          if (c[1] === 'choice' && old[1] !== 'choice') {
+            ownChoice.add(col)
+            changedChoices.add(col)
+          } else if (old[1] === 'choice' && c[1] !== 'choice') {
+            delete choices[col]
+            retire(target, `${c[0]}_name`)
+          }
+        } else notes.push(`${col}: すでに同じ定義の列があります。重ねるファイルから消してかまいません`)
       } else {
         const add = Object.keys(opts).length ? [c[0], c[1], opts] : [c[0], c[1]]
         target.columns.push(add)
         cols.set(c[0], add)
+        addedColumns.add(col)
         if (c[1] === 'choice') ownChoice.add(col)
       }
     }
@@ -90,11 +123,17 @@ export function mergeOverlay(base, overlay) {
       else if (Object.keys(opts).some((k) => k !== 'onDelete') || !ON_DELETE.has(opts.onDelete ?? 'NO ACTION')) problems.push(`${col}: 使えない指定です(onDelete に使えるのは ${[...ON_DELETE].sort().join(', ')})`)
       else if (lks.has(lk[0])) {
         const old = lks.get(lk[0])
-        if (old[1] !== lk[1] || !same(old[2] ?? {}, opts)) problems.push(`${col}: すでにある参照と定義が違います。別の名前にするか、いまの定義に合わせてください`)
+        if (old[1] !== lk[1] || !same(old[2] ?? {}, opts)) {
+          const next = Object.keys(opts).length ? [lk[0], lk[1], opts] : [lk[0], lk[1]]
+          target.lookups[target.lookups.indexOf(old)] = next
+          lks.set(lk[0], next)
+          changes.push(`${col}: 共通の参照の定義を変えました(いま: ${JSON.stringify(old)}、重ね: ${JSON.stringify(lk)})。DB にある外部キーは、そのまま残ります`)
+        } else notes.push(`${col}: すでに同じ定義の参照があります。重ねるファイルから消してかまいません`)
       } else {
         const add = Object.keys(opts).length ? [lk[0], lk[1], opts] : [lk[0], lk[1]]
         target.lookups.push(add)
         lks.set(lk[0], add)
+        addedColumns.add(col)
       }
     }
   }
@@ -102,16 +141,25 @@ export function mergeOverlay(base, overlay) {
   for (const [name, t] of Object.entries(overTables)) {
     if (!(name in tables) || !isObject(t)) continue
     const target = tables[name]
+    for (const r of items(t, 'retired')) {
+      if (typeof r !== 'string') {
+        problems.push(`${name}: retired には列の名前を並べてください(${JSON.stringify(r)})`)
+        continue
+      }
+      if (target.columns.some((c) => c[0] === r) || target.lookups.some((l) => l[0] === r)) {
+        target.columns = target.columns.filter((c) => c[0] !== r)
+        target.lookups = target.lookups.filter((l) => l[0] !== r)
+        delete choices[`${name}.${r}`]
+        ownChoice.delete(`${name}.${r}`)
+        changes.push(`${name}.${r}: 使わない列にしました。読み書きしなくなります(DB の列は残ります)`)
+        if ((target.unique ?? []).some((u) => u.includes(r))) {
+          target.unique = target.unique.filter((u) => !u.includes(r))
+          changes.push(`${name}.${r}: この列を含む一意の組を外しました(DB の索引は残ります)`)
+        }
+      }
+      retire(target, r)
+    }
     const names = new Set([...target.columns.map((c) => c[0]), ...target.lookups.map((l) => l[0])])
-    const retired = items(t, 'retired')
-    for (const r of retired) {
-      if (typeof r !== 'string') problems.push(`${name}: retired には列の名前を並べてください(${JSON.stringify(r)})`)
-      else if (names.has(r)) problems.push(`${name}.${r}: 使っている列を retired にはできません。共通の列を止めるなら、共通の変更として CHANGES.md に書いてください`)
-    }
-    if (retired.length && !problems.length) {
-      const have = target.retired ?? []
-      target.retired = [...have, ...retired.filter((r) => !have.includes(r))]
-    }
     const unique = items(t, 'unique')
     if (unique.length && !added.has(name)) problems.push(`${name}: unique は、重ねるファイルで足した表にだけ書けます(一意にするときに、重なった行が消えるため)`)
     else if (unique.length) {
@@ -122,32 +170,70 @@ export function mergeOverlay(base, overlay) {
     }
   }
 
-  merged.choices ??= {}
   for (const [col, values] of Object.entries(overChoices)) {
-    if (!ownChoice.has(col)) problems.push(`${col}: 重ねるファイルで足した choice の列にだけ、選択肢を書けます`)
-    else if (!Array.isArray(values) || !values.length || values.some((v) => typeof v !== 'string')) problems.push(`${col}: 選択肢は、文字の値を 1 つ以上並べてください`)
-    else merged.choices[col] = values
+    if (!Array.isArray(values) || !values.length || values.some((v) => typeof v !== 'string')) {
+      problems.push(`${col}: 選択肢は、文字の値を 1 つ以上並べてください`)
+      continue
+    }
+    const dot = col.indexOf('.')
+    const [table, column] = dot < 0 ? [col, ''] : [col.slice(0, dot), col.slice(dot + 1)]
+    const found = (tables[table]?.columns ?? []).find((c) => c[0] === column)
+    if (!found || found[1] !== 'choice') {
+      notes.push(`${col}: choice の列がないので、この選択肢は使いません。重ねるファイルのこの行を直すか消してください`)
+      continue
+    }
+    if (!ownChoice.has(col)) {
+      const old = choices[col] ?? []
+      if (JSON.stringify(old) === JSON.stringify(values)) notes.push(`${col}: すでに同じ選択肢です。重ねるファイルから消してかまいません`)
+      else {
+        const gone = old.filter((v) => !values.includes(v))
+        changes.push(`${col}: 共通の選択肢を変えました` + (gone.length ? `(消した値: ${gone.join(', ')})` : ''))
+        changedChoices.add(col)
+        if (gone.length) removedValues.push({ col, values: gone })
+      }
+    }
+    choices[col] = values
   }
   for (const col of [...ownChoice].filter((c) => !(c in overChoices)).sort()) problems.push(`${col}: choice の列には、choices に選択肢を書いてください`)
-  return { merged, problems }
+  return done()
 }
 
 /** リポジトリの定義を読む。重ねるファイルがなければ schema.json そのまま */
 export function loadSchema(root) {
   const base = JSON.parse(readFileSync(join(root, 'server', 'schema.json'), 'utf8'))
   const path = join(root, 'server', 'ccp', 'client', 'schema.json')
-  if (!existsSync(path)) return { schema: base, problems: [] }
+  if (!existsSync(path)) return { schema: base, problems: [], notes: [], changes: [], changedChoices: new Set(), removedValues: [], addedColumns: new Set(), addedTables: new Set() }
   let overlay
   try {
     overlay = JSON.parse(readFileSync(path, 'utf8'))
   } catch (e) {
-    return { schema: base, problems: [`読めません(${e.message})`] }
+    return { schema: base, problems: [`読めません(${e.message})`], notes: [], changes: [], changedChoices: new Set(), removedValues: [], addedColumns: new Set(), addedTables: new Set() }
   }
-  const { merged, problems } = mergeOverlay(base, overlay)
-  return { schema: merged, problems }
+  const { merged, ...rest } = mergeOverlay(base, overlay)
+  return { schema: merged, ...rest }
+}
+
+/** 引用符付きでその値を書いているコードのファイル(選択肢から値を消したときに、合わせる所の目安。別の意味の同じ文字も入る) */
+export function filesUsing(root, value) {
+  const quoted = [`'${value}'`, `"${value}"`]
+  const out = []
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) {
+        if (e.name !== 'mock' && e.name !== 'client' && e.name !== '__pycache__') walk(p)
+      } else if (/\.(ts|tsx|py)$/.test(e.name)) {
+        const text = readFileSync(p, 'utf8')
+        if (quoted.some((q) => text.includes(q))) out.push(relative(root, p).replaceAll('\\', '/'))
+      }
+    }
+  }
+  for (const d of [join(root, 'src'), join(root, 'server', 'ccp')]) if (existsSync(d)) walk(d)
+  return out
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const read = (p) => JSON.parse(readFileSync(p, 'utf8'))
-  process.stdout.write(JSON.stringify(mergeOverlay(read(process.argv[2]), read(process.argv[3]))))
+  const { merged, problems, notes, changes } = mergeOverlay(read(process.argv[2]), read(process.argv[3]))
+  process.stdout.write(JSON.stringify({ merged, problems, notes, changes }))
 }
