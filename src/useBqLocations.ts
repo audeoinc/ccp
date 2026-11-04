@@ -16,6 +16,8 @@ export interface BqLocationsState {
   dirty: (keys: string[]) => boolean
   tryOutputs: (names?: string[]) => Promise<void>
   save: (keys: string[]) => Promise<void>
+  /** 値を読み直す(確認待ちを解いたあとなど) */
+  reload: () => Promise<void>
 }
 
 /** 表の場所の値と保存(パネルに 1 つ)。onSaved = 取り込みの状態を読み直す(設定した出力が変わるため) */
@@ -41,6 +43,11 @@ export function useBqLocations(onSaved: () => void): BqLocationsState {
     return () => {
       alive = false
     }
+  }, [])
+
+  const reload = useCallback(async () => {
+    const r = await AppSettingsService.get('bq')
+    if (r.data) setView(r.data)
   }, [])
 
   const set = useCallback((key: string, v: string) => {
@@ -71,5 +78,5 @@ export function useBqLocations(onSaved: () => void): BqLocationsState {
     setSavedKeys(keys)
     onSaved()
   }
-  return { view, form, busy, error, savedKeys, tried, set, dirty, tryOutputs, save }
+  return { view, form, busy, error, savedKeys, tried, set, dirty, tryOutputs, save, reload }
 }

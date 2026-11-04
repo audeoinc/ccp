@@ -1,5 +1,7 @@
 # 新しい版を受け取る手順: 利用先の Git と Workbench
 
+> **AWS 版は、この文書の手順を使わない。** 総入れ替えでなくマージで取り込む([AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の 5 章。2026-11-04)。以下は Workbench 版の記録。
+
 CCP は、区切りのよいところで「Workbench 版」の ZIP(`ccp-workbench-<版>.zip`)として届きます。
 受け取った ZIP を**利用先の Git のリポジトリ**に入れ、Workbench はそのリポジトリを `git pull` して動かします。
 

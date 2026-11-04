@@ -12,7 +12,14 @@ import {
   AccordionPanel,
   Badge,
   Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
   InfoLabel,
+  Link,
   Menu,
   MenuItem,
   MenuList,
@@ -31,9 +38,12 @@ import {
   TableRow,
   makeStyles,
   tokens,
+  MessageBarActions,
 } from '@fluentui/react-components'
 import { ArrowSyncRegular, ChevronDownRegular, ChevronRightRegular, MoreHorizontalRegular, SearchRegular } from '@fluentui/react-icons'
+import { SettingsTemplateService } from './data/settingsTemplate'
 import { DataImportService, type ImportCheck, type ImportOutput, type ImportRecord, type ImportStatus } from './data/dataImport'
+import { DataListService, type SeedStatus } from './data/dataList'
 import { setImportStatus } from './dataImportState'
 import { bqOutputLabel } from './gcp/bq'
 import { LabeledValue } from './LabeledValue'
@@ -46,6 +56,8 @@ const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', rowGap: tokens.spacingVerticalM, minWidth: 0 },
   bar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: tokens.spacingHorizontalM, rowGap: tokens.spacingVerticalS },
   barRight: { marginLeft: 'auto', display: 'flex', alignItems: 'center', columnGap: tokens.spacingHorizontalS, flexWrap: 'wrap' },
+  // 列の幅を中身に合わせる(等分だと、行数の列の「一覧を見る」が隣の列に隠れるため)
+  table: { tableLayout: 'auto' },
   row: { cursor: 'pointer' },
   name: { ...typo.valueStrong, display: 'inline-flex', alignItems: 'center', columnGap: '4px', whiteSpace: 'nowrap' },
   num: { whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
@@ -156,7 +168,9 @@ function HistoryRow({ r }: { r: ImportRecord }) {
   const t = useT()
   const ok = r.status === 'ok'
   const badge =
-    r.status === 'settings' ? (
+    r.status === 'removed' ? (
+      <Badge size="small" appearance="outline" color="warning">{t('見本を消した', 'Sample removed')}</Badge>
+    ) : r.status === 'settings' ? (
       <Badge size="small" appearance="outline" color="informative">{t('場所を変えた', 'Location changed')}</Badge>
     ) : ok ? (
       <Badge size="small" appearance="tint" color="success">{t('取り込んだ', 'Imported')}</Badge>
@@ -171,7 +185,7 @@ function HistoryRow({ r }: { r: ImportRecord }) {
         {triggerName(r.trigger)}
         {r.actor ? ` · ${r.actor}` : ''}
       </span>
-      <span className={ok || r.status === 'settings' ? undefined : s.message}>
+      <span className={ok || r.status === 'settings' || r.status === 'removed' ? undefined : s.message}>
         {r.message}
         {/* 同じ理由の失敗は、記録を足さずに回数を進めている(サーバー)。最後に試した時刻も添える */}
         {r.repeat > 1 && ` ${t(`(同じ理由で ${r.repeat} 回。最後 ${when(r.checkedAt)})`, `(${r.repeat} times for the same reason; last ${when(r.checkedAt)})`)}`}
@@ -236,7 +250,93 @@ function Detail({ o, check, loc }: { o: Row; check?: ImportCheck['outputs'][numb
   )
 }
 
-export function DataImportPanel({ onImported }: { /** 取り込めたら、商品(在庫・売上の集計)を読み直す */ onImported: () => void }) {
+/**
+ * 見本のデータが入っているときだけ出す帯(X105)。見本の商品は BigQuery の商品と合わず、取り込みを止める原因になるので、ここで気づけて、ここで消せるようにする。
+ * 消す前に、消える行の数を窓で見せる。見本でない行が見本を使っていれば、消せないことと、その行を出す(cli remove-seed と同じ中身。server/ccp/seeddata.py)
+ */
+function SampleDataBar({ onRemoved }: { onRemoved: (text: string) => void }) {
+  const s = useStyles()
+  const t = useT()
+  const [seed, setSeed] = useState<SeedStatus | null>(null)
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const read = useCallback(async () => {
+    const r = await DataListService.seedStatus()
+    if (r.data) setSeed(r.data)
+  }, [])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 開いたときに、見本が入っているかを読む
+    void read()
+  }, [read])
+  const tables = Object.entries(seed?.found ?? {})
+  if (!seed || tables.length === 0) return null
+  const products = seed.found.products ?? 0
+  const remove = async () => {
+    setBusy(true)
+    setError('')
+    const r = await DataListService.removeSeed()
+    setBusy(false)
+    // 窓を開いているあいだに見本を使う行ができたときも、理由を出して読み直す
+    if (!r.data) {
+      setError(r.error ?? '')
+      return void read()
+    }
+    setAsking(false)
+    setSeed(null)
+    onRemoved(t('見本のデータを消しました。「全部を今すぐ取り込む」か、次の定期の取り込みで、BigQuery の商品が入ります。', 'Sample data removed. BigQuery products come in with “Import all now” or the next scheduled import.'))
+  }
+  return (
+    <>
+      <MessageBar intent="warning" layout="multiline">
+        <MessageBarBody>
+          {t(`見本のデータが入っています(商品 ${products} 点など)。見本の商品は BigQuery の商品と合わないので、商品の取り込みが止まることがあります。`, `Sample data is in the app (${products} products and more). Sample products do not match BigQuery, so the product import may stop.`)}{' '}
+          <Link onClick={() => setAsking(true)}>{t('見本を消す', 'Remove sample data')}</Link>
+        </MessageBarBody>
+      </MessageBar>
+      <Dialog open={asking} onOpenChange={(_, d) => setAsking(d.open)}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>{t('見本のデータを消しますか?', 'Remove the sample data?')}</DialogTitle>
+            <DialogContent>
+              <div className={s.section}>
+                <div>{t('次の行を消します。見本として入れた行だけで、ほかの行は消えません。元に戻すには、見本を入れ直します。', 'These rows will be removed. Only rows added as samples are affected. To undo, add the samples again.')}</div>
+                <div className={s.note}>{tables.map(([k, n]) => `${k} ${n.toLocaleString(locale())}`).join(' · ')}</div>
+                {seed.used.length > 0 && (
+                  <MessageBar intent="error" layout="multiline">
+                    <MessageBarBody>
+                      {t('見本でない行が見本を使っているので、消せません。その行から見本を外すか、その行を消してから、もう一度開いてください。', 'Rows that are not samples use the samples, so they cannot be removed. Take the samples out of those rows or delete them, then open this again.')}
+                      {seed.used.map((u) => (
+                        <div key={`${u.table}.${u.column}`}>{t(`${u.table}(${u.column}): ${u.count} 件が ${u.ref} の見本を使っています`, `${u.table} (${u.column}): ${u.count} use samples in ${u.ref}`)}</div>
+                      ))}
+                    </MessageBarBody>
+                  </MessageBar>
+                )}
+                {error && <div className={s.message}>{error}</div>}
+              </div>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setAsking(false)}>{t('やめる', 'Cancel')}</Button>
+              <Button appearance="primary" disabled={busy || seed.used.length > 0} icon={busy ? <Spinner size="extra-tiny" /> : undefined} onClick={() => void remove()}>
+                {t('見本を消す', 'Remove sample data')}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+    </>
+  )
+}
+
+export function DataImportPanel({
+  onImported,
+  onOpenList,
+}: {
+  /** 取り込めたら、商品(在庫・売上の集計)を読み直す */
+  onImported: () => void
+  /** その出力を選んだ状態で、取り込んだデータの一覧を開く(一覧を公開していないときはなし) */
+  onOpenList?: (name: string) => void
+}) {
   const s = useStyles()
   const t = useT()
   const [status, setStatus] = useState<ImportStatus | null>(null)
@@ -274,9 +374,21 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
     // 止めた理由は、その行の下に出る。ここでは、どの出力かだけを言う
     if (r.data.failed.length)
       setNotice({ intent: 'warning', text: t('取り込めなかった出力があります(前のデータのまま使います): ', 'Some outputs were not imported (the previous data is kept): ') + r.data.failed.map((f) => label(f.name)).join(t('・', ', ')) })
+    else if (r.data.skipped === 'template') setNotice({ intent: 'warning', text: t('設定の型から写した表の場所が確認待ちなので、取り込みませんでした。上の「確認して使い始める」を押してください。', 'Not imported: locations copied from a template await confirmation. Press "Check and start using" above.') })
     else if (r.data.skipped === 'busy') setNotice({ intent: 'warning', text: t('ほかの取り込みの最中です。少し待ってから押してください', 'Another import is running. Try again shortly') })
     else if (r.data.imported.length) setNotice({ intent: 'success', text: t('取り込みました: ', 'Imported: ') + r.data.imported.map((x) => label(x.name)).join(t('・', ', ')) })
     else setNotice({ intent: 'success', text: t('読み直しました(取り込むデータはありませんでした)', 'Checked (nothing to import)') })
+  }
+
+  // 設定の型から写した表の場所の確認。いまの場所を読んで、NG がなければ取り込めるようになる
+  const confirmTemplate = async () => {
+    setBusy('*')
+    setNotice(null)
+    const r = await SettingsTemplateService.confirm()
+    setBusy(null)
+    if (!r.data) return setNotice({ intent: 'error', text: r.error ?? '' })
+    await loc.reload()
+    setNotice({ intent: 'success', text: t('確認が通りました。取り込めるようになりました。定期の取り込みは切のままなので、使うなら入にしてください。', 'Check passed. Importing is enabled. Scheduled import stays off; turn it on if you use it.') })
   }
 
   const check = async (names?: string[]) => {
@@ -360,12 +472,28 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
           </MessageBarBody>
         </MessageBar>
       )}
+      {loc.view?.pendingTemplate && (
+        <MessageBar intent="warning" layout="multiline">
+          <MessageBarBody>{t('表の場所は、ほかのサーバーの設定の型から写したものです。ここのリージョンの表か確認するまで、取り込みません。行を開いて場所を直してから、確認してください。', 'These locations were copied from another server’s template. Nothing is imported until you confirm they are right for this region. Open a row to correct a location, then confirm.')}</MessageBarBody>
+          <MessageBarActions>
+            <Button size="small" disabled={!!busy} onClick={() => void confirmTemplate()}>
+              {t('確認して使い始める', 'Check and start using')}
+            </Button>
+          </MessageBarActions>
+        </MessageBar>
+      )}
+      <SampleDataBar
+        onRemoved={(text) => {
+          setNotice({ intent: 'success', text })
+          onImported()
+        }}
+      />
       {notice && (
         <MessageBar intent={notice.intent} layout="multiline">
           <MessageBarBody>{notice.text}</MessageBarBody>
         </MessageBar>
       )}
-      <Table size="small" aria-label={t('出力ごとの取り込み', 'Import per output')}>
+      <Table size="small" className={s.table} aria-label={t('出力ごとの取り込み', 'Import per output')}>
         <TableHeader>
           <TableRow>
             <TableHeaderCell>{t('出力', 'Output')}</TableHeaderCell>
@@ -393,7 +521,16 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
                     <StatusBadge o={o} />
                   </TableCell>
                   <TableCell className={s.num}>{!o.unset && o.dataAsOf ? relative(o.dataAsOf) : <span className={s.dim}>—</span>}</TableCell>
-                  <TableCell className={s.num}>{o.rows != null ? <RowsDiff rows={o.rows} before={o.rowsBefore} /> : <span className={s.dim}>—</span>}</TableCell>
+                  <TableCell className={s.num} onClick={onOpenList ? stop : undefined}>
+                    {o.rows != null ? <RowsDiff rows={o.rows} before={o.rowsBefore} /> : <span className={s.dim}>—</span>}
+                    {/* 取り込みの前(見本だけ入っているときなど)も、何が入っているかを見られるように、件数がなくても出す */}
+                    {onOpenList && (
+                      <>
+                        {' '}
+                        <Link onClick={() => onOpenList(o.name)}>{t('→ 一覧を見る', '→ View list')}</Link>
+                      </>
+                    )}
+                  </TableCell>
                   <TableCell onClick={stop}>
                     <Select size="small" className={s.select} value={String(o.intervalMin)} disabled={!!busy} aria-label={t('確かめる間隔', 'Check interval')} onChange={(_, d) => void saveSettings({ interval: [o.name, Number(d.value)] })}>
                       {status.auto.choices.map((m) => (

@@ -8,6 +8,10 @@ const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString()
 const later = (iso: string | null | undefined, min: number) => (iso ? new Date(new Date(iso).getTime() + min * 60_000).toISOString() : null)
 
 const settings = { enabled: true, intervals: { spu: 60, sku: 60, sku_stock: 5, weekly: 60, forecast: 60, ranking: 60 } as Record<string, number> }
+// 設定の型を読み込むと、本物と同じく定期の取り込みは切になる
+export const mockTurnOffSchedule = () => {
+  settings.enabled = false
+}
 
 const DEST: Record<string, string> = { spu: 'products', sku: 'sku', sku_stock: 'sku_stock', weekly: 'weekly_performances', forecast: 'weather_forecast', ranking: 'product_rankings' }
 const base = (name: string, label: string, env: string, o: Partial<ImportOutput>): ImportOutput => ({

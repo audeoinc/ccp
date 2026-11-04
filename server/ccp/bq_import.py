@@ -172,7 +172,8 @@ def gender_of(v: Any) -> str | None:
 
 def _values(table: str, row: dict[str, Any], cols: list[str]) -> dict[str, Any]:
     t = sc.load().table(table)
-    return {c: sc.coerce(t.by_name[c].type, row.get(c)) for c in cols}
+    # AWS 側が使わない列にしたものは、書かない(取り込み全体を止めない)
+    return {c: sc.coerce(t.by_name[c].type, row.get(c)) for c in cols if c in t.by_name}
 
 
 SPU_COLS = ["name", "product_code", "market", "category", "category_path", "page_url", "season", "price", "description", "sales_trend", "rating",
@@ -187,13 +188,15 @@ async def _write_spu(conn: AsyncConnection, rows: list[dict[str, Any]]) -> str:
     by_key = {(r["market"], r["product_code"]): r["id"] for r in existing}
     by_code = {r["product_code"]: r["id"] for r in existing if r["market"] is None}
     updates, inserts = [], []
+    known = sc.load().table("products").by_name
     for r in rows:
         v = _values("products", r, SPU_COLS)
         v["weather"] = _weather_choice(r)
         v["gender"] = gender_of(r.get("gender"))
+        v = {c: x for c, x in v.items() if c in known}
         pid = by_key.get((r["market"], r["product_code"])) or by_code.get(r["product_code"])
         (updates if pid else inserts).append({**v, "id": pid} if pid else v)
-    cols = SPU_COLS + ["weather", "gender"]
+    cols = [c for c in [*SPU_COLS, "weather", "gender"] if c in known]
     if updates:
         await conn.execute(text(f"UPDATE products SET {', '.join(f'{c} = :{c}' for c in cols)}, modified_on = now() WHERE id = :id"), updates)
     if inserts:
@@ -394,6 +397,9 @@ async def sync(force: bool = False, only: list[str] | None = None, trigger: str 
     global _last_check
     if not bq.configured():
         return {"configured": False, "imported": [], "failed": [], "outputs": []}
+    # 設定の型から写した表の場所は、確認が通るまで読まない(ほかのリージョンの表を取り込まないように)
+    if appsettings.pending():
+        return {"configured": True, "imported": [], "failed": [], "skipped": "template", **(await status())}
     async with _lock:
         if trigger == "open":
             # 自動が「入」なら、開いたときは読まない(定期の取り込みが読む。二重に読まないため)
@@ -535,7 +541,8 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
 async def history(source: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     """取り込みの記録(新しい順)。表の場所を変えた記録(app_settings のまとめ bq)も、その出力の記録にまぜる(status = settings)"""
     limit = max(1, min(int(limit), 300))
-    where = "WHERE source = :source " if source else ""
+    # 見本を消した記録(datalist.py。source = sample)は、商品(SPU)の記録にまぜて出す(取り込みが通るようになった理由が、記録から分かるように)
+    where = ("WHERE source IN (:source, 'sample') " if source == "spu" else "WHERE source = :source ") if source else ""
     async with db() as conn:
         rows = (await conn.execute(text(
             f"SELECT source, status, source_modified, data_as_of, row_count, message, imported_at, checked_at, repeat_count, trigger, actor FROM bq_imports {where}ORDER BY imported_at DESC LIMIT {limit}"

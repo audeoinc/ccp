@@ -6,6 +6,7 @@ import { Badge, Button, MessageBar, MessageBarBody, Spinner, makeStyles, tokens 
 import { ArrowClockwiseRegular, ArrowRightRegular } from '@fluentui/react-icons'
 import { HealthService, type HealthItem, type HealthReport } from './data/health'
 import { setHealthCounts } from './healthState'
+import { SettingsTemplateSection } from './SettingsTemplateSection'
 import { locale, useT } from './i18n'
 import { typo } from './typo'
 
@@ -24,6 +25,8 @@ const useStyles = makeStyles({
 
 const areaName = (area: string, t: ReturnType<typeof useT>) =>
   ({
+    schema: t('データの定義', 'Data definitions'),
+    file: t('サーバーの設定のファイル', 'Server settings file'),
     db: t('DB', 'Database'),
     google: t('Google の認証', 'Google credentials'),
     ai: t('AI', 'AI'),
@@ -66,7 +69,7 @@ export function SettingsHealthPanel({ go }: { go: (id: string) => void }) {
   }, [check])
 
   // 画面で直せる所の、⚙ の項目
-  const target = (goto: string) => ({ ai: 'aiSettings', dataimport: 'bq' })[goto]
+  const target = (goto: string) => ({ ai: 'aiSettings', dataimport: 'bq', secrets: 'secrets' })[goto]
   const c = report?.counts
   const bad = c ? c.missing + c.failed : 0
   const areas = report ? [...new Set(report.items.map((i) => i.area))] : []
@@ -129,6 +132,7 @@ export function SettingsHealthPanel({ go }: { go: (id: string) => void }) {
           'Running python -m ccp.cli check on the server shows the same rows. Rows without "Fix" are fixed in the server settings (file or environment variables).',
         )}
       </span>
+      <SettingsTemplateSection go={go} />
     </div>
   )
 }

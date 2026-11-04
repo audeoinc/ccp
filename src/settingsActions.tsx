@@ -10,7 +10,9 @@ import {
   CalendarClockRegular,
   DeleteRegular,
   DocumentBulletListRegular,
+  TableRegular,
   HeartPulseRegular,
+  KeyRegular,
   ImageMultipleRegular,
   LayoutColumnTwoRegular,
   LightbulbFilamentRegular,
@@ -30,7 +32,9 @@ import {
   CountryTemplatesPanel,
   AiSettingsPanel,
   SettingsHealthPanel,
+  SettingsSecretsPanel,
   DataImportPanel,
+  ImportedDataList,
   DevRequestsDialog,
   FeaturesManager,
   HelpFaqAdmin,
@@ -111,6 +115,9 @@ export function useSettingsActions(ctx: {
   const rulesOn = useFeature('settings.country.rules')
   const learningsOn = useFeature('settings.country.learnings')
   const dataImportOn = useFeature('settings.dataimport')
+  const dataListOn = useFeature('settings.datalist')
+  // 管理の行の「一覧を見る」で選んだ出力(一覧は、これを最初に開く)
+  const [dataListOutput, setDataListOutput] = useState('spu')
   const aiSettingsOn = useFeature('settings.ai')
   const setupOn = useFeature('settings.setup')
   const canManage = useCanManage()
@@ -281,6 +288,20 @@ export function useSettingsActions(ctx: {
         </Later>
       ),
     },
+    // 秘密の設定(settings.setup)。パスワード・鍵を書くだけの欄。管理する人だけ
+    {
+      id: 'secrets',
+      section: 'company',
+      label: t('秘密の設定', 'Secrets'),
+      description: t('画面のパスワード・ログインのシークレット・AI の出口の合言葉を書きます。値は読み返せません。', 'Enter the app password, SSO client secret and AI outlet token. Values cannot be read back.'),
+      icon: <KeyRegular />,
+      hidden: !(setupOn && canManage),
+      render: () => (
+        <Later spin>
+          <SettingsSecretsPanel />
+        </Later>
+      ),
+    },
     // AI の設定(settings.ai。モデル・考える深さ・同時の上限・AI の出口)。管理する人だけに見せる(ほかの人には項目ごと出さない)
     {
       id: 'aiSettings',
@@ -295,6 +316,20 @@ export function useSettingsActions(ctx: {
         </Later>
       ),
     },
+    // 取り込んだデータの一覧は、だれでも読める(管理する人の画面の中に入れない)
+    {
+      id: 'datalist',
+      section: 'company',
+      label: t('取り込んだデータ', 'Imported data'),
+      description: t('いま入っている商品・SKU・在庫・週の実績・天気予報・順位を、読むだけで確かめます。検索・CSV の書き出しもできます。', 'Check the products, SKUs, stock, weekly results, forecast and ranks now in the app (read only). Search and export as CSV.'),
+      icon: <TableRegular />,
+      hidden: !dataListOn,
+      render: () => (
+        <Later spin>
+          <ImportedDataList key={dataListOutput} initial={dataListOutput} />
+        </Later>
+      ),
+    },
     // 管理する人には、出力ごとの状態・記録・確認だけ・定期の取り込みの管理の画面(settings.dataimport)。
     // ほかの人と、機能を公開していないときは、これまでどおりの「今すぐ取り込む」だけ。
     // 管理の画面は、全社の 1 項目に(⚙ の赤い点から、畳んだ開発・管理を開かずにたどれるように。中身を描く項目は、開発・管理では見出しなしで並ぶため)
@@ -306,9 +341,17 @@ export function useSettingsActions(ctx: {
           description: t('BigQuery の出力ごとの状態・記録。今すぐ取り込む・確認だけ・定期の取り込み。', 'Status and history per BigQuery output. Import now, check only, scheduled import.'),
           icon: <ArrowSyncRegular />,
           secondary: (bq && bqStockTime(bq)) ?? '',
-          render: () => (
+          render: (_c, _n, go) => (
             <Later spin>
               <DataImportPanel
+                onOpenList={
+                  dataListOn
+                    ? (name) => {
+                        setDataListOutput(name)
+                        go('datalist')
+                      }
+                    : undefined
+                }
                 onImported={() => {
                   clearProductDataCache()
                   void loadProducts()

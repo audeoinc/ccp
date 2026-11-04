@@ -2,7 +2,7 @@
 
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
-- 最終更新: 2026-11-03(`main` の時点のファイル。行数は目安)
+- 最終更新: 2026-11-04(`main` の時点のファイル。行数は目安)
 - 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
@@ -190,13 +190,13 @@ flowchart TD
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `main.tsx` | 28 | 起動。フォント・CSS を読み、`Root` を描く |
-| `Root.tsx` | 16 | Fluent UI のテーマで `App` を包む |
+| `main.tsx` | 32 | 起動。フォント・CSS を読み、初期設定が要るかをサーバーに聞いて、`Root` を描く |
+| `Root.tsx` | 27 | Fluent UI のテーマで `App` を包む(初期設定の状態なら `App` の代わりに `setup/SetupPage`) |
 | `App.tsx` | 1,680 | **画面の入口**。ヘッダー(システム全体: 国・アラート・依頼・新規作成・あなた・⚙)、作業の段(計画 / 制作 / 結果 の切り替えと絞り込み)、面の帯、月 / 週 / 一覧の切り替え、フロート(配信カード・制作のページ・結果・アラート)を開く、画面の状態と URL の行き来 |
 | `deepLink.ts` / `CopyLinkButton.tsx` | 88 / 39 | 画面の状態(面・見せ方・期間・国・開いているフロート)を URL のクエリと行き来させる / 「リンクをコピー」 |
 | `faces.ts` / `StageNav.tsx` | 28 / 174 | 面(計画・制作・結果)の色と名前 / フロートの段階の帯(PLAN → PRODUCTION → RESULTS) |
 | `floatLayout.ts` | 74 | フロートの大きさとペインの幅を変えて覚える、共通の部品 |
-| `MePicker.tsx` / `InboxButton.tsx` | 256 / 61 | 右上の「あなた」(選んでログイン・切り替え・ログアウト。最初の「だれでログインしますか?」) / 右上の「依頼」(自分宛ての承認の依頼) |
+| `MePicker.tsx` / `InboxButton.tsx` | 286 / 61 | 右上の「あなた」(選んでログイン・切り替え・ログアウト。最初の「だれでログインしますか?」) / 右上の「依頼」(自分宛ての承認の依頼) |
 | `theme.ts` | 70 | Fluent UI のテーマ(色・書体) |
 | `fonts.ts` | 23 | 同梱のフォント(外部の CDN に頼らない) |
 | `index.css` | — | 全体の CSS と、印刷(週の資料・レポート)のときの見せ方 |
@@ -524,10 +524,14 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `PatternPanel.tsx` / `samplePatterns.ts` | 182 / 33 | 国ごとの配信の型(ST9。「まとめて作る」が、この型どおりに枠を作る。表は `data/deliveryPatterns.ts`)/ その見本 |
 | `BrandPanel.tsx` / `SenderName.tsx` | 162 / 9 | 差出人の名前・店の URL・utm_source と utm_medium(ST10。全社の既定と国の上書き)/ 差出人の名前の表示 |
 | `UrlPatternFields.tsx` | 262 | 店の URL の形(`settings.shopurl`。X92): 実際の URL を 1 つ貼ると、商品コード・カテゴリの値・配信の ID を見つけて形を作り、別の見本の URL で見せる(`{ }` で書く欄は畳む) |
-| `DataImportPanel.tsx` / `dataImportState.ts` / `data/dataImport.ts` | 471 / 52 / 109 | ⚙ → 全社 →「データの取り込み」(`settings.dataimport`。管理する人だけ。出力ごとに 1 行の表・⋯ の操作・行を開いた所に流れ・時刻・記録)/ ⚙ の赤い点のための状態(10 分ごとに読む)/ `/api/bq/*` の窓口 |
+| `DataImportPanel.tsx` / `dataImportState.ts` / `data/dataImport.ts` | 608 / 52 / 109 | ⚙ → 全社 →「データの取り込み」(`settings.dataimport`。管理する人だけ。出力ごとに 1 行の表・⋯ の操作・行を開いた所に流れ・時刻・記録)/ ⚙ の赤い点のための状態(10 分ごとに読む)/ `/api/bq/*` の窓口 |
 | `BqLocations.tsx` / `useBqLocations.ts` | 136 / 75 | データの取り込みの「表の場所」(ジョブのプロジェクト・出力ごとの読む場所・更新の合図に見る表。「接続を確認」は保存の前の値で読むだけ) |
 | `AiSettingsPanel.tsx` | 240 | ⚙ → 全社 →「AI の設定」(`settings.ai`。モデルをいま使える一覧から選ぶ・考える深さ・同時に呼ぶ数・AI の出口。「試す」・保存の前の自動の試し) |
-| `SettingsHealthPanel.tsx` / `healthState.ts` / `data/health.ts` | 133 / 39 / 37 | ⚙ → 全社 →「設定の状態」(`settings.setup`。健康診断の行ごとの札・理由・直し方・「直す」)/ ⚙ の赤い点 / `GET /api/settings/health` |
+| `SettingsHealthPanel.tsx` / `healthState.ts` / `data/health.ts` | 138 / 39 / 37 | ⚙ → 全社 →「設定の状態」(`settings.setup`。健康診断の行ごとの札・理由・直し方・「直す」)/ ⚙ の赤い点 / `GET /api/settings/health` |
+| `SettingsSecretsPanel.tsx` / `data/secrets.ts` | 171 / 33 | ⚙ → 全社 →「秘密の設定」(`settings.setup`。パスワード・鍵を書くだけの欄。値は読み返せない)/ `/api/settings/secrets` の窓口 |
+| `SettingsTemplateSection.tsx` / `data/settingsTemplate.ts` | 103 / 24 | 「設定の状態」の中の、設定の型(書き出す・読み込む・確認待ちの確認)/ その窓口 |
+| `setup/SetupPage.tsx` / `setup/TemplateFileButton.tsx` / `data/setup.ts` | 316 / 36 / 80 | 初期設定の画面(`settings.setup`。合言葉・DB・Google Cloud・写真の置き場所・画面のパスワード)/ 設定の型のファイルを選ぶボタン(設定の状態と共通)/ `/api/setup/…` の窓口 |
+| `ImportedDataList.tsx` / `importedData.ts` / `data/dataList.ts` | 267 / 96 / 49 | ⚙ → 全社 →「取り込んだデータ」(`settings.datalist`。6 つの出力を読むだけで見る・検索・CSV)/ 部品でない所(商品のページの URL の作り方は `productPageUrl` だけ・列の名前・値の出し方・CSV)/ `/api/datalist` の窓口 |
 | `SettingsChanges.tsx` / `data/appSettings.ts` / `models/appSettings.ts` | 58 / 70 / 13 | DB に持つ仕事の設定(表 `app_settings`)を変えた記録の一覧 / `GET・PUT /api/settings/{bq,ai}` の窓口と型 |
 | `SampleShopPanel.tsx` | 191 | 「開発・管理」→「見本の商品ページ」(X76。表 `product_images` を読むだけ。表は `data/productImages.ts`) |
 | `productImageImport.ts` | 76 | ⚙ の「商品・メイン画像の写真の ZIP を取り込む」(まず件数だけ見せ、OK のときだけ取り込む) |
@@ -578,6 +582,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `mock/approvals.ts` ・ `mock/production.ts` ・ `mock/me.ts` ・ `mock/metricsImport.ts` ・ `mock/ads.ts` ・ `mock/csv.ts` | 撮影・デモ用の、サーバーの窓口(`/api/approvals`・`/api/production`・`/api/me`・指標の取り込み)の身代わりと、外部広告の出稿の見本(`server/ccp/ads.py` と同じ作り方) |
 | `mock/stockCover.ts` ・ `mock/devApi.ts` | 撮影・デモ用の、在庫の持ちの窓口と、開発用の画面(`/dev/`)の窓口の身代わり |
 | `mock/dataImport.ts` ・ `mock/appSettings.ts` ・ `mock/health.ts` | 撮影・デモ用の、データの取り込みの状態・仕事の設定・設定の健康診断の窓口の身代わり(見本の状態を返す) |
+| `mock/setup.ts` ・ `mock/secrets.ts` ・ `mock/settingsTemplate.ts` ・ `mock/dataList.ts` | 撮影・デモ用の、初期設定(`?setup=1`)・秘密の設定・設定の型・取り込んだデータの一覧の窓口の身代わり |
 
 ### 3.10 開発用の画面(`src/dev/`。B10)
 
@@ -602,9 +607,9 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | パス | 行数 | 役割 |
 |---|---|---|
-| `ccp/main.py` | 142 | **サーバーの入口**。画面(`dist-gcp/`)・API を 1 つのプロセスで配る。Basic 認証 |
+| `ccp/main.py` | 197 | **サーバーの入口**。画面(`dist-gcp/`)・API を 1 つのプロセスで配る。Basic 認証 |
 | `ccp/data_api.py` | 368 | `/api/data/{テーブル}` の読み書き。初めて DB につないだとき、足りない列・テーブルを足す |
-| `ccp/schema.py` | 356 | `schema.json` の読み込み、値の変換、選択肢の確かめ(以前の名前の対応表 `legacy_names.json` と、選択肢の数 → 文字の値の置き換えは、2026-10-30 に消した) |
+| `ccp/schema.py` | 587 | `schema.json` の読み込み(`client/schema.json` があれば重ねる `merge_overlay`。[AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の 4 章)、値の変換、選択肢の確かめ(以前の名前の対応表 `legacy_names.json` と、選択肢の数 → 文字の値の置き換えは、2026-10-30 に消した) |
 | `schema.json` | — | **データ定義**(テーブル・列・選択肢の値)。列を足すときはここ |
 | `ccp/db.py` | — | PostgreSQL への接続(`DATABASE_URL`) |
 | `ccp/dbready.py` | — | DB が使えるかどうか(DB を必要なときだけ起動する環境のための、差し込み口)。使えないときの `DbNotReady` |
@@ -612,8 +617,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/ai.py` | 91 | `/api/ask`。依頼文を Gemini(Vertex AI)に渡し、返答をそのまま返す |
 | `ccp/approvals.py` | 307 | 承認の依頼・承認・差し戻し・やり直し(`/api/approvals`) |
 | `ccp/production.py` | 346 | 制作の依頼(`/api/production`。依頼・受け取る・終わった・仕上がりの確認(OK / 直してほしい)・送る・やり直す・HTML・要素の直し) |
-| `ccp/identity.py` | 268 | 入口の認証の差し込み口(入ってよいか・ログインしている人。`/api/me`) |
-| `ccp/oidc.py` | 331 | 入口の認証の OIDC のアダプター(Entra ID などの SSO。`/auth/login`・`/auth/callback`・`/auth/logout`) |
+| `ccp/identity.py` | 305 | 入口の認証の差し込み口(入ってよいか・ログインしている人。`/api/me`) |
+| `ccp/oidc.py` | 342 | 入口の認証の OIDC のアダプター(Entra ID などの SSO。`/auth/login`・`/auth/callback`・`/auth/logout`) |
 | `ccp/policies.py` | 504 | 方針と決まりの取り込みと、AI への渡し方 |
 | `ccp/metrics.py` | 171 | 商品・カテゴリの週の指標の取り込み(`/api/metrics/import` と `ccp.cli import-metrics`。CSV の週 × 市場の行を置き換える) |
 | `ccp/heroes.py` | 119 | メイン画像を上げる・AI で画像を読んで下書き(`/api/heroes/upload`・`/api/heroes/describe`。X59) |
@@ -623,17 +628,23 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/page_text.py` | 152 | 商品ページの本文の取り出し(X80 段 ②。`<main>` / `<article>` だけ・ナビなどを除く・JSON-LD の Product の description を先頭に・8,000 字)。表 `product_page_texts` |
 | `ccp/creative.py` | 105 | 素材のファイルの置き場所(`/api/creative/files`。本番はバケットの `creative/`、Workbench は `ASSET_DIR/creative`) |
 | `ccp/ads.py` | 93 | 外部広告の出稿の記録(表 `ad_spends`。X49)。`/api/ads/sample` で見本を作り直す(消すのは `campaign` が `sample:` で始まる行だけ) |
-| `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 141 / 367 / 267 | BigQuery の出力の定義 / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報・販売チャネルごとの順位。商品の性別の読み替え)/ 取り込む前の確かめ |
+| `ccp/datasource.py` | 33 | データの入口の差し込み口(約束 `DataSource`: 列の一覧・最終更新・行を読むの 3 つと、開く `open()`)。契約テストは `tests/test_contract_datasource.py` |
+| `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 169 / 712 / 275 | BigQuery の出力の定義とアダプター `BigQuerySource` / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報・販売チャネルごとの順位。商品の性別の読み替え。定期の取り込みは読む前に番を取る `TICK_LOCK_KEY`)/ 取り込む前の確かめ |
+| `ccp/datalist.py` | 165 | `/api/datalist`。取り込んだデータの一覧(`settings.datalist`。だれでも読むだけ。検索とページ送りはサーバーの SQL。見本の印。見本を消す `/seed` は管理する人だけ) |
 | `ccp/bq_dummy.py` | 300 | BigQuery の見本のデータ(ダミーの元の表)を作る運用ツール |
 | `ccp/ranking_dummy.py` | 81 | 商品の販売順位(`product_rankings`)のダミーを作る運用ツール(`ccp.cli ranking-dummy`。BigQuery から取り込んだ行があれば何もしない) |
 | `ccp/assets.py` | — | `/img/…`。商品・メイン画像を、GCS か `ASSET_DIR` のフォルダから配る |
 | `ccp/creds.py` | — | Google の認証(サービスアカウント) |
 | `ccp/pack.py` | 263 | 引っ越し用のパック(すべてのデータと画像の ZIP)の書き出し・取り込み(古い版 1 のパックは「対応していません」で止める) |
-| `ccp/cli.py` | — | 運用のコマンド(`migrate` / `seed` / `counts` / `check` / `import-pack` / `import-metrics` / `import-images` / `bq-check` / `bq-dummy` / `ranking-dummy` / `sample-model-expiry`) |
-| `ccp/check.py` | 172 | 動かす前の確認(設定・DB・写真・画面のビルド) |
-| `ccp/health.py` | 416 | 設定の健康診断 `diagnose()`(行ごとに 済み・足りない・確認に失敗・注意と直し方・画面で直す所)。`ccp.cli check`・`GET /api/settings/health`(管理する人だけ)・起動のとき(軽く確かめてログに)の 3 か所で使う |
-| `ccp/appsettings.py` | 435 | 仕事の設定を DB に持つ(表 `app_settings`。BigQuery の表の場所・AI の設定・定期の取り込み)。読むのは `appsettings.get` だけ。最初に 1 回だけ環境変数から写し、そのあとは DB が正。5 分覚えて保存で捨てる。変えるたびに 1 行の記録。`/api/settings/{bq,ai}` |
-| `ccp/seeddata.py` | 28 | 見本のデータ(`seed.json`)の行の見分け(`cli seed` を BigQuery のある環境で止める・`cli remove-seed`・取り込みが止まった理由の「見本の商品です」) |
+| `ccp/cli.py` | — | 運用のコマンド(`migrate` / `seed` / `counts` / `check` / `remove-seed` / `import-pack` / `import-metrics` / `import-images` / `bq-check` / `bq-dummy` / `ranking-dummy` / `sample-model-expiry`) |
+| `ccp/check.py` | 71 | 動かす前の確認(設定・DB・写真・画面のビルド) |
+| `ccp/health.py` | 493 | 設定の健康診断 `diagnose()`(行ごとに 済み・足りない・確認に失敗・注意と直し方・画面で直す所)。`ccp.cli check`・`GET /api/settings/health`(管理する人だけ)・起動のとき(軽く確かめてログに)の 3 か所で使う |
+| `ccp/appsettings.py` | 443 | 仕事の設定を DB に持つ(表 `app_settings`。BigQuery の表の場所・AI の設定・定期の取り込み)。読むのは `appsettings.get` だけ。最初に 1 回だけ環境変数から写し、そのあとは DB が正。5 分覚えて保存で捨てる。変えるたびに 1 行の記録。`/api/settings/{bq,ai}` |
+| `ccp/setup.py` | 335 | 初期設定の画面の窓口(`/api/setup/…`。合言葉 `x-ccp-setup-key`。DB のつなぎ先がない・つながらないと初期設定の状態になり、ほかの `/api/` は 503 `setup_required`) |
+| `ccp/envfile.py` | 127 | サーバーの設定のファイル `server/ccp.env` の読み書き(環境変数が勝つ。`CCP_ENV_FILE` で置き方を決める: 指定なし・パス・`off`) |
+| `ccp/secretstore.py` | 77 | `/api/settings/secrets`。秘密の設定(値は返さない。起動し直さずに効く物だけ) |
+| `ccp/settings_template.py` | 124 | 設定の型の書き出し・読み込み・確認(秘密と DB のつなぎ先は入れない。読み込むと BigQuery は確認待ち) |
+| `ccp/seeddata.py` | 69 | 見本のデータ(`seed.json`)の行の見分け(`cli seed` を BigQuery のある環境で止める・`cli remove-seed`・取り込みが止まった理由の「見本の商品です」) |
 | `ccp/importer.py` | — | 画像から、デモ用の商品・メイン画像のデータを作って取り込む運用ツール |
 | `seed.json` | — | 初期データ(`scripts/export-seed.mjs` が `src/mock/seed.ts` から作る) |
 | `ccp/impact.py` | — | 配信の効果の見本(⚙ の「効果の見本を作る」。`POST /api/impact/sample`。見本の行だけを置き換える) |
@@ -659,7 +670,10 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `deploy-gcp.mjs` | 本番(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) | <!-- hosted -->
 | `release.mjs` | 利用先に渡す ZIP(AWS 版。停止した Workbench 版も)を作り、検査する(`npm run release:aws`。[RELEASE.md](RELEASE.md)) | <!-- hosted -->
 | `pack-ms-verify.mjs` | 検証の道具 `tools/ms-verify/` を ZIP に固める(`npm run pack:ms-verify`。利用先の ZIP には入れない) |
-| `check-schema.mjs` | `server/schema.json` と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
+| `check-schema.mjs` | `server/schema.json`(と重ねるファイル)と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
+| `schema-overlay.mjs` | `server/ccp/client/schema.json` を重ねて読む決まり(`schema.merge_overlay` と同じ。`test_schema_overlay.py` が食い違いを見つける) |
+| `check-client-changes.mjs` | 共通の列を変えたのに `docs/client/CHANGES.md` に書いていなければ注意を出す(`npm run verify`。止めない。比べる元は ZIP の `server/schema.base.json`) |
+| `client-diff.mjs` | 届いた版(`vendor`)との差分を「足した所」と「共通のコードを変えた所」に分けて出す(`npm run client:diff`) |
 | `check-approvals.mjs` | 承認の判定(`src/approvals.ts`)が、サーバーと同じ例(`server/tests/approval_cases.json`)で同じ結果になるかの確かめ(`npm run verify`) |
 | `check-policy.mjs` | must の決まりの確かめ(`src/policyCheck.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
 | `check-parts.mjs` / `check-slots.mjs` / `check-save.mjs` | 部品の配信ごとの中身(`src/partContent.ts`)/ 商品の並びとセクションの枠(`src/slots.ts`)/ 配信カードの保存の流れ(`src/saveFlow.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
@@ -696,3 +710,6 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | ヘッダー・ツールバー・面の切り替え | `src/App.tsx`・`src/AppToolbar.tsx` |
 | 画面の文言を日英で足す | その場で `t('日本語', 'English')`(`src/i18n.ts`) |
 | サーバー(AWS など・Workbench)の運用を変える | `scripts/workbench.sh`・`server/ccp/check.py`・[AWS.md](AWS.md)・[WORKBENCH.md](WORKBENCH.md) |
+| 初期設定の段・秘密の設定の項目を変える | `server/ccp/setup.py`・`src/setup/SetupPage.tsx` / `server/ccp/secretstore.py`(`MIN_LENGTH`)・`src/SettingsSecretsPanel.tsx` |
+| データの入口のアダプターを足す | `server/ccp/datasource.py`(`open()`)に足し、`server/tests/test_contract_datasource.py` に組み立てを 1 つ足す |
+| AWS 側の列・表を足す・共通の定義を変える | `server/ccp/client/schema.json`(開発側では作らない。[AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の 4 章) |

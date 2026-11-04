@@ -92,7 +92,7 @@ Power Apps・Power Automate・Power Platform・Dataverse・Copilot(Copilot Studi
 - 元のコミットが push 済みでないと止まる。`--no-test` とは一緒に使えない(確かめを通った ZIP だけを公開する)。
 - 利用先は、Releases の版のページから ZIP をダウンロードする。公開リポジトリなので、だれでもダウンロードできる(中身は、リポジトリで公開しているソースの一部)。
 - 公開した版は、HANDOVER に書く(版・元のコミット)。
-- 利用先は、ZIP を Git に入れ、`CCP AWS 版 <版>` でコミットする([UPDATE.md](UPDATE.md))。サーバーの `scripts/workbench.sh status` に、その版が出る。
+- 利用先は、ZIP をブランチ `vendor` に入れ(`CCP AWS 版 <版>` でコミット)、`main` にマージする([AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の 5 章。ZIP に入る)。サーバーの `scripts/workbench.sh status` に、その版が出る。
 - これまでに公開した Workbench 版(タグ `workbench-<版>`)は、Releases に残してある。
 
 ## 7. 毎日の終わりの手順(文書の更新)

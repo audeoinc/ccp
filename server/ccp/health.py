@@ -23,7 +23,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-from . import appsettings, dbready
+from . import appsettings, dbready, envfile
 
 log = logging.getLogger("ccp.health")
 router = APIRouter(prefix="/api/settings/health")
@@ -33,7 +33,7 @@ SERVER = Path(__file__).resolve().parent.parent
 
 @dataclass
 class Item:
-    """1 行。area は組(db / google / ai / bq / sync / assets / guard / static)。goto は ⚙ で直す所(ai / dataimport)"""
+    """1 行。area は組(schema / file / db / google / ai / bq / sync / assets / guard / static)。goto は ⚙ で直す所(ai / dataimport)"""
 
     area: str
     status: str
@@ -227,6 +227,8 @@ async def _sync(out: _Out) -> None:
     from . import bq
     from .bq_import import SETTINGS_NAME, env_disabled, latest, parse_settings
 
+    if appsettings.pending():
+        out.add("sync", "warn", "設定の型から写した BigQuery の表の場所が、確認待ちです。確認が通るまで取り込みません", "⚙ →「データの取り込み」の「確認して使い始める」を押す", goto="dataimport")
     if env_disabled():
         out.add("sync", "warn", "定期の取り込みは、環境変数(BQ_AUTO_SYNC=0)で止めています(画面の入・切は効きません)", "画面で決めるには、サーバーの設定からその行を消して、起動し直す", "dataimport")
     elif parse_settings(appsettings.raw(SETTINGS_NAME))["enabled"]:
@@ -284,7 +286,7 @@ async def _guard(out: _Out) -> None:
     if mode == "oidc":
         cfg = oidc.config()
         if cfg is None:
-            out.add("guard", "missing", f"入口の認証: ログイン(OIDC)の設定が足りません({', '.join(oidc.missing())})。いまは、だれも画面を開けません", "アプリの登録の発行元・クライアント ID・クライアントシークレットを環境変数に入れて、起動し直す(docs/WORKBENCH.md の 7.1)")
+            out.add("guard", "missing", f"入口の認証: ログイン(OIDC)の設定が足りません({', '.join(oidc.missing())})。いまは、だれも画面を開けません", "アプリの登録の発行元・クライアント ID・クライアントシークレットを環境変数に入れて、起動し直す(docs/WORKBENCH.md の 7.1)", goto="secrets")
             return
         try:
             await oidc.discover(cfg, fresh=True)
@@ -301,7 +303,7 @@ async def _guard(out: _Out) -> None:
         if os.getenv("APP_PASSWORD"):
             out.add("guard", "ok", "入口の認証: 画面のパスワード(APP_PASSWORD)があります(人は分かりません)")
         else:
-            out.add("guard", "missing", "入口の認証: CCP_AUTH=basic なのに、画面のパスワード(APP_PASSWORD)がありません。いまは、だれも画面を開けません", "APP_PASSWORD を設定する")
+            out.add("guard", "missing", "入口の認証: CCP_AUTH=basic なのに、画面のパスワード(APP_PASSWORD)がありません。いまは、だれも画面を開けません", "APP_PASSWORD を設定する", goto="secrets")
     elif mode == "iap":
         out.add("guard", "ok", "入口の認証: 手前のログイン(IAP)で守られています")
     elif mode == "none":
@@ -314,6 +316,7 @@ async def _guard(out: _Out) -> None:
                 "missing",
                 "入口の認証がありません。このサーバーの中から直に(http://127.0.0.1:…)しか開けず、中継(Jupyter の /proxy/・nginx など)や外からは開けません",
                 "ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か APP_PASSWORD を設定する。中継の手前でログインしている(Jupyter の中継など)ので CCP では守らないなら、CCP_AUTH=none",
+                goto="secrets",
             )
     else:
         out.add("guard", "missing", f"入口の認証: CCP_AUTH の値({mode})が分かりません。いまは、だれも画面を開けません", "oidc / basic / iap / none のどれかにする")
@@ -372,8 +375,47 @@ async def _net(out: _Out) -> None:
         out.add("net", "failed", f"サーバーから外(インターネット)に出られません({why})", "ファイアウォール・NAT・プロキシ(環境変数 HTTPS_PROXY)を確認する。外に出られないと、BigQuery・AI・ログインも動きません")
 
 
+def _settings_file(out: _Out) -> None:
+    """値が、サーバーのファイルから来ているか。コンテナなどでは入れ替えで消えるので、消える前に知らせる。
+    消えるかは環境の名前で決めず、CCP_ENV_FILE で場所を指定したか(人が残る場所を選んだか)で分ける"""
+    names = [n for n in envfile.from_file() if n != "CCP_SETUP_SKIPPED"]
+    if not names:
+        return
+    joined = ", ".join(names)
+    if envfile.mode() == "default":
+        out.add(
+            "file", "warn",
+            f"{joined} を、サーバーのファイル {envfile.path()} から読んでいます。コンテナなどでは、入れ替えや再起動でファイルが消え、次の起動で初期設定の画面に戻ります",
+            "Secrets Manager などから環境変数で渡してください。ファイルが残る置き方なら、CCP_ENV_FILE でこのファイルを指すと、この注意は消えます",
+            goto="secrets",
+        )
+    else:
+        out.add("file", "ok", f"{joined} を、指定されたファイル {envfile.path()} から読んでいます")
+
+
+def _schema_overlay(out: _Out) -> bool:
+    """AWS 側の列・表を重ねるファイル。なければ何も出さない。重ねられなければ False(そのあとの確かめは表の定義を使えない)"""
+    from . import schema as sc
+
+    st = sc.overlay_status()
+    if st is None:
+        return True
+    if st["problems"]:
+        out.add("schema", "failed", "重ねるファイル(server/ccp/client/schema.json)を重ねられません: " + " / ".join(st["problems"][:5]), "この行を直して、サーバーを起動し直してください(docs/AWS_CUSTOMIZE.md の 4 章)")
+        return False
+    out.add("schema", "ok", f"重ねるファイルを読みました(足した表 {st['tables']}、足した列と参照 {st['columns']})")
+    for change in st["changes"][:20]:
+        out.add("schema", "warn", change, "docs/client/CHANGES.md に、この名前と理由を書いてください。コードがこの値や列に頼っている所は、AWS 側で合わせます")
+    for note in st["notes"][:5]:
+        out.add("schema", "warn", note)
+    return True
+
+
 async def diagnose(full: bool = True) -> list[Item]:
     out = _Out()
+    if not _schema_overlay(out):
+        return list(out)
+    _settings_file(out)
     # 外への確かめは、画面と check のときだけ(起動を待たせない)
     if full:
         await _net(out)
@@ -417,7 +459,7 @@ async def at_startup() -> None:
         log.warning("⚙ →「設定の状態」か python -m ccp.cli check で、くわしく見られます")
 
 
-async def _denied(request: Request) -> dict[str, Any] | None:
+async def denied(request: Request) -> dict[str, Any] | None:
     from .data_api import db
     from .identity import admin_denied
 
@@ -426,10 +468,15 @@ async def _denied(request: Request) -> dict[str, Any] | None:
     return {"success": False, "error": {"message": why, "code": "forbidden"}} if why else None
 
 
+def forget_summary() -> None:
+    """設定を変えたあと、⚙ の赤い点を古い結果のままにしない(次に聞かれたときに確かめ直す)"""
+    _last["items"] = None
+
+
 @router.get("")
 async def get_health(request: Request) -> dict[str, Any]:
     """⚙ →「設定の状態」。AI を 1 回呼び、BigQuery の表を読む(数秒〜十数秒)"""
-    if bad := await _denied(request):
+    if bad := await denied(request):
         return bad
     items = await diagnose(full=True)
     _remember(items, True)
@@ -439,7 +486,7 @@ async def get_health(request: Request) -> dict[str, Any]:
 @router.get("/summary")
 async def get_summary(request: Request) -> dict[str, Any]:
     """⚙ の赤い点。起動のとき・画面で確かめた結果を使い回し、古ければ軽く確かめ直す(AI は呼ばない)"""
-    if bad := await _denied(request):
+    if bad := await denied(request):
         return bad
     if _last["items"] is None or time.time() - _last["at"] > SUMMARY_TTL_S:
         _remember(await diagnose(full=False), False)

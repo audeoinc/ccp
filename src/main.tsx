@@ -9,6 +9,7 @@ import { isOn } from './featureFlags'
 import { loadUserPrefs } from './userPrefs'
 import { watchChunkErrors } from './chunkReload'
 import { startHelpRecording } from './help/faq'
+import { SetupService } from './data/setup'
 
 // 反映のあとに古いタブで、分けた画面のファイルが読めなかったら、一度だけ読み直す(chunkReload.ts)
 watchChunkErrors()
@@ -16,7 +17,8 @@ watchChunkErrors()
 startHelpRecording()
 
 // ログインしている人の設定(ST6)を、言語・表示の大きさ・ペインの幅などを読む前に入れる(待つのは長くても少し)
-void loadUserPrefs().then(() => {
+// 初期設定が要るか(起動に要る設定が足りない)を、同時に聞く。要るなら、ふつうの画面の代わりに初期設定の画面だけを出す
+void Promise.all([SetupService.state(), loadUserPrefs()]).then(([setup]) => {
   document.documentElement.lang = getLang()
   // 表示の大きさ(X60)は、最初の描画の前に効かせる(大きさが変わって見えるのを避ける)。
   // 覚えた値がなければ、画面に合わせて決める(settings.me.autoscale。公開の設定は読み込む前なので、版の既定で判定し、非公開と分かったら UiScaleNotice が 100% に戻す)
@@ -24,7 +26,7 @@ void loadUserPrefs().then(() => {
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <Root />
+      <Root setup={!!setup.data?.needed} />
     </StrictMode>,
   )
 })

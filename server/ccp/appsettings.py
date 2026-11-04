@@ -48,6 +48,8 @@ AI_FIELDS: dict[str, tuple[str, Any]] = {
     "outlet_timeout": ("AI_OUTLET_TIMEOUT", 120),
 }
 GROUPS = ("bq", "ai")
+# 設定の型を読み込んだあと、BigQuery の表の場所を確認するまでの印(settings_template.py)。解くと、中身が空の行を足す
+PENDING = "template.pending"
 # 変えたら保存の前に試す AI の項目(同時に呼ぶ数は、呼べるかに関係しない)
 TRIED_KEYS = {"model", "thinking", "outlet_url", "outlet_timeout"}
 
@@ -114,6 +116,11 @@ def raw(name: str) -> dict[str, Any] | None:
     """まとめの最新の行の値(bq / ai 以外のまとめ。例 bq.sync)。なければ None"""
     row = _rows.get(name)
     return dict(row["value"]) if row else None
+
+
+def pending() -> dict[str, Any] | None:
+    """設定の型から写した BigQuery の表の場所が、確認待ちか"""
+    return raw(PENDING) or None
 
 
 class trying:
@@ -349,6 +356,7 @@ async def _view(group: str) -> dict[str, Any]:
         "copiedFromEnvAt": copied["at"] if copied else None,
         "history": past,
         "choices": {"thinking": list(THINKING)} if group == "ai" else {},
+        "pendingTemplate": pending() if group == "bq" else None,
     }
 
 

@@ -30,7 +30,11 @@ const state: Record<SettingsGroup, Omit<SettingsView, 'saved' | 'choices'>> = {
   },
 }
 
-const view = (g: SettingsGroup): SettingsView => ({ ...structuredClone(state[g]), saved: true, choices: g === 'ai' ? { thinking: ['minimal', 'low', 'medium', 'high'] } : {} })
+let templatePending: SettingsView['pendingTemplate'] = null
+export const mockSetTemplatePending = (on: boolean) => {
+  templatePending = on ? { exportedAt: new Date().toISOString() } : null
+}
+const view = (g: SettingsGroup): SettingsView => ({ ...structuredClone(state[g]), pendingTemplate: g === 'bq' ? templatePending : null, saved: true, choices: g === 'ai' ? { thinking: ['minimal', 'low', 'medium', 'high'] } : {} })
 const wait = () => new Promise((r) => setTimeout(r, 500))
 // 見本: 一覧にあるモデルは呼べる、ほかは見つからない。出口は 127.0.0.1 だけ届く
 const MODELS = ['gemini-3.5-flash', 'gemini-3.5-pro', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']
