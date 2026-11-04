@@ -31,7 +31,7 @@ const TARGETS = {
     about: 'AWS などの Linux のサーバーで動かす CCP',
     guide: 'docs/AWS.md',
     // 手順書・操作のスクリプト・設定の見本がないと、立ち上げられない(作り忘れ・規則の書き違いで落ちたら、ここで止める)
-    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'docs/AWS.md', 'docs/WORKBENCH.md', 'docs/DATA_TABLES.md', 'docs/API.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
+    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'docs/AWS.md', 'docs/AWS_CUSTOMIZE.md', 'docs/WORKBENCH.md', 'docs/DATA_TABLES.md', 'docs/API.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
   },
   workbench: {
     name: 'Workbench 版',
