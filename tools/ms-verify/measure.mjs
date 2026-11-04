@@ -8,6 +8,7 @@
 //                                 プロンプトは名前(AIB_PROMPT_NAME。既定「CCP AI 出口の検証 中継」)で探し、頼みの文を入力 request に入れる
 //                                 (Predict は外から直接呼べず「Source is null」で断られた。手順書 15.5)
 //   node measure.mjs --via flow   方式 3 を、Power Automate の流れを窓口にして呼ぶ(AIB_FLOW_URL に {"request": …} を POST し、{"text": …} を受け取る)
+//   node measure.mjs --via dl --secret-name DIRECT_LINE_SECRET_GH   別のエージェントの鍵(設定の別の名前)で送る
 //   node measure.mjs --runs 5     どれも 5 回ずつ送る
 //   node measure.mjs --only T3    T3 だけ
 //   node measure.mjs --model "GPT Chat Latest"   記録に書くモデルの名前(設定の MODEL_LABEL より優先)
@@ -56,6 +57,9 @@ if (args.includes('--self-test')) {
 }
 
 const via = opt('--via') ?? 'sdk'
+// 別のエージェントの Direct Line の鍵を、設定の別の名前で持つとき(例: --secret-name DIRECT_LINE_SECRET_GH)。いつもの鍵を書き換えずに済む
+const DL_SECRET_NAME = opt('--secret-name') ?? 'DIRECT_LINE_SECRET'
+if (!/^[A-Z_]+$/.test(DL_SECRET_NAME)) throw new Error(`--secret-name は大文字と _ だけの名前です: ${DL_SECRET_NAME}`)
 if (!['sdk', 'dl', 'aib', 'flow'].includes(via)) throw new Error(`--via は sdk・dl・aib・flow です: ${via}`)
 
 function readEnv() {
@@ -66,7 +70,7 @@ function readEnv() {
     if (m) env[m[1]] = m[2]
   }
   const need =
-    via === 'dl' ? ['DIRECT_LINE_SECRET'] : via === 'flow' ? ['AIB_FLOW_URL'] : via === 'aib' ? ['TENANT_ID', 'AIB_CLIENT_ID', 'AIB_CLIENT_SECRET', 'DATAVERSE_URL'] : ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'TENANT_ID', 'APP_CLIENT_ID']
+    via === 'dl' ? [DL_SECRET_NAME] : via === 'flow' ? ['AIB_FLOW_URL'] : via === 'aib' ? ['TENANT_ID', 'AIB_CLIENT_ID', 'AIB_CLIENT_SECRET', 'DATAVERSE_URL'] : ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'TENANT_ID', 'APP_CLIENT_ID']
   const missing = need.filter((k) => !env[k])
   if (missing.length) throw new Error(`設定が空です: ${missing.join(', ')}(${ENV_FILE})`)
   return env
@@ -361,7 +365,7 @@ if (via === 'flow') {
   ask = (prompt, images) => askOnceAib(dv, prompt, images)
 } else if (via === 'dl') {
   // 窓口は、チャネルの画面に出る URL(地域ごとに違うことがある)。なければ既定の窓口
-  const dl = { base: `${(env.DIRECT_LINE_ENDPOINT || 'https://directline.botframework.com').replace(/\/+$/, '').replace(/\/v3\/directline$/, '')}/v3/directline`, secret: env.DIRECT_LINE_SECRET }
+  const dl = { base: `${(env.DIRECT_LINE_ENDPOINT || 'https://directline.botframework.com').replace(/\/+$/, '').replace(/\/v3\/directline$/, '')}/v3/directline`, secret: env[DL_SECRET_NAME] }
   ask = (prompt, images) => askOnceDl(dl, prompt, images)
 } else {
   const settings = new ConnectionSettings({ environmentId: env.COPILOT_ENVIRONMENT_ID, agentIdentifier: env.COPILOT_AGENT_SCHEMA_NAME })

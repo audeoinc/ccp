@@ -102,7 +102,7 @@ CCP が AI に頼むことは、主に次の 4 つ: (1)「AI で下書き」で�
 |---|---|---|---|
 | Direct Line に 12MB の写真を送る | Direct Line の upload は、1 回の送信が 4,194,304 バイト(4MB)まで(400「MessageSizeTooBig」) | **確か**(答えの文に上限が出た) | 層で写真を縮める(長い辺 1024〜2048 の JPEG。512 まで素材を読めた) |
 | Agents SDK を、人のサインインなしで呼ぶ | Copilot Studio の Agents SDK は、アプリだけの認証に対応していない | **確か**(Microsoft のサンプルの説明に「S2S is not currently supported」) | Direct Line を使う。アプリだけの認証が出たら見直す |
-| GitHub Copilot ハーネスのエージェントを Agents SDK から呼ぶ | そのハーネスは、Agents SDK のつなぎに対応していない | **確か**(エージェントの答えに書かれていた) | 標準のハーネスで作る |
+| GitHub Copilot ハーネスのエージェントを Agents SDK から呼ぶ | そのハーネスは、Agents SDK のつなぎに対応していない | **確か**(エージェントの答えに書かれていた) | 標準のハーネスで作る。**Direct Line からなら、GitHub Copilot ハーネスのエージェントも呼べた**(2026-11-04。ただし標準の 2 倍ほど遅い。12.6) |
 | AI Builder の `Predict` を、アプリだけの認証で直接呼ぶ | 「Source is null」。プロンプトの `Predict` は、Power Apps・Power Automate の中から呼ばれる前提で、外のプログラムからは呼べない作り | **推測**(外の作者の報告と同じ症状。Microsoft の文書では確かめていない。人のサインインで直接呼ぶ形は試していない) | 流れを窓口にする(文の頼みは通った) |
 | AI Builder の流れで、画像をプロンプトに渡す(**2026-11-04 に解決**) | Image の欄は、受けた中身を自分で base64 にする。HTTP で受けた base64 の文をそのまま入れると、2 重に包まれてプロンプトが画像として読めない。`base64ToBinary(…)` を**式として**入れる(前は文字のまま入っていた)と通った | **ほぼ確か**(式を正しく入れたら通った。失敗した実行の値の頭(2 重なら `LzlqLzRB…`)は見ていない) | 済み。流れの作り方は 15.8 |
 | AI Builder の流れで、写真の枚数を毎回変える(T9) | プロンプトの画像の入力は数が決まっていて、空(null)にすると「入力パラメーターがモデルに対して無効です」で断られる | **確か**(8 つすべてを埋めると通った) | 入力を 8 つ持つプロンプトにし、層が空いた欄を白い画像で埋める(2 枚・4 枚で通った。15.8) |
@@ -489,6 +489,7 @@ Direct Line の窓口は、既定の `https://directline.botframework.com` で�
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-10-30 | 2(GitHub Copilot ハーネス) | テストの欄 | GPT 6.1 Sol | T1 | 3 | 3 / 3 ○ | 3 / 3 ○ | なし | 未記録 | 3 回で 3.02(1 回あたり約 1) | 案の長さ 7・13・9 文字など(元は 23 文字)。3 回の案はほぼ同じ |
 | 2026-10-30 | 2(GitHub Copilot ハーネス) | 測るプログラム(Agents SDK) | GPT 6.1 Sol | T1 | 1 | × | × | — | 会話を始める 0.90・本文 0.41 | — | **断られた**: 「This action doesn't support agents built with the GitHub Copilot harness.」(12.6) |
+| 2026-11-04 | 1(GitHub Copilot ハーネス・認証なし・鍵を必須) | 測るプログラム(Direct Line) | GPT 6.1 Sol | T1〜T5・T7 | 各 1(T1 は 2) | 6 / 6 ○ | 6 / 6 ○ | なし | 始める 0.20〜0.62・本文 T1 9.50・7.37 / T2 10.93 / T3 9.21 / T4 5.31 / T5 6.63 / T7 9.94(写真 156KB) | — | **Direct Line からは呼べた**。答えの形は標準のハーネスと同じ(T4 は `{"error": …}` だけ、T5 は 25〜35 文字に収まった)。標準のハーネスの 2 倍ほど遅い。鍵なしの入口は 404「ObjectNotFound」(トークンは出ない) |
 | 2026-10-30 | 2(標準のハーネス) | テストの欄 | GPT Chat Latest | T1 | 1 | ○ | ○ | なし | 未記録 | — | 7・8・8 文字 |
 | 2026-10-30 | 2(標準のハーネス) | 測るプログラム(Agents SDK) | GPT Chat Latest | T1 | 1 | ○ | ○ | なし | 始める 0.77・最初に届く 0.12・本文 4.50 | — | **疎通できた**。入力中の印が先に届き、本文は 1 通でまとめて届いた |
 | 2026-10-30 | 2(標準のハーネス) | 測るプログラム | GPT Chat Latest | T1 | 1 | ○ | ○ | なし | 始める 1.83・本文 3.78 | — | 7・9・11 文字 |
@@ -595,7 +596,7 @@ Node(22 以上)のプログラム。7 章の T1〜T6 を送り、秒数と答え
 |---|---|
 | `tools/ms-verify/measure.mjs` | 送って測る本体 |
 | `tools/ms-verify/tests.mjs` | T1〜T6 の頼みと、決まりの確かめ(7 章と同じ中身。直すときは両方) |
-| `tools/ms-verify/check-token-endpoint.mjs` | 鍵を必須にしたエージェントが、鍵なしの入口を断るかを確かめる(8 章)。Agents SDK 用の接続先の URL を入れたときは、Direct Line のトークン エンドポイントを組み立てて試す |
+| `tools/ms-verify/check-token-endpoint.mjs` | 鍵を必須にしたエージェントが、鍵なしの入口を断るかを確かめる(8 章)。Agents SDK 用の接続先の URL を入れたときは、Direct Line のトークン エンドポイントを組み立てて試す。別のエージェントは `--schema-name <設定の名前>` でスキーマ名を差し替える |
 | `tools/ms-verify/package.json` | 使う部品(`@microsoft/agents-copilotstudio-client`・`@microsoft/agents-activity`・`@azure/msal-node`・`open`) |
 | `scripts/pack-ms-verify.mjs` | 道具を ZIP に固める(下) |
 
@@ -677,6 +678,10 @@ node measure.mjs --via dl --only T1 --runs 1   # 方式 1
   - 標準のハーネス: 決まった話題・頼みに、決まった形で答える向け。チャネル・つなぎ方は、こちらのほうが揃っている。
 - Microsoft Learn に書かれているのは、Power Automate の Copilot Studio のつなぎが GitHub Copilot ハーネスに対応していないこと。**Agents SDK も、試したとおり対応していない。**
 - **標準のハーネスで作り直したエージェントは、Agents SDK からも Direct Line からも呼べた。** ハーネスを後から切り替える方法は、文書では見つからなかった(Microsoft は「移すのは作り直し」としている)。
+- **Direct Line からは、GitHub Copilot ハーネスのエージェントも呼べた**(2026-11-04)。最初の「CCP AI 出口の検証」(モデル GPT 6.1 Sol)を、認証なし・「セキュリティで保護されたアクセスを要求する」オンにして公開した(どちらの設定も、このハーネスの画面にあった)。T1〜T5・T7 は JSON・決まりともすべて ○ で、答えの形は標準のハーネスと同じ。
+  - **遅い**: 文の頼みは本文まで 5.3〜10.9 秒(標準のハーネスは 3.0〜4.6 秒)、画像 1 枚(T7)は 9.9 秒(標準は 6.0 秒)。目標を受けて手順を組む作りの分と、モデルの違いと推測する(1 回ずつの測定)。
+  - 鍵なしの入口(トークン エンドポイント)は、403 ではなく **404「4100 ObjectNotFound」**(トークンは出なかった)。同じ環境の標準のハーネスのエージェント(DL)は、続けて試して 403。スキーマ名の形も標準と違ったので、このハーネスのエージェントはこの入口に載っていないと推測する(鍵なしで話しかけられないことは同じ)。
+  - **それでも標準のハーネスを勧める**: 速い(CCP の「AI で下書き」は 6〜9 回呼ぶので、1 回の遅さが積もる)。Agents SDK・Power Automate からも呼べ、つなぎ方を後から替えられる。CCP の頼みは決まった形の答えを返すだけで、手順を組む重い仕事は要らない。選べるモデルが文書に揃っている。
 - 標準のハーネスで選べるモデル: GPT Chat Latest・GPT-5.5 Chat・GPT-5 Chat・GPT-4.1・GPT-5 Auto / Reasoning(プレビュー)・Claude Sonnet 4.6・Opus 4.6〜4.8。固定の GPT のモデルは 2026-10-31〜11-12 に終わり、GPT Chat Latest に移されるので、**GPT Chat Latest** を選ぶ。中身の版は知らないうちに新しくなるので、測った日を記録に残す。GitHub Copilot ハーネスとは選べるモデルが違う(GPT 6.1 Sol などは標準にはない)。
 
 出典: Microsoft Learn「Call a Copilot Studio agent from Power Automate」・「Harnesses overview」・「Choose a harness」・「Access standard harness agents and agent flows」・「Select a primary AI model for your agent」(Copilot Studio)。
