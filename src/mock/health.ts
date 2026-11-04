@@ -2,6 +2,7 @@
 import type { HealthItem, HealthService as Real } from '../data/health'
 
 const ITEMS: HealthItem[] = [
+  { area: 'net', status: 'ok', text: 'サーバーから外(インターネット)に出られます', fix: '', goto: '' },
   { area: 'db', status: 'ok', text: 'つながりました(PostgreSQL 16.4)。DATABASE_URL(scheme=postgresql+asyncpg host=localhost port=5432 db=ccp user=ccp)', fix: '', goto: '' },
   { area: 'google', status: 'ok', text: 'Google の認証: このサーバーのアカウント / プロジェクト sample-project / 場所 global', fix: '', goto: '' },
   { area: 'ai', status: 'ok', text: 'Gemini(gemini-3.5-flash) を呼べました(1.4 秒。DB の設定)', fix: '', goto: '' },

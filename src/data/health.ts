@@ -6,7 +6,7 @@ import { callApi } from '../gcp/services'
 export type HealthStatus = 'ok' | 'missing' | 'failed' | 'warn'
 
 export interface HealthItem {
-  /** 組(db / google / ai / bq / sync / assets / guard / static) */
+  /** 組(net / db / google / ai / bq / sync / assets / guard / static) */
   area: string
   status: HealthStatus
   text: string

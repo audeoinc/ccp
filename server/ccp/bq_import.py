@@ -49,6 +49,8 @@ MIN_INTERVAL_S = 60
 VIEW_REFRESH = timedelta(minutes=10)
 # 取り込みを、複数のプロセス(サーバーの複数の台)で同時に行わない(PostgreSQL の勧告ロックの番号。CCP の中で一意なら何でもよい)
 LOCK_KEY = 4210017
+# 定期の取り込みの順番(サーバーが 2 台以上でも、BigQuery を読むのは 1 台だけにする。書き込みの LOCK_KEY とは別の番号)
+TICK_LOCK_KEY = 4210018
 # 出力 → 書き込む表(取り込む順。SKU の確かめに SPU が、在庫の確かめに SKU が要る)
 ORDER = ("spu", "sku", "sku_stock", "weekly", "forecast", "ranking")
 
@@ -570,7 +572,7 @@ async def tick(trigger: str = "auto") -> list[str] | None:
     if env_disabled():
         return []
     if not appsettings.loaded():
-        # DB の起動を受け持つ仕組みがない環境(Workbench など。DB は止まらない)は、自分で読む。
+        # DB の起動を受け持つ仕組みがない環境(DB は止まらない)は、自分で読む。
         # 止まる DB の環境は、画面・窓口が読むのを待つ(人が使い始めれば、DB は起きている)
         if dbready.controller() is not None:
             return None
@@ -588,7 +590,13 @@ async def tick(trigger: str = "auto") -> list[str] | None:
         return []  # 取り込み中(ボタン・開いたとき)なら、この回は飛ばす
     names = [o.name for o in _pick(None)]
     targets = names if trigger == "startup" else due(names, settings, await latest(), _now())
-    if targets:
+    if not targets:
+        return targets
+    # 書き込みは LOCK_KEY で 1 台に絞れるが、読むのは絞れない。同じ時刻に見回った別のサーバーが同じ出力を読まないように、
+    # 取り込みが終わるまで番を持つ(トランザクションの錠なので、サーバーが落ちても残らない)。取れなければ、この回は飛ばす
+    async with db() as conn:
+        if not (await conn.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": TICK_LOCK_KEY})).scalar_one():
+            return []
         await sync(False, targets, trigger)
     return targets
 

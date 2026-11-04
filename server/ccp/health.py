@@ -69,7 +69,7 @@ async def _db(out: _Out, full: bool) -> bool:
     """つながって、表がそろっていれば True(そのあとの DB を使う確かめに進む)"""
     target, host, _port = db_target()
     if target == "なし":
-        out.add("db", "missing", "DB のつなぎ先(DATABASE_URL)がありません", "サーバーの設定のファイル(Workbench は server/workbench.env)に DATABASE_URL を書いて、起動し直す")
+        out.add("db", "missing", "DB のつなぎ先(DATABASE_URL)がありません", "環境変数かサーバーの設定のファイルに DATABASE_URL を書いて、起動し直す")
         return False
     url = os.getenv("DATABASE_URL", "")
     bad = False
@@ -313,7 +313,7 @@ async def _guard(out: _Out) -> None:
                 "guard",
                 "missing",
                 "入口の認証がありません。このサーバーの中から直に(http://127.0.0.1:…)しか開けず、中継(Jupyter の /proxy/・nginx など)や外からは開けません",
-                "ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か APP_PASSWORD を設定する。中継の手前でログインしている(Workbench の Jupyter など)ので CCP では守らないなら、CCP_AUTH=none",
+                "ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か APP_PASSWORD を設定する。中継の手前でログインしている(Jupyter の中継など)ので CCP では守らないなら、CCP_AUTH=none",
             )
     else:
         out.add("guard", "missing", f"入口の認証: CCP_AUTH の値({mode})が分かりません。いまは、だれも画面を開けません", "oidc / basic / iap / none のどれかにする")
@@ -345,8 +345,38 @@ def _static(out: _Out) -> None:
         out.add("static", "missing", f"画面のビルドがありません({static})", "リポジトリのルートで npm ci → npm run build:gcp")
 
 
+# 外に出られるかを見る先。中身のない返事だけを返す、どこからでも届くはずの公開の URL
+NET_PROBE = "https://www.gstatic.com/generate_204"
+
+
+def _can_reach(url: str = NET_PROBE, timeout: float = 5) -> str | None:
+    """届けば None、届かなければ理由。プロキシの環境変数(HTTPS_PROXY など)にも従う。返事の中身は見ない"""
+    import urllib.error
+    import urllib.request
+
+    try:
+        urllib.request.urlopen(url, timeout=timeout).close()  # noqa: S310 — 決まった https の URL だけ
+    except urllib.error.HTTPError:
+        return None  # 返事が来たので、外には出られている
+    except Exception as e:  # noqa: BLE001
+        return f"{type(e).__name__}: {str(e)[:120]}"
+    return None
+
+
+async def _net(out: _Out) -> None:
+    """サーバーから外に出られるか(BigQuery・Gemini・ログインの発行元の前提。止まっていると、それらの行の失敗の理由が分かりにくいので、先に出す)"""
+    why = await asyncio.to_thread(_can_reach)
+    if why is None:
+        out.add("net", "ok", "サーバーから外(インターネット)に出られます")
+    else:
+        out.add("net", "failed", f"サーバーから外(インターネット)に出られません({why})", "ファイアウォール・NAT・プロキシ(環境変数 HTTPS_PROXY)を確認する。外に出られないと、BigQuery・AI・ログインも動きません")
+
+
 async def diagnose(full: bool = True) -> list[Item]:
     out = _Out()
+    # 外への確かめは、画面と check のときだけ(起動を待たせない)
+    if full:
+        await _net(out)
     db_ok = await _db(out, full)
     google_ok = await _google(out)
     await _ai(out, full, google_ok)

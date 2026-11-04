@@ -74,7 +74,11 @@ class TickTest(unittest.TestCase):
         self.settings = bq_import.parse_settings({"enabled": True})
         self.loaded = True
         self.sync = mock.AsyncMock(return_value={})
+        store = FakeStore()
+        # 定期の取り込みの番は、いつも取れる(番が取れないときは test_bq_sync.TickTurnTest)
+        store.statements += [(r"^SELECT pg_try_advisory_xact_lock", lambda s, m, p: Result([Row({"got": True})]))]
         patches = [
+            store.patch("ccp.bq_import"),
             mock.patch.dict(bq_import._checked, {"spu": NOW - timedelta(minutes=10), "sku_stock": NOW - timedelta(minutes=10)}, clear=True),
             mock.patch.dict("os.environ", {"BQ_AUTO_SYNC": ""}),
             mock.patch.object(bq, "configured", return_value=[SPU, STOCK]),

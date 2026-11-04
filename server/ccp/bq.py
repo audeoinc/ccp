@@ -3,7 +3,7 @@
 いまは「つながるか・出力の場所と列が仕様どおりか」を確かめるところまで(python -m ccp.cli check の「■ BigQuery」)。
 取り込み(B2 以降)は、これを土台に足す。
 
-接続は、Workbench のサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
+接続は、サーバーのサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
 出力の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)は、利用先の名前を含むので、コードにもリポジトリにも書かず、
 ⚙ →「データの取り込み」で DB に持つ(appsettings.py のまとめ bq。2026-11-03 までは環境変数。DB にまだなければ、一度だけ写す):
   BQ_SPU / BQ_SKU / BQ_SKU_STOCK / BQ_WEEKLY / BQ_FORECAST   5 つの出力(BIGQUERY_EXPORT.md の 2〜6 章)
