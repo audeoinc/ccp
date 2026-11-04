@@ -38,8 +38,8 @@ AWS の環境で作業する人と Claude のための決まりと手順です(2
 
 | 置き場所 | 置くもの |
 |---|---|
-| `src/client/` | 足す画面・差し替える画面 |
-| `server/ccp/client/` | 足すサーバーの処理 |
+| `src/client/` | 足す画面・差し替える画面。足した列・表の型は `src/client/models/`(4 章) |
+| `server/ccp/client/` | 足すサーバーの処理。足す列・表は `server/ccp/client/schema.json`(4 章) |
 | `docs/client/` | この環境の記録(下の 2 つなど) |
 
 - 共通のファイルには、呼び出しの登録など、**要る行だけ**を足す。
@@ -52,12 +52,27 @@ AWS の環境で作業する人と Claude のための決まりと手順です(2
 
 ## 4. スキーマの変え方
 
-いまは、開発側の仕組み(7 章)ができるまでの形。
+**列・表を足すときは、`server/schema.json` を直さず、`server/ccp/client/schema.json` に書く。** サーバーは 2 つを重ねて読み、起動のときに DB に反映する(足すだけで、列は消さない)。開発側が `schema.json` を変えても、このファイルとはぶつからない。**DB を手で変えない**(定義に戻されるか、起動のときに失敗する)。
 
-- 列・表は `server/schema.json` に足す(サーバーの起動のときに DB に反映される。足すだけで、列は消さない)。**DB を手で変えない**(`schema.json` の定義に戻されるか、起動のときに失敗する)。
-- 表を足したら、型のファイル `src/models/<表の名前>.ts` も作る。列を足したら、型も直す(`npm run verify` が食い違いを見つける)。
-- `schema.json` は開発側も足すので、同じ表の同じ場所に足すとぶつかる(5.4)。
-- 共通の列の消す・名前を変える・型を変えるは、2 章の順番で考えたうえで、`docs/client/CHANGES.md` に書く。
+```json
+{
+  "tables": {
+    "products": { "columns": [["maker_code", "text", { "index": true }], ["size_band", "choice"]] },
+    "maker_notes": {
+      "columns": [["body", "text"]],
+      "lookups": [["product_id", "products", { "onDelete": "CASCADE" }]],
+      "unique": [["product_id"]]
+    }
+  },
+  "choices": { "products.size_band": ["s", "m", "l"] }
+}
+```
+
+- 書けるもの: 共通の表への列・参照、新しい表(`columns`・`lookups`・`unique`)、足した `choice` の列の `choices`、足した列をやめるときの `retired`(`columns` から消して、ここに移す)。
+- 書けないもの(`npm run verify`・起動・`check` が、理由と直し方を出して止める): 共通の列と定義が違う列、共通の列の `retired`、共通の表の `unique`(一意にするときに、重なった行が消えるため)、共通の列の `choices`。
+- 開発側の新しい版に、同じ定義の列が入ったら、そのまま動く。⚙ の「設定の状態」と `check` が、消してよい行を教える。**定義が違えば止まる**ので、別の名前にするか、合わせる。
+- 型は、共通のファイルを直さず、`src/client/models/<表の名前>.ts`(例: `makerNotes.ts`)に `export interface` で書く。足した `choice` の列は、共通の型と同じ形の `export const …SizeBand = { s: '…' } as const` も書く。`npm run verify` が、重ねたあとの定義と型を突き合わせる。
+- 共通の列の消す・名前を変える・型を変えるは、2 章の順番で考えたうえで、`server/schema.json` を直して `docs/client/CHANGES.md` に書く。
 
 ## 5. 新しい版を取り込む
 
@@ -166,13 +181,12 @@ git revert -m 1 <マージのコミット>
 
 まとめたら、利用者に見てもらい、AWS 側で進め方を決める(開発側には渡さない。8 章)。
 
-## 7. 開発側で作るもの(まだない)
+## 7. 開発側で作るもの
 
-できたら、この文書を直して版で届ける。**版を取り込んだら、この章を見直す。**
+スキーマの重ね読みは、できた(4 章)。次は、まだない。できたら、この文書を直して版で届ける。**版を取り込んだら、この章を見直す。**
 
 | 作るもの | 中身 |
 |---|---|
-| スキーマの重ね読み | AWS 側の列・表を別のファイルに置き、`schema.json` に重ねて読む(ぶつからなくする) |
 | 書き出さない変更を止める確認 | 共通の列を消す・名前を変える・型を変えるときに、`docs/client/CHANGES.md` に書いていなければ止める |
 | 差分の一覧 | 「足した所」と「共通のコードを変えた所」を分けて出す |
 | 固定の選択肢をやめる | カテゴリなど、相手ごとに違う値を固定しない(いまは `server/schema.json` の `choices`) |

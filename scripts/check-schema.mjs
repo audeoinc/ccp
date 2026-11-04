@@ -4,9 +4,15 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadSchema } from './schema-overlay.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const schema = JSON.parse(readFileSync(join(root, 'server', 'schema.json'), 'utf8'))
+// AWS 側が重ねた列・表(server/ccp/client/schema.json)も、重ねたあとの形で照合する。ファイルがなければ schema.json だけ
+const { schema, problems: overlayProblems } = loadSchema(root)
+if (overlayProblems.length) {
+  console.error('server/ccp/client/schema.json を重ねられません:\n- ' + overlayProblems.join('\n- ') + '\n次にやること: 上の行を直してください(決まりは docs/AWS_CUSTOMIZE.md の 4 章)')
+  process.exit(1)
+}
 const problems = []
 // 表の名前 → ファイル名(delivery_cards → deliveryCards)
 const stemOf = (table) => table.replace(/_(\w)/g, (_, c) => c.toUpperCase())
@@ -16,12 +22,17 @@ const SYSTEM = new Set(['id', 'state_code', 'created_on', 'modified_on'])
 for (const [table, def] of Object.entries(schema.tables)) {
   const model = join(root, 'src', 'models', `${stemOf(table)}.ts`)
   const data = join(root, 'src', 'data', `${stemOf(table)}.ts`)
-  const file = existsSync(model) ? model : data
+  // AWS 側が足した列・表の型は src/client/models/ に置く(共通の型のファイルを直さずに済む)
+  const client = join(root, 'src', 'client', 'models', `${stemOf(table)}.ts`)
+  const hasClient = existsSync(client)
+  const common = existsSync(model) ? model : data
+  const file = existsSync(common) ? common : client
   if (!existsSync(file)) {
-    problems.push(`${table}: 型のファイルが見つかりません(src/models/${stemOf(table)}.ts か src/data/${stemOf(table)}.ts)`)
+    problems.push(`${table}: 型のファイルが見つかりません(src/models/${stemOf(table)}.ts か src/data/${stemOf(table)}.ts。AWS 側が足した表は src/client/models/${stemOf(table)}.ts)`)
     continue
   }
   const text = readFileSync(file, 'utf8')
+  const clientText = hasClient && file !== client ? readFileSync(client, 'utf8') : ''
   const defined = new Set([...def.columns.map((c) => c[0]), ...def.lookups.map((l) => l[0])])
   // 型の項目。models は、ファイルの中のすべての interface を合わせる(書き込める列 + 読んだ行)。
   // data は、schema.json の列をいちばん多く含む interface を、この表の型とみなす(ほかの interface も同じファイルにあるため)
@@ -30,19 +41,26 @@ for (const [table, def] of Object.entries(schema.tables)) {
   )
   const hits = (s) => [...s].filter((f) => defined.has(f)).length
   const fields = file === model ? new Set(interfaces.flatMap((s) => [...s])) : interfaces.reduce((a, b) => (hits(b) > hits(a) ? b : a), new Set())
+  const clientFields = new Set(
+    [...clientText.matchAll(/export interface \w+(?: extends \w+)? \{([\s\S]*?)\n\}/g)].flatMap((m) => [...m[1].matchAll(/^\s+(\w+)\??:/gm)].map((f) => f[1])),
+  )
+  for (const f of clientFields) {
+    if (SYSTEM.has(f) || (f.endsWith('_name') && defined.has(f.slice(0, -5)))) continue
+    if (!defined.has(f)) problems.push(`${table}: 型にある項目 ${f} が、重ねたあとの定義にありません(src/client/models/${stemOf(table)}.ts)`)
+  }
   for (const f of fields) {
     if (SYSTEM.has(f) || (f.endsWith('_name') && defined.has(f.slice(0, -5)))) continue
     if (!defined.has(f)) problems.push(`${table}: 型にある項目 ${f} が、schema.json にありません`)
   }
-  for (const f of defined) if (!fields.has(f)) problems.push(`${table}: schema.json にある項目 ${f} が、型にありません`)
+  for (const f of defined) if (!fields.has(f) && !clientFields.has(f)) problems.push(`${table}: schema.json にある項目 ${f} が、型にありません`)
 
   // 選択肢の値(models の export const <型><列> = { 値: '表示名' })
   for (const [col, type] of def.columns) {
     const codes = schema.choices?.[`${table}.${col}`]
     if (type === 'choice' && !codes) problems.push(`${table}.${col}: 選択肢の値が、schema.json の choices にありません`)
-    if (type !== 'choice' || file !== model) continue
+    if (type !== 'choice' || (file !== model && !hasClient)) continue
     const pascal = col.replace(/(^|_)(\w)/g, (_, __, c) => c.toUpperCase())
-    const block = text.match(new RegExp(`export const \\w+${pascal} = \\{([\\s\\S]*?)\\} as const`))?.[1]
+    const block = (text + '\n' + clientText).match(new RegExp(`export const \\w+${pascal} = \\{([\\s\\S]*?)\\} as const`))?.[1]
     if (!block) {
       problems.push(`${table}.${col}: 型のファイルに、選択肢(…${pascal})がありません`)
       continue

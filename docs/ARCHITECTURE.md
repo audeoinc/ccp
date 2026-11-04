@@ -287,7 +287,7 @@
 - CSS の `zoom` を使う箇所(`items.ts` の `scaled`、プレビューの倍率)では、**幅を `%` で補正しない**(現在のブラウザの仕様では、枠より広がる)。
 - Fluent の `Switch` の色は、ヘッダーのような色付きの背景では、効きにくい(ヘッダーのトグルは自作)。
 - Fluent の `Textarea` には最低の高さがある(`AutoTextarea` で解消している)。
-- 列を変えたら、`server/schema.json` と画面の型(`src/models/`、一部の表は `src/data/`)を一緒に直す(`npm run verify` が食い違いを見つける)。
+- 列を変えたら、`server/schema.json` と画面の型(`src/models/`、一部の表は `src/data/`)を一緒に直す(`npm run verify` が食い違いを見つける)。AWS 側の列・表は `server/ccp/client/schema.json` に書いて重ねて読む(足すだけ。`schema.merge_overlay` と `scripts/schema-overlay.mjs` が同じ決まりを持ち、`test_schema_overlay.py` が食い違いを見つける。[AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の 4 章)。
 - 改行コードは、すべて LF(2026-10-23。以前は CRLF と LF が混ざっていた)。`.gitattributes` の `* text=auto eol=lf` で、Git に入るのは LF になる。Windows のエディタやスクリプトが CRLF で書き出すと、差分がファイル全体になり、ほかのセッションの変更とぶつかる。
 
 ## 描画の失敗で真っ白にしない(2026-10-23)

@@ -64,9 +64,17 @@ _bg: set[asyncio.Task] = set()
 async def start_bq_scheduler() -> None:
     """BigQuery の定期の取り込み(bq_import.run_scheduler)を、裏で回し始める。
     BigQuery の設定がない・自動が切・BQ_AUTO_SYNC=0 なら、回っても何もしない(DB にも BigQuery にも触らない)"""
+    from . import schema as sc
     from .bq_import import run_scheduler
 
     from .health import at_startup
+
+    # 重ねるファイルが壊れたまま動かすと、足した列への保存があとで分かりにくく失敗する。ここで理由と次にやることを出して止める
+    try:
+        sc.load()
+    except sc.SchemaOverlayError as e:
+        print(f"[schema] {e}", flush=True)
+        raise
 
     # 設定の健康診断も、起動を待たせずに裏で(足りない設定をログに出し、管理する人の ⚙ に赤い点)
     for job in (run_scheduler(), at_startup()):
