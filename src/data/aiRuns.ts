@@ -1,6 +1,6 @@
 // 表「AI の依頼の記録」(server/schema.json の ai_runs)。配信カードで AI の案を頼んだときに、どの学び(これまでの学び)を渡したかを残す。
 // 学びを渡した配信と渡さなかった配信、AI の案をそのまま使った配信と人が直した配信を、あとで比べるため(結果の面の「効果」)。
-// AI の案そのものは保存しない(CLAUDE.md の約束)。残すのは、渡した学びの id と、案の扱いだけ。
+// AI の案そのものは保存しない(CLAUDE.md の約束)。残すのは、渡した学びの id と、案の扱いと、扱いを決めるための指紋(元の文には戻せない。src/aiAdoption.ts)だけ。
 import { tableService } from '../gcp/services'
 
 export const AiRunAdoption = {
@@ -18,6 +18,10 @@ export interface AiRunFields {
   learning_ids?: string
   /** 案の扱い。空 = まだ分からない */
   adoption?: AiRunAdoption
+  /** 案の指紋(JSON。文のハッシュと MinHash、コードのハッシュ。案そのものではない)。承認・制作に渡したときに、いまの中身と比べて adoption を決める。空 = 比べない依頼 */
+  fingerprint?: string
+  /** わざと渡さなかった学びの id(JSON の配列。X56 の (c)。学びごとに、渡した配信と比べるため)。空 = 渡さないことはしていない */
+  withheld_ids?: string
   /** 1 = 見本の行(見本を作り直すときに、この行だけを消す) */
   sample?: number
 }

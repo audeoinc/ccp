@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { filled } from '../slots'
 import type { SwapRender } from '../ProductActionFloat'
 import { InfoLabel, Divider, ToggleButton, Badge, Button, Field, Input, Link, Spinner, Text, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular, ChevronUpRegular, ImageEditRegular } from '@fluentui/react-icons'
+import { AddRegular, LinkRegular, LockClosedRegular, ArrowSwapRegular, ArrowUploadRegular, ChatRegular, DismissRegular, EditRegular, ImageMultipleRegular, SparkleRegular, WarningRegular, ChevronUpRegular, ImageEditRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from '../AutoTextarea'
 import { ChooseDrawer } from '../ChoosePanel'
+import { UrlImagePicker, type UrlImagePick } from './UrlImagePicker'
 import { DropZone } from '../DropZone'
 import { HeroCandidates } from '../HeroCandidates'
 import { ImageThumb } from '../ImageThumb'
@@ -173,6 +174,7 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
   const productsAiOn = useFeature('ai.products')
   const heroUploadOn = useFeature('content.hero.upload')
   const heroPickOn = useFeature('content.hero.pick')
+  const heroUrlOn = useFeature('content.hero.fromurl')
   // 商品の画像を替える(X87 の content.products.pageimage。非公開なら「画像を替える」を出さない)
   const pageImageOn = useFeature('content.products.pageimage')
 
@@ -191,6 +193,21 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
       apply: () => {
         e.setAiPreview(null)
         e.setHero(id, why)
+      },
+    })
+  }
+  // URL のページから選んだ画像を試す(content.hero.fromurl)。確定で、写してライブラリに入れ、メイン画像にする
+  const tryHeroUrl = (pick: UrlImagePick) => {
+    const name = pick.name || t('URL から選んだ画像', 'Image from a URL')
+    heroTrial.tryIt({
+      key: pick.src,
+      from: e.hero?.name ?? '',
+      to: name,
+      preview: () => e.setAiPreview({ heroUrl: { src: pick.src, name } }),
+      unpreview: () => e.setAiPreview(null),
+      apply: () => {
+        e.setAiPreview(null)
+        void e.heroFromUrl({ ...pick, name })
       },
     })
   }
@@ -567,13 +584,25 @@ export function PartPane({ editor: e, part, compareKey, onPlace, onCompareDone, 
                     ),
                   },
                   {
+                    value: 'url',
+                    label: t('URL から選ぶ', 'From a URL'),
+                    icon: <LinkRegular />,
+                    content: (
+                      <UrlImagePicker
+                        selected={heroTrial.trial?.key}
+                        onPick={tryHeroUrl}
+                        fallbackHint={heroUploadOn ? t('「アップロード」のタブで、手元の画像からも選べます', 'You can also use your own image in the Upload tab.') : undefined}
+                      />
+                    ),
+                  },
+                  {
                     value: 'all',
                     label: t('すべての画像', 'All images'),
                     icon: <ImageMultipleRegular />,
                     content: <HeroCandidates heroes={e.poolHeroes} selectedId={heroTrial.trial?.key ?? e.hero?.id} onSelect={(id) => tryHero(id, '')} />,
                   },
-                  // 公開していない入口のタブは出さない(X87。AI のおすすめ・AI に頼む = ai.hero、上げる = content.hero.upload、すべての画像 = content.hero.pick)
-                ].filter((tab) => (tab.value === 'recommend' || tab.value === 'ask' ? heroAiOn : tab.value === 'upload' ? heroUploadOn : tab.value === 'all' ? heroPickOn : true))}
+                  // 公開していない入口のタブは出さない(X87。AI のおすすめ・AI に頼む = ai.hero、上げる = content.hero.upload、URL から = content.hero.fromurl、すべての画像 = content.hero.pick)
+                ].filter((tab) => (tab.value === 'recommend' || tab.value === 'ask' ? heroAiOn : tab.value === 'upload' ? heroUploadOn : tab.value === 'url' ? heroUrlOn : tab.value === 'all' ? heroPickOn : true))}
               />
             )}
             {e.channel === 'push' && heroSlot && (

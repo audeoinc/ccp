@@ -29,6 +29,11 @@ export interface FeatureDef extends Named {
   size?: FeatureSize
   /** この機能を使うのに要る機能(公開するときに、非公開なら知らせる) */
   requires?: string[]
+  /**
+   * 入り切りのスイッチ(画面の入口ではなく、動きを変えるもの)。版・開発者かどうかに関わらず、⚙ で入れたときだけ動く(featureFlags の switchOn)。
+   * param は、スイッチと一緒に決める数(割合など。featureFlags の switchValue)
+   */
+  switch?: { param?: { label: () => string; default: number; min: number; max: number; unit: string } }
 }
 
 /** 版の並び(まとめて当てるときは、選んだ版までを公開する) */
@@ -155,6 +160,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'content.theme', group: 'area.content.text', ...named('テーマを手で書く', 'Write the theme by hand'), version: 'MVP' },
   { id: 'content.hero.pick', group: 'area.content.hero', ...named('ライブラリから選ぶ', 'Pick from the library'), version: 'MVP', size: 'S' },
   { id: 'content.hero.upload', group: 'area.content.hero', ...named('持っている画像を上げる', 'Upload your own image'), version: 'MVP', size: 'S' },
+  { id: 'content.hero.fromurl', group: 'area.content.hero', ...named('URL を指定して、そのページの画像から選ぶ', 'Pick from the images on a page URL'), version: 'v1', size: 'M' },
   { id: 'content.products', group: 'area.content.products', ...named('商品を探して入れる・入れ替える・外す・並べ替える', 'Find, add, replace, remove and reorder products'), version: 'MVP' },
   { id: 'content.products.pageimage', group: 'area.content.products', ...named('商品の画像を選ぶ(取り込んだ画像・BigQuery の画像・貼り付け・ファイル・画像の URL から)', 'Choose product images (imported, BigQuery, paste, file, image URL)'), version: 'MVP', size: 'S' },
   { id: 'content.products.pagefetch', group: 'area.content.products', ...named('商品ページの URL を読んで、画像を拾ってくる', 'Read a product page URL and collect its images'), version: 'v1', size: 'M' },
@@ -179,6 +185,16 @@ export const FEATURES: FeatureDef[] = [
   { id: 'ai.weekslots', group: 'area.ai.bulk', ...named('週の枠と、まとめて中身を作る', 'Week slots and bulk content'), version: 'MVP', size: 'M' },
   { id: 'ai.abvariant', group: 'area.ai.ab', ...named('B 案を AI で作る', 'Make variant B with AI'), version: 'v2', size: 'S', requires: ['card.abtest'] },
   { id: 'ai.learnings', group: 'area.ai.learnings', ...named('下書きに学びを渡す', 'Pass learnings to the draft'), version: 'v3', size: 'S', requires: ['results.learnings'] },
+  // 学びごとの効き目を比べるために、配信ごとに一部の学びをわざと渡さない(X56 の (c))。最初は切っておく
+  {
+    id: 'ai.learnings.holdout',
+    group: 'area.ai.learnings',
+    ...named('学びをときどき AI に渡さない(学びごとに効き目を比べる)', 'Sometimes withhold learnings from AI (to compare each learning)'),
+    version: 'dev',
+    size: 'S',
+    requires: ['ai.learnings'],
+    switch: { param: { label: () => tr('渡さない割合', 'Share withheld'), default: 20, min: 5, max: 50, unit: '%' } },
+  },
   { id: 'approval.card', group: 'area.approval.card', ...named('承認を依頼する・承認する・差し戻す', 'Request approval / approve / send back'), version: 'MVP', size: 'M' },
   { id: 'approval.week', group: 'area.approval.week', ...named('週の帯・週の確定・確定後の変更の理由', 'Week band, confirm the week, reasons for changes after confirming'), version: 'MVP', size: 'L' },
   { id: 'approval.week.checklist', group: 'area.approval.week', ...named('確定の前に直すこと(確認の一覧)', 'Things to fix before confirming'), version: 'MVP', size: 'M' },
@@ -229,14 +245,23 @@ export const FEATURES: FeatureDef[] = [
   // 使う学びは、学び(results.learnings。v3)を前提にするので、決まり・アラートの基準(v1)から分けた(2026-11-02 利用者)
   { id: 'settings.country.learnings', group: 'area.settings.country', ...named('使う学び', 'Learnings to use'), version: 'v3', size: 'S', requires: ['results.learnings'] },
   { id: 'settings.sender', group: 'area.settings.company', ...named('差出人の名前と店の URL', 'Sender name and shop URL'), version: 'MVP', size: 'S' },
+  // 店の URL の形(商品・カテゴリ・配信のページ)。差出人の名前と店の URL の欄の下に出す。商品の page_url の優先・写しに固めるのは作りなので、ID を分けない(2026-11-02 利用者)
+  { id: 'settings.shopurl', group: 'area.settings.company', ...named('店の URL の形', 'Shop URL patterns'), version: 'v1', size: 'M' },
   { id: 'settings.utm', group: 'area.settings.company', ...named('計測用のパラメーター(utm)の決まった値', 'Fixed values for tracking parameters (utm)'), version: 'MVP', size: 'S' },
   { id: 'settings.users', group: 'area.settings.company', ...named('ユーザー・承認グループ', 'Users and approval groups'), version: 'MVP', size: 'S' },
   { id: 'settings.templates', group: 'area.settings.company', ...named('テンプレートの管理・編集・AI で作る', 'Manage, edit and AI-create templates'), version: 'v4', size: 'L' },
   { id: 'settings.library', group: 'area.settings.company', ...named('画像のライブラリ(メイン画像・部品の画像)', 'Image library (main images, part images)'), version: 'v1', size: 'M' },
   { id: 'settings.policy', group: 'area.settings.company', ...named('方針・決まりの編集', 'Edit policies and rules'), version: 'v4', size: 'S' },
+  // データの取り込みの管理(BigQuery → PostgreSQL)と、サーバーの中で回す定期の取り込み。管理する人だけ(2026-11-03 利用者)
+  { id: 'settings.dataimport', group: 'area.settings.company', ...named('データの取り込みの管理(出力ごとの状態・記録・今すぐ取り込む・確認だけ・定期の取り込み)', 'Data import management (status per output, history, import now, check only, scheduled import)'), version: 'MVP', size: 'M' },
+  // AI の設定(モデル・考える深さ・同時の上限・AI の出口の URL と待ち時間)を DB と管理画面で持つ。鍵は環境のまま。管理する人だけ(2026-11-03 利用者)
+  { id: 'settings.ai', group: 'area.settings.company', ...named('AI の設定(モデル・考える深さ・同時に呼ぶ数・AI の出口)', 'AI settings (model, thinking, concurrency, AI outlet)'), version: 'MVP', size: 'S' },
+  // 設定の健康診断(⚙ →「設定の状態」)・初期設定の画面・秘密を書くだけの欄・設定の型。忘れても設定できるように(2026-11-03 利用者)
+  { id: 'settings.setup', group: 'area.settings.company', ...named('設定の状態(健康診断)・初期設定・秘密の欄・設定の型', 'Settings health check, first-time setup, secrets and settings templates'), version: 'MVP', size: 'L' },
   { id: 'settings.admin', group: 'area.settings.admin', ...named('取り込み・書き出し・見本のデータ', 'Import, export and sample data'), version: 'dev', size: 'S' },
   { id: 'settings.features', group: 'area.settings.admin', ...named('使える機能(この管理機能)', 'Features (this admin screen)'), version: 'dev' },
   { id: 'dev.requests', group: 'area.devtools.requests', ...named('右クリックの「開発に伝える」・ピン・一覧', '"Tell the developers" on right-click, pins and list'), version: 'MVP', size: 'M' },
   { id: 'dev.ask', group: 'area.devtools.ask', ...named('「？ 聞く」(使い方を AI に聞く・右クリックの「ここについて聞く」・スポットライト)', '"? Ask" (ask AI how to use CCP, "Ask about this" on right-click, spotlight)'), version: 'v1', size: 'M' },
   { id: 'dev.tools', group: 'area.devtools.devscreen', ...named('`/dev/`', 'Developer screen (/dev/)'), version: 'dev', size: 'S' },
+  { id: 'dev.tools.pg', group: 'area.devtools.devscreen', ...named('CCP の DB(PostgreSQL)に SQL を投げる(読むだけ。AI には表と列の形だけ)', 'Query the CCP DB (PostgreSQL, read-only; AI sees only tables and columns)'), version: 'dev', size: 'M' },
 ]

@@ -274,5 +274,3 @@ export function useAiDrafts(inputs: DraftInputs, onError: (message: string | nul
     applyAuto,
   }
 }
-
-export type AiDrafts = ReturnType<typeof useAiDrafts>

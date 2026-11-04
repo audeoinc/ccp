@@ -140,6 +140,16 @@ export function versionCounts(v: FeatureVersion): { total: number; stopped: numb
   return { total: list.length, stopped: list.filter((f) => modeOf(f.id) === 'stop').length, early: list.filter((f) => modeOf(f.id) === 'early').length }
 }
 
+/** スイッチの機能(features の switch)が入っているか。版・開発者かどうかに関わらず、⚙ で入れたときだけ(上書きの「先に出す」= 入) */
+export const switchOn = (id: string) => modeOf(id) === 'early'
+/** スイッチの数(⚙ で決めた値。決めていない・範囲の外なら既定の値) */
+export function switchValue(id: string): number {
+  const p = byId.get(id)?.switch?.param
+  if (!p) return NaN
+  const v = Number(state.overrides.get(id)?.value || NaN)
+  return Number.isFinite(v) && v >= p.min && v <= p.max ? v : p.default
+}
+
 /** 部品の中で使う(設定・「あなた」が変わったら描き直す) */
 export function useFeature(id: string): boolean {
   useSyncExternalStore(subscribe, snapshot)

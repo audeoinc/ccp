@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogTitle, Field, Input, Spinner, Textarea, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dialog, DialogBody, DialogTitle, Field, Input, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { AutoTextarea } from './AutoTextarea'
 import { ResizableSurface } from './ResizableSurface'
 import { ArrowDownloadRegular, ArrowSyncRegular, AttachRegular, DeleteRegular, DismissRegular, DocumentPdfRegular, DocumentRegular, EditRegular, LinkRegular, OpenRegular } from '@fluentui/react-icons'
 import { CardAssetsService } from './data/cardAssets'
@@ -385,7 +386,7 @@ export function CreativeAssets({ cardId, stage, people, cardName, productionOwne
                 </Button>
               </div>
               <Field label={t('制作へのメッセージ(任意)', 'Message for production (optional)')} size="small">
-                <Textarea size="small" resize="vertical" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: このような雰囲気で。背景は明るめに。/ この資料の数字を使って', 'e.g. A mood like this, with a lighter background. / Use the figures in this document')} />
+                <AutoTextarea heightKey="CreativeAssets.addNote" rows={2} size="small" value={note} onChange={(_, d) => setNote(d.value)} placeholder={t('例: このような雰囲気で。背景は明るめに。/ この資料の数字を使って', 'e.g. A mood like this, with a lighter background. / Use the figures in this document')} />
               </Field>
               <span className={s.addActions}>
                 <Button size="small" onClick={() => setAdding(null)}>
@@ -606,7 +607,7 @@ function AssetFloat({ asset: a, me, canEdit, onChanged, onClose, comments }: { a
                     <Input size="small" value={edit.name} onChange={(_, d) => setEdit({ ...edit, name: d.value })} />
                   </Field>
                   <Field label={t('制作へのメッセージ', 'Message for production')} size="small">
-                    <Textarea size="small" value={edit.note} onChange={(_, d) => setEdit({ ...edit, note: d.value })} />
+                    <AutoTextarea heightKey="CreativeAssets.editNote" rows={2} size="small" value={edit.note} onChange={(_, d) => setEdit({ ...edit, note: d.value })} />
                   </Field>
                   <div className={s.actions}>
                     <Button size="small" appearance="primary" disabled={busy} onClick={() => void save()}>

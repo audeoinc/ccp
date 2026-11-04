@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import type { DeliveryCard } from './models/deliveryCards'
+import type { Campaign } from './models/campaigns'
 import type { Product } from './models/products'
 import type { HeroImage } from './models/heroImages'
 import { HeatPreview } from './HeatPreview'
@@ -51,6 +52,8 @@ interface Props {
   onOpen: (cardId: string) => void
   /** 月の表示で、週の行から、その週の週表示へ移る */
   onOpenWeek?: (sunday: Date) => void
+  /** キャンペーン(X79)。渡すと、計画の面と同じく、キャンペーン単位の箱にまとめ、子のカードの合計を出す(X89・c-2) */
+  campaigns?: Map<string, Campaign>
 }
 
 // 前年比の色(左や上の線)。よければ緑、悪ければ赤、比べられなければ灰色
@@ -76,16 +79,41 @@ const byDay = (cards: DeliveryCard[]) => {
  * 計画と結果は同じ配信の表と裏なので、カレンダーの形・箱の 1 行目(アイコン + 名前)はそろえ、2 行目と色だけを変える
  * (左の線 = 前年比。地の色 = 結果があれば白、なければ灰色)
  */
-export function ResultsMonth({ month, cards, results, money, onOpen, onOpenWeek }: Props & { month: Date }) {
+export function ResultsMonth({ month, cards, results, money, onOpen, onOpenWeek, campaigns }: Props & { month: Date }) {
   const styles = useStyles()
   const t = useT()
   const delta = useDelta()
+  // キャンペーンの合計(保存せず、子のカードの結果から計算する)。前年比は、子の前年の売上の合計と比べる
+  const sumOf = (children: DeliveryCard[]) => {
+    const rows = children.map((c) => results.get(c.id)).filter((r): r is ResultRow => !!r)
+    const revenue = rows.reduce((a, r) => a + r.revenue, 0)
+    const lastYear = rows.reduce((a, r) => a + Number(r.result.last_year_revenue ?? 0), 0)
+    const recipients = rows.reduce((a, r) => a + Number(r.result.recipients ?? 0), 0)
+    const clicks = rows.reduce((a, r) => a + Number((isPush(r.card) ? r.result.opens : r.result.clicks) ?? 0), 0)
+    return { rows, revenue, vsLastYear: lastYear ? revenue / lastYear - 1 : undefined, clickRate: recipients ? clicks / recipients : undefined }
+  }
   return (
     <Calendar
       month={month}
       cards={cards}
       onSelect={onOpen}
       onOpenWeek={onOpenWeek}
+      campaigns={campaigns}
+      campaignTone={(children) => {
+        const x = sumOf(children)
+        return { line: x.rows.length ? trendColor({ vsLastYear: x.vsLastYear } as ResultRow) : tokens.colorNeutralStroke1, background: x.rows.length ? tokens.colorNeutralBackground1 : tokens.colorNeutralBackground3 }
+      }}
+      renderCampaignMeta={(children) => {
+        const x = sumOf(children)
+        if (!x.rows.length) return <span className={styles.noResult}>{t('結果なし', 'No results')}</span>
+        return (
+          <>
+            <span>{money(x.revenue, x.rows[0].card)}</span>
+            <span>{t(`クリック ${pct(x.clickRate)}`, `Click ${pct(x.clickRate)}`)}</span>
+            {delta(x.vsLastYear)}
+          </>
+        )
+      }}
       chipTone={(c) => {
         const r = results.get(c.id)
         return { line: trendColor(r), background: r ? tokens.colorNeutralBackground1 : tokens.colorNeutralBackground3 }

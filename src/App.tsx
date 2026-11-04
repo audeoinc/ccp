@@ -37,7 +37,7 @@ import { DevRequestLayer } from './DevRequestLayer'
 import { onOpenDevRequestList } from './devRequestPlace'
 import { DeliveryCardsService } from './data/deliveryCards'
 import type { DeliveryCard } from './models/deliveryCards'
-import type { WeekRow, WeekStatus } from './data/weeks'
+import type { WeekStatus } from './data/weeks'
 import { WeekReviewBar, WeekScopeBar } from './WeekReviewBar'
 import { SignInDialog } from './MePicker'
 import { PrevMonthRetro, WeekRetro } from './WeekRetro'
@@ -72,7 +72,8 @@ import { SwipePager } from './SwipePager'
 import { approveMine, needsRequest, requestAll } from './weekApprovals'
 import { markTemplatesLoadFailed, useTemplateManagerOpen, useTemplates } from './templates'
 import { useOpenedOnce } from './useOpenedOnce'
-import { CardDetail, type NewCardDefaults } from './CardDetail'
+import type { NewCardDefaults } from './CardDetail'
+import { loadCardDetail } from './cardDetailChunk'
 import { NewCampaignDialog } from './CampaignDialogs'
 import { isFrame } from './bulkDraft'
 import { useBulkWorkspace, type BulkDraft } from './useBulkWorkspace'
@@ -80,7 +81,8 @@ import { loadAutoDraft, loadLastNewCountry, loadPref, saveAutoDraft, savePref } 
 import { locale, optionLabel, setLang, tr, useLang, useT } from './i18n'
 import { countryOptions, statusColor, statusOptions, statusRank, statusView } from './status'
 import { themeTypeOf } from './themeTypes'
-import { confirmedWeekOf, dayKeyOf, saveWeekRow, scopeLabel, scopeOfCard, segmentsOf, sundayOf, weekConfirmedIn, weekKeyOf, weekRowOf } from './weekLock'
+import { confirmedWeekOf, dayKeyOf, saveWeekRetro, saveWeekRow, scopeLabel, scopeOfCard, segmentsOf, sundayOf, weekConfirmedIn, weekKeyOf, weekRetroOf, weekRowOf } from './weekLock'
+import { WeekRetrosService, type WeekRetroRow } from './data/weekRetros'
 import { logEvent, myName, myUserId, onMeChange } from './history'
 import { WeekCheckChip, WeekChecklist } from './WeekChecklist'
 import { MiniCalendar } from './MiniCalendar'
@@ -100,8 +102,9 @@ import { useSettingsActions } from './settingsActions'
 import { AppToolbar } from './AppToolbar'
 import { noFilter, useFaceButtonStyles, type Filters } from './appToolbarParts'
 import { loadSimpleProduction } from './simpleProductionChunk'
+import { loadSimpleResults } from './simpleResultsChunk'
 import { UiScaleNotice } from './UiScaleNotice'
-import { Later, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, ResultPeek, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
+import { CardDetailView, Later, LoadingWindow, SettingsDialog, ResultsPage, ImpactView, LearningHand, ProductsView, SimpleResultsView, SimpleProductionView, AlertsPage, BulkWorkspace, TemplateManager, PeopleManager, DevRequestsDialog } from './lazyViews'
 import { ym, ymd } from './dates'
 import { isOn, useFeature, useFeatureVersion } from './featureFlags'
 import { FeatureBadge } from './FeatureBadge'
@@ -234,7 +237,7 @@ function App() {
   const {
     cards, products, heroes, loading, error, setError, bq, bqBusy, patterns, policies,
     cardProducts, variantProducts, cardImages, expiringImages, productRows, resultsKey, changeKey,
-    notes, weeks, setWeeks, events,
+    notes, weeks, events,
     reloadHeroes, loadPatterns, loadMarketingPolicies, loadParts, reloadCards, load, loadProducts, runBqSync,
   } = useAppData({
     notify: setBqNotice,
@@ -305,10 +308,9 @@ function App() {
   const [page, setPage] = useState<'calendar' | 'production' | 'results' | 'alerts'>(link.page ?? 'calendar')
   // 開いている制作のページ(配信の id)
   const [productionOpen, setProductionOpen] = useState<string | null>(link.production ?? null)
-  // 結果の面で、詳しい結果(フロート)を開いている配信
-  const [resultDetail, setResultDetail] = useState<string | null>(link.result ?? null)
-  // 計画の面で、配信カードの上に重ねて見ている結果(閉じると、配信カードに戻る)
-  const [peekResult, setPeekResult] = useState<string | null>(null)
+  // 結果のシンプルな画面(X89)。配信カード・制作のシンプルな画面と同じ窓のまま、段階のタブで切り替える(2026-11-02 利用者: 案 A・同じ窓)。
+  // 詳しい結果のフロート(ResultDetail・ResultPeek)は、これに置きかえて消した(req-results-simple.md の 5 章の 8)
+  const [resultsOpen, setResultsOpen] = useState<string | null>(link.result ?? null)
   // 結果の面の操作を差し込む、ツールバーの場所
   const [toolbarSlot, setToolbarSlot] = useState<HTMLSpanElement | null>(null)
   // 週の見方を、このボタンから下に生える形に置く(WeekLensTabs)
@@ -340,39 +342,63 @@ function App() {
     // シンプルな制作の画面とは、同じ窓のまま中身だけを入れ替える(2026-10-29 利用者: 上にもう 1 つ開かず、× で全部閉じる)。
     // 窓の出てくる動きは付けない(きょうだいの切り替えと同じ instant。チカつかないように)
     if (f === 'calendar' && productionOpen === id && selectedId !== id) {
-      setPeekResult(null)
+      // 配信カードのプログラムを読み終わってから入れ替える(読む間に前の窓だけ閉じて、カレンダーが見えないように)
+      await loadCardDetail()
       setProductionOpen(null)
       openNext(id)
+      return
+    }
+    // 結果のシンプルな画面から、同じ窓のまま計画・制作へ
+    if (resultsOpen === id && f !== 'results') {
+      await (f === 'production' ? loadSimpleProduction() : loadCardDetail())
+      setResultsOpen(null)
+      if (f === 'calendar') openNext(id)
+      else {
+        setInstantId(id)
+        setProductionOpen(id)
+      }
+      return
+    }
+    // 計画・制作のシンプルな画面から、同じ窓のまま結果へ
+    if (f === 'results') {
+      if (selectedId === id && !(await (cardLeaveRef.current?.() ?? Promise.resolve(true)))) return
+      // 結果の画面のプログラムを読み終わってから入れ替える(制作と同じ。読む間に前の窓だけ閉じて、カレンダーが見えないように)
+      await loadSimpleResults()
+      if (selectedId === id) setSelectedId(null)
+      if (productionOpen === id) setProductionOpen(null)
+      setInstantId(selectedId === id || productionOpen === id ? id : null)
+      setResultsOpen(id)
       return
     }
     if (f === 'production' && selectedId === id) {
       if (!(await (cardLeaveRef.current?.() ?? Promise.resolve(true)))) return
       // 制作の画面のプログラムを読み終わってから入れ替える(読む間に配信カードだけ閉じて、カレンダーが見えないように)
       await loadSimpleProduction()
-      setPeekResult(null)
       setSelectedId(null)
       setInstantId(id)
       setProductionOpen(id)
       return
     }
     if (f === 'calendar') {
-      setPeekResult(null)
       // 配信カードが制作のページの下にあれば、制作のページを閉じて見せる。なければ、上に重ねて開く(閉じると制作のページに戻る)
       if (selectedId === id) setProductionOpen(null)
       else setSelectedId(id)
-    } else if (f === 'production') {
-      setPeekResult(null)
+    } else {
       // 制作のページが配信カードの下にあれば、開き直して上に出す
       if (productionOpen === id) setProductionKey((k) => k + 1)
       else setProductionOpen(id)
-    } else {
-      setProductionOpen(null)
-      setPeekResult(id)
     }
   }
-  // 配信カードを開いたら、制作の画面のプログラムを裏で読んでおく(PRODUCTION のタブで、すぐ切り替えられるように)
+  // 配信カードのプログラムは、最初の画面を出したあとに裏で読んでおく(押したときに待たないように。読み終わる前に押したら、そのとき読む)
   useEffect(() => {
-    if (selectedId) void loadSimpleProduction()
+    const id = window.setTimeout(() => void loadCardDetail().catch(() => undefined), 1500)
+    return () => window.clearTimeout(id)
+  }, [])
+  // 配信カードを開いたら、制作・結果の画面のプログラムを裏で読んでおく(PRODUCTION・RESULTS のタブで、すぐ切り替えられるように)
+  useEffect(() => {
+    if (!selectedId) return
+    void loadSimpleProduction().catch(() => undefined)
+    void loadSimpleResults().catch(() => undefined)
   }, [selectedId])
   const stageNav = (c: DeliveryCard, f: Face, variant?: 'chips' | 'tabs') => <StageNav face={f} card={c} production={production.latest.get(c.id)} onGo={(to) => void goStage(c.id, to)} variant={variant} />
   // 制作の面では、配信を押すと制作のページを開く(計画の面は配信カード)
@@ -476,9 +502,10 @@ function App() {
   // 見せ方「効果」を読み直すための印(⚙ で見本を作り直したとき)
   const [impactKey, setImpactKey] = useState(0)
   const showFace = (p: 'calendar' | 'production' | 'results' | 'alerts') => {
-    setResultDetail(null)
     // 「比べる」「効果」「学び」は結果の面だけ。ほかの面に移るときは、月にする
     if (p !== 'results' && RESULTS_ONLY.includes(view)) setView('month')
+    // 結果の面の見せ方は、月・週・一覧の 3 つ(X89。2026-11-02 利用者)。商品別は計画・制作の面だけ
+    if (p === 'results' && view === 'products') setView('list')
     setPage(p)
   }
   // 機能の公開・非公開(X87): 非公開の面(制作・結果)を開こうとしたら(リンク・「戻る」・開いたあとに非公開にした)、計画の面で開く
@@ -595,21 +622,26 @@ function App() {
     if (!printingWeek) return
     printWeek(`week-plan_${weekKey}`, () => setPrintingWeek(false))
   }, [printingWeek, weekKey])
-  // 前週の行(計画の面に、前週の振り返りを出す)
-  const prevWeek = useMemo(() => {
-    const k = ymd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7))
-    return weekRowOf(weeks, k, weekScope)
-  }, [weeks, weekStart, weekScope])
-  // 週の振り返りのメモを保存する(その国・チャネルの行がなければ作る)
-  const saveRetro = async (key: string, row: WeekRow | undefined, text: string): Promise<boolean> => {
+  // 週の振り返り(表 week_retros。X89 の案 1: 国だけ選べば書け、チャネルも選べばその組で書ける。承認・確定の週の行とは分けて持つ)
+  const [weekRetros, setWeekRetros] = useState<WeekRetroRow[]>([])
+  useEffect(() => {
+    WeekRetrosService.getAll()
+      .then((r) => r.success && setWeekRetros(r.data ?? []))
+      .catch(() => undefined)
+  }, [])
+  const thisRetro = weekRetroOf(weekRetros, weeks, weekKey, weekScope)
+  // 前週の振り返り(計画の面に出す)
+  const prevRetro = weekRetroOf(weekRetros, weeks, ymd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7)), weekScope).text
+  // 週の振り返りのメモを保存する(その週・国・チャネルの行がなければ作る)
+  const saveRetro = async (text: string): Promise<boolean> => {
     setError(null)
-    const res = await saveWeekRow(row, key, weekScope, { retro: text })
+    const res = await saveWeekRetro(thisRetro.own, weekKey, weekScope, text)
     if (!res.success || !res.data) {
       setError(res.error?.message ?? t('振り返りを保存できませんでした', 'Could not save the retrospective'))
       return false
     }
     const saved = res.data
-    setWeeks((prev) => (prev.some((w) => w.id === saved.id) ? prev.map((w) => (w.id === saved.id ? { ...w, ...saved } : w)) : [...prev, saved]))
+    setWeekRetros((prev) => (prev.some((w) => w.id === saved.id) ? prev.map((w) => (w.id === saved.id ? { ...w, ...saved } : w)) : [...prev, saved]))
     return true
   }
   const changeWeek = async (next: WeekStatus) => {
@@ -777,7 +809,7 @@ function App() {
     from: range.from,
     to: range.to,
     card: selectedId ?? undefined,
-    result: page === 'results' ? (resultDetail ?? undefined) : undefined,
+    result: resultsOpen ?? undefined,
     production: productionOpen ?? undefined,
     alerts: alertsOpen ? (alertsFocus ?? '') : undefined,
   }
@@ -796,7 +828,7 @@ function App() {
     setSelectedId(l.card ?? null)
     setCreating(null)
     setDraftOpen(null)
-    setResultDetail(l.result ?? null)
+    setResultsOpen(l.result ?? null)
     setProductionOpen(l.production ?? null)
     setAlertsOpen(l.alerts !== undefined)
     setAlertsFocus(l.alerts || undefined)
@@ -808,7 +840,7 @@ function App() {
     const missing = [link.card, link.result, link.production].filter((id): id is string => !!id && !cards.some((c) => c.id === id))
     if (missing.length > 0) {
       if (link.card && missing.includes(link.card)) setSelectedId(null)
-      if (link.result && missing.includes(link.result)) setResultDetail(null)
+      if (link.result && missing.includes(link.result)) setResultsOpen(null)
       if (link.production && missing.includes(link.production)) setProductionOpen(null)
       setBqNotice({ intent: 'warning', text: tr('リンクの配信が見つかりません(消された、または別の環境のリンクです)。いつもの画面で開きました', 'The delivery in the link was not found (deleted, or a link from another environment). Opened the usual view.') })
     }
@@ -1116,17 +1148,18 @@ function App() {
                     ],
                   ] as const
                 )
-                  .filter(([v, , off]) => !off && viewOn(v))
+                  // 結果の面は、月・週・一覧の 3 つ(X89。比べるは一覧の中の「並べて比べる」、商品別は計画・制作の面だけ。効果・学びは版の公開しだい)
+                  .filter(([v, , off]) => !off && viewOn(v) && !(page === 'results' && (v === 'products' || v === 'compare')))
                   .map(([v, label, off, title]) => (
                   <button
                     key={v}
                     ref={v === 'week' ? setWeekBtn : undefined}
                     type="button"
                     role="tab"
-                    aria-selected={view === v}
+                    aria-selected={view === v || (v === 'list' && view === 'compare' && page === 'results')}
                     disabled={off}
                     title={title}
-                    className={mergeClasses(faceBtn.faceBtn, styles.viewBtn, view === v && faceBtn.faceBtnOn)}
+                    className={mergeClasses(faceBtn.faceBtn, styles.viewBtn, (view === v || (v === 'list' && view === 'compare' && page === 'results')) && faceBtn.faceBtnOn)}
                     onClick={() => changeView(v)}
                   >
                     {label}
@@ -1251,10 +1284,10 @@ function App() {
             {/* 日付から作るときは、その日の 10:00 を配信日時にする(過去の日付でも作れる) */}
             {view === 'learnings' ? (
               // 見せ方「学び」(X78 の手札): すべての学びをカードで。期間・チャネルの絞り込みによらず、学びの側の絞り込みで見る
-              <Later spin><LearningHand allCards={cards} country={filters.country} onOpenResult={setPeekResult} /></Later>
+              <Later spin><LearningHand allCards={cards} country={filters.country} onOpenResult={setResultsOpen} /></Later>
             ) : view === 'impact' ? (
               // 見せ方「効果」: 配信の増分と、学びの記録・指標・売上・評価。期間によらず、絞り込みの国・チャネルのすべての配信で見る(件数が少ないと比べられないため)
-              <Later spin><ImpactView key={impactKey} cards={filtered} allCards={cards} country={filters.country} onOpenResult={setPeekResult} /></Later>
+              <Later spin><ImpactView key={impactKey} cards={filtered} allCards={cards} country={filters.country} onOpenResult={setResultsOpen} /></Later>
             ) : view === 'products' ? (
               <>
               {/* 期間の近道(見せ方「商品」) */}
@@ -1284,14 +1317,13 @@ function App() {
                 from={range.from}
                 to={range.to}
                 onOpenCard={setSelectedId}
-                onOpenResult={(id) => (page === 'results' ? setResultDetail(id) : setPeekResult(id))}
+                onOpenResult={setResultsOpen}
               /></Later>
               </>
             ) : page === 'results' ? (
               // 結果の面も、週・月なら、つかんで前後へ(一覧・比べるは動かさない)
               <SwipePager onPrev={() => shift(-1)} onNext={() => shift(1)} enabled={swipeOn && (view === 'week' || view === 'month')}>
               <Later spin><ResultsPage
-                stageNav={(c) => stageNav(c, 'results')}
                 country={filters.country}
                 cards={filtered}
                 products={products}
@@ -1301,19 +1333,22 @@ function App() {
                 month={month}
                 weekStart={weekStart}
                 toolbarSlot={toolbarSlot}
-                detailId={resultDetail}
-                onDetail={setResultDetail}
+                openId={resultsOpen}
+                // 配信を押したら、結果のシンプルな画面(X89)
+                onOpenResult={setResultsOpen}
+                // 比べるは、一覧の中の「並べて比べる」(X89。見せ方を 7 → 3 に)
+                onCompare={(on) => changeView(on ? 'compare' : 'list')}
                 onOpenCard={setSelectedId}
                 onCardsChanged={load}
                 onOpenWeek={(d) => goTo('week', d)}
                 onDataActions={setResultsData}
                 retro={(draft) =>
-                  // 週の振り返りは、週・国・チャネルの行に書く(ST3)。組が決まっていなければ、書く所を決められない
-                  weekScoped ? (
-                    <WeekRetro mode="results" text={thisWeek?.retro ?? ''} onSave={(text) => saveRetro(weekKey, thisWeek, text)} onDraft={draft} />
+                  // 週の振り返りは、国だけ選べば書ける(チャネルは任意。月の振り返りとそろえる。X89)
+                  filters.country ? (
+                    <WeekRetro key={`${weekKey}:${filters.country}:${filters.channel ?? ''}`} mode="results" text={thisRetro.text} onSave={saveRetro} onDraft={draft} />
                   ) : (
                     <MessageBar intent="info" layout="multiline">
-                      <MessageBarBody>{t('週の振り返りは、国とチャネルごとに書きます。上で国とチャネルを選んでください', 'Weekly retrospectives are per country and channel. Choose both above.')}</MessageBarBody>
+                      <MessageBarBody>{t('週の振り返りは、国ごとに書きます(チャネルは選ばなくても書けます)。上で国を選んでください', 'Weekly retrospectives are per country (channel is optional). Choose a country above.')}</MessageBarBody>
                     </MessageBar>
                   )
                 }
@@ -1370,7 +1405,7 @@ function App() {
               {!onProduction && (
               <WeekRetro
                 mode="plan"
-                text={prevWeek?.retro ?? ''}
+                text={prevRetro}
                 onOpenResults={() => {
                   setPage('results')
                   goTo('week', new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7))
@@ -1522,7 +1557,7 @@ function App() {
             setDraftOpen(null)
           }}
         >
-        <CardDetail
+        <Later fallback={<LoadingWindow instant={!!selected && selected.id === instantId} />}><CardDetailView
           key={selected?.id ?? (draftOpen ? `draft:${draftOpen.day}` : 'new')}
           card={selected}
           draft={selected ? undefined : draftOpen?.draft}
@@ -1552,8 +1587,8 @@ function App() {
             void reloadCards()
           }}
           onSaved={reloadCards}
-          // 結果は、面を切り替えずに、配信カードの上に重ねて見る。結果の面で、その結果から開いた配信カードでは出さない(下に結果があるため)
-          onOpenResults={page === 'results' && resultDetail === selected?.id ? undefined : setPeekResult}
+          // 結果は、同じ窓のまま結果のシンプルな画面へ(X89)
+          onOpenResults={(id) => void goStage(id, 'results')}
           alerts={selected ? cardAlerts.get(selected.id) : draftOpen?.alerts}
           // 週の上限超えの差し替えで、上限に届いた商品を候補から除く(作業画面の案は、保存していない案も数える)
           weekUse={selected?.scheduled_at ? weekUseAll.get(weekKeyOf(new Date(selected.scheduled_at))) : draftOpen ? bulk.weekUse : undefined}
@@ -1573,8 +1608,7 @@ function App() {
             // 配信カードの「制作に渡す」は、開いた制作の画面で、そのまま渡すまで進める(K1。シンプルな制作の画面が渡す)。
             // 配信カードの上に重ねて開く(渡したあと、× で配信カードに戻れるように)
             if (opts?.request) {
-              setPeekResult(null)
-              setProductionAuto(true)
+                      setProductionAuto(true)
               setProductionOpen(id)
               return
             }
@@ -1596,7 +1630,7 @@ function App() {
           instant={!!selected && selected.id === instantId}
           leaveRef={cardLeaveRef}
           alertsOf={(id) => cardAlerts.get(id)}
-        />
+        /></Later>
         </ErrorBoundary>
       )}
       {/* AI でまとめて作った配信を、確かめる引き出し(W14) */}
@@ -1616,12 +1650,30 @@ function App() {
           }}
         />
       )}
-      {peekResult && (
-        <Later><ResultPeek cardId={peekResult} cards={cards} cardProducts={cardProducts} products={products} heroes={heroes} onClose={() => setPeekResult(null)} stageNav={(c) => stageNav(c, 'results')} /></Later>
+      {resultsOpen && cards.find((c) => c.id === resultsOpen) && (
+        <Later fallback={<LoadingWindow instant={resultsOpen === instantId} />}><SimpleResultsView
+          key={resultsOpen}
+          card={cards.find((c) => c.id === resultsOpen)!}
+          allCards={cards}
+          cardProducts={cardProducts}
+          productIds={cardProducts.get(resultsOpen) ?? []}
+          variantIds={variantProducts.get(resultsOpen)}
+          products={products}
+          productImages={cardImages.get(resultsOpen)}
+          heroes={heroes}
+          people={owners}
+          onClose={() => setResultsOpen(null)}
+          instant={resultsOpen === instantId}
+          stageTabs={stageNav(cards.find((c) => c.id === resultsOpen)!, 'results', 'tabs')}
+          onSwitchCard={(id) => {
+            setInstantId(id)
+            setResultsOpen(id)
+          }}
+        /></Later>
       )}
       {/* 制作のページ(PR3)。制作の面の箱、または配信カードの「制作の依頼」の札から開く。配信カードの上に重なる */}
       {productionOpen && cards.find((c) => c.id === productionOpen) && (
-        <Later><SimpleProductionView
+        <Later fallback={<LoadingWindow instant={productionOpen === instantId} />}><SimpleProductionView
           key={`${productionOpen}:${productionKey}`}
           card={cards.find((c) => c.id === productionOpen)!}
           productIds={cardProducts.get(productionOpen) ?? []}

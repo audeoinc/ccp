@@ -1,6 +1,7 @@
 // 確定した週の、変更の制限(バックログ W3)。
 // 週の計画は、確定したら制作に回してよい状態なので、そのあとに配信を変えるときは、理由を残して、週をレビューに戻す。
 import { WeeksService, type WeekRow } from './data/weeks'
+import { WeekRetrosService, type WeekRetroRow } from './data/weekRetros'
 import { CHANNEL_EMAIL, channelOptions, countryOptions } from './status'
 import { optionLabel } from './i18n'
 import { weekStartSunday, ymd } from './dates'
@@ -93,4 +94,28 @@ export function saveWeekRow(row: WeekRow | undefined, weekKey: string, scope: We
 /** 確定した週の配信を変えたとき、その国・チャネルの週をレビュー中に戻す(ほかの国・チャネルの確定は、そのまま) */
 export function reopenWeek(row: WeekRow, scope: WeekScope) {
   return saveWeekRow(row, row.week_start?.slice(0, 10) ?? '', scope, { status: 'review', submitted_at: new Date().toISOString() })
+}
+
+/**
+ * 週の振り返り(X89 の案 1。表 week_retros)。国だけ選べば書け、チャネルも選べばその組で書ける。
+ * 読む順は、その組 → 国だけの行 → 以前の weeks.retro(移し替えはしない)。own は、そのまま直せる自分の行(なければ、保存で作る)。
+ * 国だけを見ていて以前の行しかないときは、その国のチャネルごとの振り返りを、組の名前を付けて並べる(書き始めの下地に)
+ */
+export function weekRetroOf(retros: WeekRetroRow[], weeks: WeekRow[], weekKey: string, scope: WeekScope): { text: string; own?: WeekRetroRow } {
+  const inWeek = retros.filter((r) => r.week_start?.slice(0, 10) === weekKey && !!scope.country && r.country === scope.country)
+  const own = inWeek.find((r) => (r.channel ?? '') === (scope.channel ?? ''))
+  if (own) return { text: own.retro ?? '', own }
+  const countryRow = scope.channel ? inWeek.find((r) => !r.channel) : undefined
+  if (countryRow?.retro?.trim()) return { text: countryRow.retro }
+  if (scope.country && !scope.channel) {
+    const old = weeks.filter((w) => w.week_start?.slice(0, 10) === weekKey && w.country === scope.country && w.retro?.trim())
+    if (old.length) return { text: old.map((w) => `[${scopeLabel(w)}] ${w.retro!.trim()}`).join('\n') }
+  }
+  return { text: weekRowOf(weeks, weekKey, scope)?.retro ?? '' }
+}
+
+/** 週の振り返りを書く。自分の行(その週・国・チャネル)があれば直し、なければ作る。承認・確定の週の行(weeks)には触らない */
+export function saveWeekRetro(own: WeekRetroRow | undefined, weekKey: string, scope: WeekScope, text: string) {
+  if (own) return WeekRetrosService.update(own.id, { retro: text })
+  return WeekRetrosService.create({ week_start: weekKey, country: scope.country ?? '', channel: scope.channel ?? '', retro: text })
 }

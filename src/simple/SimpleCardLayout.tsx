@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { filled } from '../slots'
-import { Button, InfoLabel, Tab, TabList, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { AddRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, LinkMultipleRegular, CheckmarkRegular, ErrorCircleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
+import { Button, ToggleButton, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Popover, PopoverSurface, PopoverTrigger, Spinner, Tooltip, makeStyles, tokens } from '@fluentui/react-components'
+import { AddRegular, BoxMultipleArrowRightRegular, ImageMultipleRegular, LinkMultipleRegular, ColumnTripleRegular, CommentRegular, SettingsRegular, ChevronRightRegular, HistoryRegular, LightbulbRegular, WarningRegular, LayoutColumnTwoRegular, PersonAvailableRegular, SaveRegular } from '@fluentui/react-icons'
 import { AiIcon } from '../AiMark'
 import { ProductInfoPane } from '../ProductInfoPane'
 import { PreviewPartPicker } from '../PreviewPartPicker'
 import { SideRail, type RailItem } from './SideRail'
 import { useStableCallback } from '../useStableCallback'
-import { PreviewPins } from '../PreviewPins'
 import { pinView } from '../pinStore'
 import { CommPane, type CommCounts, type CommSection } from './CommPane'
 import { CardAlertsBar } from '../CardAlertsBar'
 import { Hint } from '../Hint'
-import { PinFloat } from '../PinFloat'
 import { focusSoon, type ContextItem } from '../ContextMenu'
 import { previewMenuItems } from '../previewMenu'
 import { CopyLinkButton } from '../CopyLinkButton'
@@ -24,7 +22,7 @@ import { MoreHorizontalRegular, ArrowSwapRegular, DeleteRegular } from '@fluentu
 import { Row, productMeta } from '../ProductRow'
 import { ALERT_COLOR } from '../alertColors'
 import { productImage } from '../images'
-import { locale, useT } from '../i18n'
+import { useT } from '../i18n'
 import { audienceSet } from '../target'
 import { getTemplate, sectionsOf, slotsOf } from '../templates'
 import { statusRank } from '../status'
@@ -38,14 +36,18 @@ import { PartPane } from './PartPane'
 import { ProductSwap, type SwapAt } from './ProductSwap'
 import { useFloatSwap } from './floatSwap'
 import { placeInPart } from './actions'
-import { partFromElement, partKey, partOfAnchor, samePart, type PartRef } from './parts'
+import { partFromElement, partKey, samePart, type PartRef } from './parts'
 import { PreviewFrame, StageFrame, StagePane, StagePanes } from './StageFrame'
 import { useStageLayout } from './stageLayout'
+import { useSidePanel } from './useSidePanel'
+import { sendWhenText } from '../dates'
+import { useAssetDrop } from './useAssetDrop'
 import { DeliveryMetaBand } from './DeliveryMetaBand'
+import { VariantTabs } from './VariantTabs'
+import { StagePins } from './StagePins'
 import { HandoffSheet } from './HandoffSheet'
 import { LinksPanel } from './LinksPanel'
 import { CreativeAssets } from '../CreativeAssets'
-import { addDroppedAssets, canDropAsset } from './assetDrop'
 import { myName, onMeChange } from '../history'
 import { CardAssetsService } from '../data/cardAssets'
 import { PreviewMarks, type Mark } from './PreviewMarks'
@@ -108,18 +110,12 @@ const useStyles = makeStyles({
   },
   listHead: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '-6px' },
   colTitle: { ...typo.heading, marginBottom: '10px' },
-  dropNote: { fontSize: '16px' },
   candHead: { marginTop: '16px', paddingBottom: '4px', fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold, borderBottom: `1px solid ${tokens.colorNeutralStroke1}` },
   // 候補の行と、マウスを乗せたときの「⇄ 入れる」(SU9)
   // 「入れる」は、マウスを乗せたとき・フォーカスがあるときだけ見せる(一覧をうるさくしない)
   candList: { display: 'grid', rowGap: '6px', marginTop: '6px' },
   candWrap: { '& [data-row-action]': { visibility: 'hidden' }, ':hover [data-row-action]': { visibility: 'visible' }, ':focus-within [data-row-action]': { visibility: 'visible' } },
   hint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  // 案のタブ(SU2)
-  // 上の帯の AB テストの案(SU8)。面のタブのあとに、線で区切って並べる
-  abBar: { display: 'flex', alignItems: 'center', columnGap: '4px', minWidth: 0, flexShrink: 0, paddingLeft: '10px', marginLeft: '2px', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` },
-  // キャンペーンの帯の 3 段目に置くとき(帯の中では、左の区切りの線は要らない)
-  abBarInBand: { paddingLeft: 0, marginLeft: 0, borderLeft: 'none' },
   abWarn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
   abDiff: { boxShadow: `inset 0 -2px 0 ${tokens.colorPaletteDarkOrangeBorder2}` },
 })
@@ -246,7 +242,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const swapInFloat = useFloatSwap({ editor: e, chats, setChat, onSwapped: swapped })
 
   // まだ保存していない案(e.unsaved)は、配信カードの ID を使うパネル(やり取り・承認・素材・渡すもの・履歴・学び)を出さない。開けるのはアラートだけ
-  const [side, setSide] = useState<Side>(null)
+  // 左のバーの欄の開け閉め(制作・結果の面と同じ useSidePanel)
+  const sidePanel = useSidePanel<Exclude<Side, null>>(null, 'alerts')
+  const { side, setSide, panel, moving } = sidePanel
   // 開いたときの左のペインは、載せた商品まで読み終わってから決める(アラートの数は商品で決まるので、読む前に決めると一瞬開いて閉じる)。
   // きょうだいの配信カードに切り替えたとき(この画面は作り直されない)も、開いたときと同じ始まり方にする
   const [decided, setDecided] = useState<string | null>(null)
@@ -262,14 +260,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   }
   /** サイドパネルを開く(open: 必ず開く。省略は、開いている方を押したら閉じる) */
   const showSide = (v: Exclude<Side, null>, open = false) => {
-    const next = !open && side === v ? null : v
-    setSide(next)
+    const next = sidePanel.show(v, open)
     if (isComm(next)) setCommSection(next)
-    if (next) setLastSide(next)
-    if (next !== side) {
-      setMoving(true)
-      window.setTimeout(() => setMoving(false), 260)
-    }
   }
   // 送る前の確かめ(承認を依頼する・制作に渡す の前の一覧。中身は readiness.ts。2026-10-25 利用者と決めた)
   const checkInput = {
@@ -303,10 +295,6 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       setHandoffFocus((f) => ({ field: target.field, seq: (f?.seq ?? 0) + 1 }))
     } else select(target)
   }
-  // しまっている間も、最後に開いたパネルの中身を描いておく(しまう動きの間に、中身が先に消えないように)
-  const [lastSide, setLastSide] = useState<Exclude<Side, null>>('alerts')
-  const panel = side ?? lastSide
-  const [moving, setMoving] = useState(false)
   // 列の幅と、狭いときの割り振り(面の枠。幅は面で 1 つの鍵で覚える)。アプリの配信は、スマホの幅
   const layout = useStageLayout({ device: e.channel === 'email' && e.device === 'pc' ? 'pc' : 'mobile', side: isComm(side) ? 'comm' : side ? 'hand' : null, list: { open: productsOpen, insist } })
   const fit = layout.fit
@@ -325,19 +313,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const myStep = myNextStep(e.nextStep, { author, myTurn: counts.myTurn, changesRequested: counts.changesRequested })
   // 左のバーの「渡すもの」に、画像・資料・URL を落として、参考の素材に入れる(列を開かずに書き留めるため)
   const [assetsVersion, setAssetsVersion] = useState(0)
-  const [dropOver, setDropOver] = useState<'assets' | 'handoff' | null>(null)
-  const [dropNote, setDropNote] = useState<{ ok: boolean; text: string } | null>(null)
-  const dropAssets = async (dt: DataTransfer) => {
-    setDropOver(null)
-    try {
-      const r = await addDroppedAssets(e.card.id, myName() || e.form.owner || '', dt)
-      setDropNote(r.error ? { ok: false, text: r.error } : { ok: true, text: t(`${r.added} 件を参考の素材に入れました`, `Added ${r.added} to reference assets`) })
-      if (r.added > 0) setAssetsVersion((v) => v + 1)
-    } catch (err) {
-      setDropNote({ ok: false, text: err instanceof Error ? err.message : String(err) })
-    }
-    window.setTimeout(() => setDropNote(null), 4000)
-  }
+  const assetDrop = useAssetDrop<Exclude<Side, null>>({ cardId: e.card.id, me: () => myName() || e.form.owner || '', onAdded: () => setAssetsVersion((v) => v + 1) })
   // 帯に出す、参考の素材の数(帯の数を合わせるため、開いていなくても数える)
   const [assetCount, setAssetCount] = useState(0)
   useEffect(() => {
@@ -354,7 +330,8 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const handoffMissing = !e.form.handedOffAt && (!e.form.productionOwner.trim() || !e.form.productionDue)
   // プレビューの場所を押してコメントを書く(PreviewPins の覆い)。打ったピン・押したピンは、その横のフロート(PinFloat)で書く・読む・返す。
   // 右の帯のやり取りは開かない(2026-10-23 利用者: ほとんどのコメントはピン経由なので、ピンだけで進められるように)
-  const { placing, setPlacing, endPlacing, target: pinTarget, setTarget: setPinTarget, openThreads, close: closePin } = usePreviewPins()
+  const pins = usePreviewPins()
+  const { placing, setPlacing } = pins
   // 右クリックの「画像を入れ替える」(メイン画像のペインの「入れ替える」を開く)
   const [heroReplace, setHeroReplace] = useState(0)
   /**
@@ -457,7 +434,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
   const tpl = getTemplate(e.template)
   // 配信の情報の帯の 1 行(例「配信 10/3(土) 09:00  国 US  対象 女性・30代  送る相手 会員だけ」)。ラベルと値の組で並べる(LabeledValue)。送る相手はメールでもアプリでも
   // 配信の情報の帯は 1 行(2026-10-28 利用者: 対象・送る相手は、押すと開く右のペインの配信の情報で見る。中身が重なっていたため)
-  const when = e.form.scheduledAt ? new Date(e.form.scheduledAt).toLocaleString(locale(), { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }) : t('配信日時(未設定)', 'No send date')
+  const when = sendWhenText(e.form.scheduledAt)
 
   const sideTitle = (v: Exclude<Side, null>) =>
     ({ alerts: t('この配信のアラート', 'Alerts for this delivery'), learn: t('この配信に使う学び', 'Learnings for this delivery'), links: t('この配信のリンク', 'Links in this delivery'), talk: t('やり取り(承認者と)', 'Conversation'), approval: t('承認の様子', 'Approval'), history: t('変更の履歴', 'Change history'), assets: t('素材', 'Assets'), handoff: t('渡すもの(制作へ)', 'Handoff (to production)') })[v]
@@ -526,24 +503,14 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       </MenuPopover>
     </Menu>
   )
+  // AB テストの案(制作・結果の画面と同じ VariantTabs。AB テストをしていないときは、タブを出さず、案を足すメニューなどだけ)
   const abBar = (
-    <div className={mergeClasses(s.abBar, e.campaignBand && s.abBarInBand)}>
-      {/* キャンペーンの帯の中で、AB テストをしていないときは、ⓘ だけが残らないように出さない(段の名前「案」がある) */}
-      {(!e.campaignBand || e.ab) && <InfoLabel
-        size="small"
-        info={t('同じ配信を、見出しや画像を変えて複数作り、どれがよいかを比べます。タブを押すと、プレビューと中身がその案に切り替わります', 'Make several versions of the same delivery with different headlines or images, and compare which works better. Pick a tab to switch the preview and content to that variant.')}
-      >
-        {e.ab ? t('AB テスト', 'A/B test') : ''}
-      </InfoLabel>}
-      {e.ab && (
-        <TabList size="small" selectedValue={e.ab.active} onTabSelect={(_, d) => d.value !== e.ab?.active && (void onCommit(), e.abSwitch(d.value as typeof e.ab.active))}>
-          {e.ab.keys.map((k) => (
-            <Tab key={k} value={k}>
-              {t(`案 ${k}`, `Variant ${k}`)}
-            </Tab>
-          ))}
-        </TabList>
-      )}
+    <VariantTabs
+      info={t('同じ配信を、見出しや画像を変えて複数作り、どれがよいかを比べます。タブを押すと、プレビューと中身がその案に切り替わります', 'Make several versions of the same delivery with different headlines or images, and compare which works better. Pick a tab to switch the preview and content to that variant.')}
+      selected={e.ab?.active ?? 'A'}
+      onSelect={(v) => e.ab && (void onCommit(), e.abSwitch(v as typeof e.ab.active))}
+      tabs={(e.ab?.keys ?? []).map((k) => ({ value: k, label: t(`案 ${k}`, `Variant ${k}`) }))}
+    >
       {/* 案から選んだあと: どの案に決めたかと、配信しなかった案を並べて見る入口(詳しい画面の AbDecidedBar と同じもの。X81 の 6) */}
       {!e.ab && e.abDecided && (
         <Button type="button" size="small" appearance="subtle" icon={<ColumnTripleRegular />} onClick={e.abViewDecided} title={t('配信しなかった案も、中身を残してあります', 'The variants not sent are kept for reference')}>
@@ -583,7 +550,7 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
         <PopoverSurface>{e.abSettings}</PopoverSurface>
       </Popover>
       {e.ab?.busy && <Spinner size="extra-tiny" label={t('AI が案を作っています', 'AI is drafting')} labelPosition="after" />}
-    </div>
+    </VariantTabs>
   )
 
   // 選んだ部品のペイン(プレビューで Enter を押したとき、ここの最初の入力欄へ移る)
@@ -758,7 +725,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
     <StageFrame
       // キャンペーンの帯(X79)。親(キャンペーン) › 子(配信) › 孫(AB の案)。承認の帯より上に置く(承認の帯は、ここで選んだ配信の状態なので)
       // AB テストをしていないときは、案の段を出さず、「AB テストを足す」は配信のタブの ＋ のメニューに(2026-10-28 利用者)
-      band={e.campaignBand?.({ variants: e.ab || e.abDecided ? abBar : undefined, addVariantItems: e.ab || e.abDecided || e.saving || !abOn ? undefined : addVariantItems })}
+      campaign={e.campaignBand && { ...e.campaignBand, addVariantItems: e.ab || e.abDecided || e.saving || !abOn ? undefined : addVariantItems }}
+      // 案の段(キャンペーンの帯では、AB テストをしているとき・案に決めたあとだけ。帯がなければ、題の帯の 2 段目にいつも)
+      variants={!e.campaignBand || e.ab || e.abDecided ? abBar : undefined}
       // 上の帯は、制作の画面と同じ部品(StageFrame)。題(チャネル・配信名・日時)とタブの位置は、面を切り替えても動かない(2026-10-30 利用者)
       channel={e.form.channel}
       // キャンペーンに入っている配信の名前は「キャンペーン名 + チャネル」で決まるので、直す入口を出さない。
@@ -851,12 +820,10 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
       // この配信カードを開くリンクをコピー(詳しい配信カードにあったもの。2026-10-28 利用者)。まだ保存していない新しいカードには URL がないので出さない
       tools={e.card.id && <CopyLinkButton iconOnly />}
       menu={e.menu}
-      // 閉じる ×: キャンペーンの帯があれば、その右の端(CardDetail が入れる)。なければ、この行の右の端
-      onClose={e.campaignBand ? undefined : onClose}
+      // 閉じる ×: キャンペーンの帯があれば、その右の端。なければ、この行の右の端(StageFrame が置く)
+      onClose={onClose}
       // 面のタブ(PLAN | PRODUCTION | RESULTS)。配信が主役で、面はその見方なので、題名の下に
       tabs={e.stageNav}
-      // AB テストの案(SU8)。1 段目に置くと配信名が縮むので、同じ帯の 2 段目、面のタブの右に
-      tabsExtra={e.campaignBand ? undefined : abBar}
       notices={e.notices}
     >
       <StagePanes
@@ -870,28 +837,9 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
             selected={side}
             onPick={(v) => showSide(v)}
             ariaLabel={t('配信の全体の情報とメニュー', 'Delivery info and menus')}
-            drop={{
-              over: dropOver,
-              onOver: (v, ev) => {
-                if (!canDropAsset(ev.dataTransfer)) return
-                ev.preventDefault()
-                setDropOver(v === 'assets' ? 'assets' : 'handoff')
-              },
-              onLeave: () => setDropOver(null),
-              onDrop: (_, ev) => {
-                ev.preventDefault()
-                void dropAssets(ev.dataTransfer)
-              },
-            }}
+            drop={assetDrop.drop}
           >
-            {/* 落としたものを入れた・入れられなかったを、バーの下に短く知らせる */}
-            {dropNote && (
-              <Tooltip content={dropNote.text} relationship="label" positioning="after" visible>
-                <span className={s.dropNote} style={{ color: dropNote.ok ? tokens.colorPaletteGreenForeground1 : tokens.colorPaletteRedForeground1 }}>
-                  {dropNote.ok ? <CheckmarkRegular /> : <ErrorCircleRegular />}
-                </span>
-              </Tooltip>
-            )}
+            {assetDrop.note}
           </SideRail>
         }
         // 開いているパネル(1 つ)。やり取りの部品は、バーの数を合わせるため、いつも描く
@@ -1013,21 +961,19 @@ export function SimpleCardLayout({ editor: e, boxRef, isDirty, onCommit, onApply
           >
             {e.preview}
             {e.alertOverlay}
-            {!e.unsaved && <PreviewPins boxRef={boxRef} cardId={e.card.id} view={pinView(e.channel, e.device, e.ab?.active ?? 'A')} items={e.items} placing={placing} onPlacingEnd={endPlacing} onOpenThreads={openThreads} menuItems={previewMenu} pinsOn={pinsOn} />}
-            {pinTarget && !e.unsaved && (
-              <PinFloat
+            {!e.unsaved && (
+              <StagePins
+                pins={pins}
+                boxRef={boxRef}
                 cardId={e.card.id}
-                cardOwner={e.card.owner}
+                cardOwner={e.card.owner ?? undefined}
                 stage="plan"
-                root={() => boxRef.current}
-                target={pinTarget}
+                view={pinView(e.channel, e.device, e.ab?.active ?? 'A')}
+                items={e.items}
+                menuItems={previewMenu}
+                pinsOn={pinsOn}
                 productName={(id) => productById.get(id)?.name ?? ''}
-                onTarget={setPinTarget}
-                onClose={closePin}
-                editSpot={(anchor, productId) => {
-                  const p = partOfAnchor(anchor, (pid) => e.items.find((i) => i.productId === pid)?.key, productId)
-                  return p ? () => select(p) : null
-                }}
+                onPart={select}
               />
             )}
             {diffMarks.length > 0 && <PreviewMarks boxRef={boxRef} marks={diffMarks} onSelect={select} />}

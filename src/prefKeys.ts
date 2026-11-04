@@ -47,13 +47,10 @@ export const PREF = {
   productionSize: 'productionPage.size',
   productionPaneWidths: 'productionPage.paneWidths.v1',
   // 制作の面のシンプルな画面(X86): ペインの幅と、シンプル / 詳しいのどちらで開くか(消すまでは並べて残す)
-  productionSimplePaneWidths: 'productionSimple.paneWidths.v1',
-  productionSimpleZoom: 'productionSimple.previewZoom',
   productionPreviewZoom: 'productionPage.previewZoom',
   bulkPaneWidths: 'bulkWorkspace.paneWidths.v1',
   templateListWidth: 'templateManager.paneWidths.v1',
   assetPaneWidths: 'assetFloat.paneWidths.v1',
-  resultPaneWidths: 'resultDetail.paneWidths.v1',
   settingsPaneWidths: 'settings.paneWidths.v1',
   pinFloatSize: 'float.pin.size',
   // ---- 人を見分ける記録(サーバーには写さない)

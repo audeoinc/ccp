@@ -85,6 +85,8 @@ export const tables: Record<string, Row[]> = {
   FeatureVersionsService: ['MVP', 'v1', 'v2', 'v3', 'v4'].map((v) => ({ id: guid(`feature-version:${v}`), version: v, published: 1, changed_by: 'system' })),
   FeatureLogsService: [],
   WeeksService: structuredClone(weeks),
+  // 週の振り返り(表 week_retros。X89)。見本の週の振り返りは、以前からの週の行(weeks.retro)にあるので、ここは空から
+  WeekRetrosService: [],
   // 月の振り返り(表 months)の見本: 前月の計画の面に「前月の振り返り」が出るように、9 月分を 1 つ
   MonthsService: [{ id: guid('month:2026-09'), month_start: '2026-09-01', retro: 'Weather-led emails beat last year in most weeks — keep one per week in October. Push taps fell on evening sends; move flash deals to noon.' }],
   DeliveryResultsService: structuredClone(deliveryResults),

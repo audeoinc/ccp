@@ -200,7 +200,6 @@ export function LearningsBar({ card, templateId, country, channel, name, theme, 
     setActiveLearnings(
       learnings.map((l) => `${l.sentAt.slice(0, 10)} ${l.source.name ?? ''}: ${l.notes.replace(/\n/g, ' / ')}`),
       learnings.map((l) => l.id),
-      card.id,
     )
     return () => setActiveLearnings([])
     // eslint-disable-next-line react-hooks/exhaustive-deps

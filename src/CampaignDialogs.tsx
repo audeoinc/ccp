@@ -23,11 +23,11 @@ import {
   Option,
   Radio,
   RadioGroup,
-  Textarea,
   Tooltip,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
+import { AutoTextarea } from './AutoTextarea'
 import { AddRegular, ArrowUndoRegular, MoreHorizontalRegular, ProhibitedRegular } from '@fluentui/react-icons'
 import type { Campaign } from './models/campaigns'
 import type { DeliveryCard } from './models/deliveryCards'
@@ -370,7 +370,7 @@ export function CampaignMenu({ campaign, cards, weeks, beforeRun, onChanged, bus
                 </MessageBar>
               )}
               <Field label={t('取りやめの理由', 'Reason')} required size="small">
-                <Textarea value={reason} onChange={(_, d) => setReason(d.value)} rows={3} />
+                <AutoTextarea heightKey="CampaignDialogs.cancelReason" value={reason} onChange={(_, d) => setReason(d.value)} rows={3} />
               </Field>
               <ErrorBar error={error} />
             </DialogContent>

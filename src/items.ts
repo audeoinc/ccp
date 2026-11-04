@@ -43,7 +43,6 @@ export interface Candidate extends Item {
 // 配信商品テーブルの「state」列(選択肢)の値
 export const STATE_SELECTED = 'selected'
 export const STATE_CANDIDATE = 'candidate'
-export const DND_CAND = 'application/x-candidate' // 中ペインの候補の行(値は Candidate.key)
 
 /**
  * 商品を差し替えたときの、配信のメモの文(差し替えのどの道 — アラートへの対応・残りの候補と入れ替え・ほかの商品に置き換え — でも同じ形。2026-10-24 の整理)。

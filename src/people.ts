@@ -36,7 +36,7 @@ export async function reloadPeople(): Promise<void> {
   if (me?.email) {
     if (me.user) setMe({ id: me.user.id, name: me.user.name })
     else setMe(undefined)
-    setMeLock({ email: me.email, registered: !!me.user })
+    setMeLock({ email: me.email, registered: !!me.user, source: me.source })
   } else setMeLock(null)
   // ユーザーが読めなければ、読めていない扱いにする(「あなた」は名前の入力に戻る。いまの運用を止めないため)
   if (!u.success) return

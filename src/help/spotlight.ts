@@ -17,7 +17,6 @@ export function setSpotlight(next: string[]) {
   names = [...new Set(next.map((n) => n.trim()).filter((n) => n && !n.includes('…')))]
   bump()
 }
-export const spotlightNames = () => names
 export function useSpotlight(): { names: string[]; version: number } {
   const v = useSyncExternalStore(
     (f) => {

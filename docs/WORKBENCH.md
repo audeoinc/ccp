@@ -81,7 +81,15 @@ BigQuery・指標のコマンド(`cd ~/ccp/server` で、`.venv/bin/python -m cc
 | 商品・カテゴリの週の指標を取り込む(CSV) | `import-metrics <CSV> [--yes]` |
 | BigQuery の販売順位がないとき、結果の画面の「販売チャネルごとの順位」のダミーを作る | `ranking-dummy [--yes]` |
 
-画面からは、⚙ の「BigQuery から取り込む」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
+画面からは、⚙ の「データの取り込み」「商品・カテゴリの指標を取り込む(CSV)」でも行えます。
+
+**本物の BigQuery のデータの始め方**(2026-11-03。くわしくは [BIGQUERY.md](BIGQUERY.md) の 5 章):
+
+0. 表の場所を入れる: ⚙ →「データの取り込み」の「表の場所」に、出力ごとの場所を入れ、「接続を確認」が通ったら保存します(前の版で `workbench.env` に `BQ_SPU` などを書いてあれば、最初に一度だけ写されています)。
+1. 値を確かめる: `bq-check`、または ⚙ →「データの取り込み」の「確認だけ」(管理する人だけ。読んで確かめるだけで、DB には書きません)。NG があれば、出力(ビュー)を直してからやり直します。
+2. 取り込む: 同じ画面の「今すぐ取り込む」。画面で、商品・在庫・実績が正しく見えるかを確かめます。
+3. 定期の取り込みを「入」にする: 同じ画面の上のスイッチ(既定は「切」)。在庫は 5 分ごと、ほかは 60 分ごとに更新を確かめ、変わっていれば取り込みます(間隔は出力ごとに変えられます)。止まった・古い出力があれば、管理する人の ⚙ に赤い点が付きます。
+   - 試験などで定期の取り込みを止めたいときは、`server/workbench.env` に `BQ_AUTO_SYNC=0` と書いて、サーバーを起動し直します(画面の設定にかかわらず回りません)。
 
 - `update` は、`git pull --ff-only`(Workbench でコードを直していると止まる<!-- hosted:begin -->。直さない約束は [UPDATE.md](UPDATE.md)<!-- hosted:end -->)→ (`requirements.txt` が変わったときだけ)`pip install` → (`package-lock.json` が変わったときだけ)`npm ci` → `npm run build` → 停止 → 起動、の順に行います。
 - ポートは `CCP_PORT`(既定 8082。**2026-10-19 に 8081 から変えた**。前の版で動かしていた Workbench は、`update` のあと画面の URL が `/proxy/8082/` になる。**8081 のまま使い続けるなら、`server/workbench.env` に `CCP_PORT=8081` と書く**(コマンドの前に `CCP_PORT=8081` を付けてもよい))、Python の場所は `CCP_PYTHON`(既定 `server/.venv/bin/python`)で変えられます。
@@ -182,7 +190,10 @@ ASSET_DIR=/home/jupyter/ccp/server/images    # 実際のパスに合わせる
 | 用途 | CCP が読む名前 |
 |---|---|
 | DB | `DATABASE_URL` |
-| AI | `GOOGLE_CLOUD_PROJECT`(必須)、`GOOGLE_CLOUD_LOCATION`(省略時 `global`)、`GEMINI_MODEL`(省略時 `gemini-3.5-flash`) |
+| AI | `GOOGLE_CLOUD_PROJECT`(必須)、`GOOGLE_CLOUD_LOCATION`(省略時 `global`) |
+
+AI のモデル(前の版の `GEMINI_MODEL`)・考える量などと、BigQuery の表の場所(前の版の `BQ_SPU` など)は、2026-11-03 から **⚙ の画面で変え、DB に持ちます**(管理する人だけ。⚙ →「AI の設定」・「データの取り込み」)。
+すでに環境変数に書いてあれば、サーバーが最初に設定を読むときに**一度だけ DB に写します**(画面に「環境変数から写しました」と出ます)。写したあとは、環境変数が残っていても DB の値が効くので、消してかまいません([付録 A](#付録-a-環境変数の一覧))。
 
 CCP は、Gemini を **Vertex AI の形**(Workbench のサービスアカウントの権限)で呼びます。Gemini の **API キー**(`GEMINI_API_KEY` など)では動かないので、その形で接続しているときは、`GOOGLE_CLOUD_PROJECT` の設定と、Vertex AI の権限が別に要ります。
 
@@ -338,12 +349,13 @@ cd server
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8082/` のように `/` を付ける |
+| 画面に「**入口の認証が設定されていないため、外と中継…からは開けません**」(503) | `workbench.env` に入口の認証の設定がない(2026-11-03 から、中継を通った依頼は、設定がないと止める) | `workbench.env` に `CCP_AUTH=none` を書き、`scripts/workbench.sh restart`(Jupyter の中継が Google のログインで守るので、CCP では守らない) |
 | 画面に「**データベースにつながりません**」(以前の版では「データベースを起動しています」のまま進まない) | **サーバーを起動したターミナル**に、DB の設定が読み込まれていない(`check` を実行したターミナルとは別のターミナルで起動した、`conda activate` していない など)。画面の赤い文字が、つながらない理由 | サーバーを止め、**同じターミナルで** `set -a; source workbench.env; set +a`(必要なら `conda activate`)→ `check` → 起動 の順に実行する。サーバーのターミナルにも「DB につながりません: …」と理由が出る |
 | `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる) | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
 | 画面やサーバーのログに「設定がありません: 'DATABASE_URL'」 | 設定を読み込んでいない | 同じターミナルで `set -a; source workbench.env; set +a` を実行してから起動 |
 | 画面が「準備中」のまま・DB につながらない | `DATABASE_URL` の間違い(先頭が `postgresql+asyncpg://` でない、パスワードの記号を置き換えていない、ホスト・ポート・DB 名の違い)、PostgreSQL が外からの接続を受け付けていない | `.venv/bin/python -m ccp.cli check` で確かめる。ほかのサーバーの PostgreSQL なら、`pg_hba.conf` などで Workbench からの接続が許されているかを、DB の管理者に確認 |
-| AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。`GEMINI_MODEL` をその環境で使えるモデルに変える |
+| AI のボタンでエラーになる | `GOOGLE_CLOUD_PROJECT` の間違い、Vertex AI の権限不足、モデル名がその環境で使えない | 設定と権限を確かめる。⚙ →「AI の設定」で、その環境で使えるモデルに変える |
 | `import-pack` で「形式に対応していません」 | パックが新しく、コードが古い | 4.1 でコードを最新にしてから取り込む |
 | `npm ci` / `pip install` が止まる | パッケージの取得先(インターネット)にアクセスできない | 2 の「パッケージの取得について」 |
 | 8082 が使えない(`address already in use`) | 前に起動したサーバーが残っている | `pkill -f "uvicorn ccp.main:app"` で止めてから起動 |
@@ -353,7 +365,9 @@ cd server
 
 ### 動かす前の確認(`check`)
 
-設定・DB への接続・写真・画面のビルドを、まとめて確かめるコマンドです。パスワードは表示せず、何も変えません。困ったときは、まずこれを実行し、`[NG]` の行を直します。
+設定・DB への接続・AI・BigQuery・写真・画面のビルドを、まとめて確かめるコマンドです(設定の健康診断)。パスワードは表示せず、何も変えません。困ったときは、まずこれを実行し、`[NG]` の行の `→` を直します。
+
+画面の ⚙ → 全社 →「設定の状態」(管理する人だけ)にも、同じ行が出ます(画面で直せる行には「直す」が付き、その設定の画面に移ります)。サーバーは起動のときにも軽く確かめ、足りない設定があればターミナルに出し、管理する人の ⚙ に赤い点を付けます。
 
 ```bash
 cd ~/ccp/server
@@ -361,26 +375,30 @@ set -a; source workbench.env; set +a
 .venv/bin/python -m ccp.cli check
 ```
 
-出力の例(問題がないとき):
+出力の例(BigQuery を使わないとき):
 
 ```
 ■ DB
-  [OK  ] 接続先: DATABASE_URL(scheme=postgresql+asyncpg host=localhost port=5432 db=ccp user=ccp_app)
-  [OK  ] ホスト localhost → 127.0.0.1
-  [OK  ] つながりました(PostgreSQL 16.x …)。テーブル 32 個、配信カード 83 件
-■ AI(Vertex AI の Gemini)
-  [OK  ] GOOGLE_CLOUD_PROJECT=… / GOOGLE_CLOUD_LOCATION=global / GEMINI_MODEL=…
+  [OK  ] つながりました(PostgreSQL 16.x …)。DATABASE_URL(scheme=postgresql+asyncpg host=localhost port=5432 db=ccp user=ccp_app)
+■ Google の認証
+  [OK  ] Google の認証: …@….iam.gserviceaccount.com / プロジェクト … / 場所 global
+■ AI(Vertex AI の Gemini。出口があれば、その層)
+  [OK  ] Gemini(…) を呼べました(1.6 秒。DB の設定)
+■ BigQuery(利用先の本番のデータ。docs/BIGQUERY.md)
+  [注意] BigQuery の表の場所が 1 つもありません(BigQuery から取り込みません)
+         → 取り込むときは ⚙ →「データの取り込み」で、行を開いて表の場所を入れる
 ■ 写真
-  [OK  ] ASSET_DIR=/home/jupyter/ccp/server/images(商品 100 点・メイン画像 42 点)
+  [OK  ] 写真: ASSET_DIR=/home/jupyter/ccp/server/images(商品 100 点・メイン画像 42 点)
+■ 画面の守り
+  [注意] 画面にパスワードも、手前のログインもありません
+         → Workbench の中継など、内側からしか開けないなら、このままでよい。外から開けるなら APP_PASSWORD を設定する
 ■ 画面
-  [OK  ] ビルドがあります(/home/jupyter/ccp/dist-gcp)
-■ BigQuery(利用先の本番のデータ)
-  [注意] BQ_SPU などの設定がありません(BigQuery から取り込まない)
-■ その他
-  [注意] APP_PASSWORD なし(画面にパスワードをかけない)
+  [OK  ] 画面のビルドがあります(/home/jupyter/ccp/dist-gcp)
+
+問題は見つかりませんでした
 ```
 
-BigQuery を使わないなら、「■ BigQuery」の [注意] はそのままでかまいません。
+BigQuery を使わないなら、「■ BigQuery」の [注意] はそのままでかまいません。AI の行は、AI を実際に 1 回、短く呼んで確かめます(数秒かかります)。
 
 主な `[NG]` と直し方:
 
@@ -509,6 +527,84 @@ PY
 
 ---
 
+## 7. Workbench 以外の Linux のサーバー(AWS など)で動かすとき
+
+**AWS で動かすときの手順は [AWS.md](AWS.md) にまとめました(2026-11-03)。** この章は、Workbench との違いの一覧として残しています。
+
+この手順書の「Workbench」は、**CCP を動かしているそのサーバー**と読み替えれば、そのまま使えます。
+仕組みは同じです。サーバーが PostgreSQL につなぎ、BigQuery と Gemini(Vertex AI)を呼びます。
+違うのは、次の 4 点だけです。
+
+| 点 | Workbench | AWS などのサーバー |
+|---|---|---|
+| **Google Cloud への入り方** | ノートブックに付いたサービスアカウントが、自動で使われる(設定は要らない) | その機械には Google のサービスアカウントがない。**環境変数や秘密の置き場所(Secrets など)から、Google の認証情報を渡す**。方法は 2 つ: <br>① AWS から Google Cloud への鍵なしのつなぎ(Workload Identity 連携) <br>② サービスアカウントの鍵のファイル(`GOOGLE_APPLICATION_CREDENTIALS`) <br>CCP は、その機械の標準の認証(`google.auth.default`)で入るので、どちらでも動く |
+| **サービスアカウントの権限** | 同じ | BigQuery を読む権限と、Vertex AI を使う権限が要る |
+| **外への通信** | 外のサイトを読めないことがある(6 章) | 外に出られれば、**商品ページを読む・URL の画像から選ぶ機能が、そのまま動く**。6 章の試しは要らない |
+| **画面の開き方** | Jupyter の中継 `https://<ノートブックの URL>/proxy/<ポート>/` | ロードバランサーなどで直接開く。CCP は置かれた場所に合わせて動くので、パスの設定は要らない。**外から開けるなら、HTTPS と、ログイン(Entra ID などの SSO。7.2)か画面のパスワード(`APP_PASSWORD`)を、必ず付ける**(Workbench は Jupyter の認証の内側にあった)。何も付けないと、CCP はそのサーバーの中から直に(`http://127.0.0.1:…`)しか開けず、中継(nginx など)や外からの依頼には設定の案内を返す。**Workbench の Jupyter の中継も「中継」なので、Workbench では `CCP_AUTH=none` を書く**(`workbench.env.example` に入っている) |
+
+そのほかの点:
+
+- **PostgreSQL**: 同じ機械で動かすなら、`DATABASE_URL` のホストは `localhost`。マネージドの DB(RDS など)を使うなら、そのつなぎ先にする。
+- **操作のスクリプト**: `scripts/workbench.sh`(起動・停止・状態・確認)は、Linux ならそのまま使える。画面の URL の案内(`/proxy/…`)だけ、読み替える。
+- **困ったときの確認**: Workbench と同じく、最初に `python -m ccp.cli check` を実行する。
+- **通信料**: BigQuery から AWS へ読み出すと、Google Cloud の外への通信料がかかる。行数が数千なので、ほとんど気にしなくてよい額。
+
+### 7.1 新しいリージョンにサーバーを立てるときのチェックリスト
+
+めったにしない作業なので、ここを上から順に見れば済むようにしてある。
+CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(6〜8)。
+
+**CCP の外で用意するもの**(サーバーを立てる人の作業)
+
+1. Linux のサーバー(Python 3.12 以上・Node.js 20.19 以上。2 章の表。`scripts/workbench.sh setup` が足りない物を教える)
+2. PostgreSQL(同じ機械か、マネージドの DB)と、CCP 用の DB・ユーザー
+3. Google Cloud のサービスアカウントと、その認証情報の渡し方(7 章の表)。権限は、BigQuery を読む・Vertex AI を使う
+4. 秘密の置き場所(Secrets など)に、DB のパスワード・画面のパスワードなど
+5. 画面を開く入口(ロードバランサーなど)と、HTTPS。ログインを Entra ID にするなら、アプリの登録(7.2)
+
+**CCP で行うこと**(画面が案内する)
+
+6. リポジトリを取得して起動する(`scripts/workbench.sh setup` → `start`)。設定が足りなければ、**画面に「初期設定」が出る**ので、上から順に入れる。
+   - 「つながるか確認」が通らないと、次へ進めない。
+   - 途中でやめても、続きから始まる。
+7. ほかのリージョンの設定を使い回すなら、そのサーバーの ⚙ から「設定の型」を書き出し、初期設定の画面で読み込む。
+   - 秘密と DB のつなぎ先は入らない。
+   - BigQuery の表の場所・国など、リージョンで変わる所には印が付くので、確かめる。
+8. 最後に、⚙ の「設定の状態」(健康診断)で、全部の行が「済み」になったのを見る。
+   - 同じ確認は、コマンドの `python -m ccp.cli check` でもできる。
+   - 足りない行には、直し方が出る。画面で直せる行は「直す」で、その設定の画面に移る。
+
+(8 の「設定の状態」はできている。6・7 の初期設定の画面と設定の型は、`settings.setup` として作っている途中。できるまでは、3.4 の手順でファイルを書き、`check` で確かめる)
+
+### 7.2 ログインを Entra ID(SSO)にする
+
+CCP の中に、標準の OIDC のログインがある(`server/ccp/oidc.py`)。Google・Okta なども、発行元を替えるだけで同じ。
+設定が足りないと、画面は開かず、何が足りないかを返す。健康診断(`check`)の「画面の守り」の行にも出る。
+
+**Entra の管理画面で行うこと**(テナントの管理者)
+
+1. 「アプリの登録」で、新しいアプリを登録する。対象は「この組織のディレクトリのみ」。
+2. 「リダイレクト URI」に、種類「Web」で `https://<画面のアドレス>/auth/callback` を足す(健康診断の行に、そのまま出る)。
+3. 「証明書とシークレット」で、クライアントシークレットを作る(期限を控える。切れるとログインできなくなる)。
+4. 「トークンの構成」で、ID トークンに `email` を足す(足さなくても、`preferred_username` から取る)。
+5. ログインできる人を絞るなら、エンタープライズ アプリの「割り当てが必要」をはいにし、人・グループを割り当てる。
+6. 「概要」から、アプリ(クライアント)ID とディレクトリ(テナント)ID を控える。
+
+**CCP に入れる設定**(環境変数。シークレットは秘密の置き場所から)
+
+| 環境変数 | 中身 |
+|---|---|
+| `OIDC_ISSUER` | `https://login.microsoftonline.com/<テナント ID>/v2.0`(`common`・`organizations` は使えない) |
+| `OIDC_CLIENT_ID` | アプリ(クライアント)ID |
+| `OIDC_CLIENT_SECRET` | クライアントシークレットの値 |
+| `CCP_PUBLIC_URL` | 画面のアドレス(`https://…`)。手前の機械が `X-Forwarded-Proto`・`Host` を付けるなら、なくてもよい |
+
+- だれが何をできるかは、これまでどおり CCP の「ユーザー」(⚙ →「ユーザーと承認グループ」)で決める。ログインしたメールアドレスで、ユーザーに結ぶ。
+- 管理する人がまだ 1 人もいない DB では、ログインした人がユーザーを足せる(最初の管理者を作るため)。管理者ができたら、ほかの人は足せなくなる。
+- ログインは 12 時間続く(使っていれば延びる。`CCP_SESSION_HOURS`)。サーバーを 2 台以上にしても切れない(どのサーバーも同じシークレットで確かめる。別の鍵にしたければ `CCP_SESSION_SECRET` をすべてのサーバーにそろえて入れる)。
+
+---
+
 ## 付録 A. 環境変数の一覧
 
 | 環境変数 | 必須 | 中身 | Workbench での値 |
@@ -516,18 +612,27 @@ PY
 | `DATABASE_URL` | ○ | `postgresql+asyncpg://<ユーザー>:<パスワード>@<ホスト>:5432/<DB の名前>` | **利用先の環境の PostgreSQL** |
 | `GOOGLE_CLOUD_PROJECT` | AI を使うとき | Vertex AI のプロジェクト | その環境のプロジェクト |
 | `GOOGLE_CLOUD_LOCATION` | — | Vertex AI の場所(既定 `global`) | `global` |
-| `GEMINI_MODEL` / `GEMINI_THINKING` | — | AI のモデル・考える量 | 本番と同じなら `gemini-3.8-flash` / `low` |
 | `ASSET_DIR` | 写真を出すとき | 写真のフォルダ(パックの展開先) | `<server の絶対パス>/images` |
 | `APP_PASSWORD` | — | 画面のパスワード(Basic 認証)。空なら、かけない | 空でよい(中継が Google のログインで守られている) |
+| `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `CCP_PUBLIC_URL` / `CCP_SESSION_HOURS` / `CCP_SESSION_SECRET` | ログインを使うとき | ログイン(Entra ID などの SSO。7.2)。`OIDC_ISSUER` があれば、`APP_PASSWORD` より先に使う | 設定しない |
+| `CCP_AUTH` | — | 入口の認証を名指しする(`oidc` / `basic` / `iap` / `none`)。なければ、ある設定から選ぶ。**どれもないと、そのサーバーの中から直に(`http://127.0.0.1:…`)しか開けず、中継(Jupyter の /proxy/・nginx など)からも開けない**。中継の手前で守っている・守りなしにすると決めたときだけ `none` | **`none`**(Jupyter の中継が Google のログインで守る。`workbench.env.example` に入っている) |
 | `STATIC_DIR` | — | 画面のビルドの場所(既定 `<リポジトリ>/dist-gcp`) | 設定しない |
 | `CCP_PORT` | — | サーバーのポート(`scripts/workbench.sh`) | 既定 8082 |
 | `CCP_PYTHON` / `CCP_PGDATA` / `CCP_PG_BIN` | — | スクリプトが使う Python・Workbench の中の PostgreSQL のデータの場所・`pg_ctl` のあるフォルダ | `server/workbench.env.example` の説明のとおり |
-| `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` | BigQuery を使うとき | 出力の場所 `<プロジェクト>.<データセット>.<表>`(ジョブのプロジェクトは `BQ_PROJECT`)。ビューなら、更新を見る元の表を `BQ_<名前>_WATCH` に | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) |
+| `BQ_AUTO_SYNC` | — | `0` なら、BigQuery の定期の取り込みを回さない(画面の設定にかかわらず)。なければ、⚙ →「データの取り込み」の設定に従う | 設定しない |
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
-| `GEMINI_CONCURRENCY` | — | AI への同時の呼び出しの上限(既定 4。AI の出口を使うときも効く) | 設定しない |
-| `AI_OUTLET_URL` / `AI_OUTLET_TOKEN` / `AI_OUTLET_TIMEOUT` | ほかの AI を使うとき | AI の出口: 入っていれば、AI をすべて外の層に頼む(空なら Gemini)。層に送る合言葉・1 回の待ち時間(既定 120 秒)。約束と見本の層は [AI_OUTLET.md](AI_OUTLET.md) | 使わないなら設定しない |
+| `AI_OUTLET_TOKEN` | ほかの AI を使うとき | AI の出口の層に送る合言葉(秘密なので環境変数のまま。出口の URL は ⚙ →「AI の設定」)。約束と見本の層は [AI_OUTLET.md](AI_OUTLET.md) | 使わないなら設定しない |
+| `CCP_DB_READONLY_URL` / `DEVTOOLS_PG_TIMEOUT_S` | 開発用の画面から CCP の DB を読むとき(ログインした開発者だけ) | 読むだけの DB のユーザーのつなぎ先(書き方は `DATABASE_URL` と同じ。なければアプリと同じ)・1 回の時間の上限(既定 15 秒) | なくてよい([DEVTOOLS.md](DEVTOOLS.md) の 11 章) |
 | `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` / `DEVTOOLS_GEMINI_MODEL` / `DEVTOOLS_THINKING` / `DEVTOOLS_PRICE_PER_TIB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/<ポート>/dev/`。ポートは CCP の画面と同じ `CCP_PORT`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。AI のモデル(既定は一覧でいちばん賢い Gemini)・考える量(既定 high)・料金の概算の単価(既定 $6.25/TiB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
+
+**DB に移した設定**(2026-11-03 から。⚙ の画面で変える。管理する人だけ)。前の版で、下の環境変数を書いてあれば、サーバーが最初に設定を読むときに一度だけ DB に写します。写したあとは、環境変数が残っていても DB の値が効くので、`workbench.env` から消してかまいません。
+
+| 前の版の環境変数 | いまの置き場所 |
+|---|---|
+| `BQ_PROJECT` / `BQ_SPU` / `BQ_SKU` / `BQ_SKU_STOCK` / `BQ_WEEKLY` / `BQ_FORECAST` / `BQ_RANKING` / `BQ_<名前>_WATCH` | ⚙ →「データの取り込み」で出力の行を開いた所。`BQ_<名前>` は「読む場所(BigQuery の表かビュー)」、`BQ_<名前>_WATCH` は「更新の合図に見る表(BigQuery。読む場所がビューのときだけ)」、`BQ_PROJECT` は表の下の「BigQuery の共通の設定」。どちらも BigQuery の場所で、写す先の CCP の DB の表(`products`・`sku`・`sku_stock`・`weekly_performances`・`weather_forecast`・`product_rankings`)は決まっていて変えられない(場所の形は [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md)。「接続を確認」で、保存の前に確かめられる) |
+| `GEMINI_MODEL` / `GEMINI_THINKING` / `GEMINI_CONCURRENCY` | ⚙ →「AI の設定」(モデル・考える量・同時の上限。既定 `gemini-3.5-flash` / `low` / 4) |
+| `AI_OUTLET_URL` / `AI_OUTLET_TIMEOUT` | ⚙ →「AI の設定」(AI の出口の URL・待ち時間。合言葉 `AI_OUTLET_TOKEN` は環境変数のまま) |
 
 ## 付録 B. 引っ越し用のパックの中身
 

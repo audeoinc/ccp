@@ -49,8 +49,10 @@ export interface ChatContext {
   allow_run: boolean
   notes: string
   sql: string
-  /** いまの SQL を流した結果(エラー、または結果の先頭) */
+  /** いまの SQL を流した結果(エラー、または結果の先頭。CCP の DB のときは、エラーだけ) */
   last: string
+  /** SQL の欄の流す先(pg = CCP の DB。AI には表と列の形だけを渡す。X104) */
+  target?: 'bigquery' | 'pg'
 }
 
 export interface ChatTurn {
@@ -184,6 +186,32 @@ export interface JobStats {
   views: string[]
 }
 
+/** CCP の DB(PostgreSQL)を読めるか(X104。ログインした開発者だけ) */
+export interface PgStatus {
+  ok: true
+  available: boolean
+  /** 使えないとき、なぜか */
+  reason: string
+  readonly_role: boolean
+  timeout_s: number
+  max_rows: number
+}
+
+/** CCP の DB の表と列(server/schema.json から) */
+export interface PgTable {
+  name: string
+  columns: { name: string; type: string; choices?: string[] }[]
+}
+
+export interface PgRunResult {
+  ok: true
+  columns: Column[]
+  rows: Row[]
+  /** 返した行のほかにも、まだある */
+  more: boolean
+  seconds: number
+}
+
 export interface RunResult {
   ok: true
   columns: Column[]
@@ -260,6 +288,9 @@ export const DevApi = {
   preview: (ref: string) => call<{ ok: true; columns: Column[]; rows: Row[] }>(`/bq/preview?ref=${q(ref)}`),
   dryrun: (sql: string) => callLong<DryRun>('bq/dryrun', { sql }),
   run: (sql: string, maxRows: number, runId = '') => callLong<RunResult>('bq/run', { sql, max_rows: maxRows, run_id: runId }),
+  pgStatus: () => call<PgStatus>('/pg/status'),
+  pgTables: () => call<{ ok: true; tables: PgTable[] }>('/pg/tables'),
+  pgRun: (sql: string, maxRows: number) => callLong<PgRunResult>('pg/run', { sql, max_rows: maxRows }),
   cancel: (runId: string) => call<{ ok: true; cancelled: boolean }>('/bq/cancel', post({ run_id: runId })),
   projects: () => call<{ ok: true; default: string | null; projects: string[] }>('/bq/projects'),
   models: () => call<{ ok: true; default: string; models: string[]; thinking: string }>('/ai/models'),
@@ -415,6 +446,10 @@ export interface RunEntry {
   at: string
   /** 画面 / AI / 列を調べる */
   source: string
+  /** 流す先(bigquery / pg = CCP の DB)。前の履歴にはない */
+  target?: string
+  /** 流した人(ログインしていれば) */
+  actor?: string
   sql: string
   ok: boolean
   rows: number | null

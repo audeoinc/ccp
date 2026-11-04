@@ -1,9 +1,10 @@
 // やり取りが、どの段階の話か(バックログ PR6。docs/PRODUCTION.md)。
-// plan = 何を配信するか(企画 ↔ レビュー・承認者。計画の配信カード)/ production = どう見せるか(企画 ↔ 制作。制作のページ)。
+// plan = 何を配信するか(企画 ↔ レビュー・承認者。計画の配信カード)/ production = どう見せるか(企画 ↔ 制作。制作のページ)/
+// results = 結果を見ての相談・次の配信への申し送り(シンプルな結果の窓。X89)。
 // 列 stage が空の古い書き込みは、種類から決める(レビューのコメント = 企画、質問 = 制作。2026-10-17 まで、ちょうどそう分かれていた)
 import type { CardNote } from './data/cardNotes'
 
-export type NoteStage = 'plan' | 'production'
+export type NoteStage = 'plan' | 'production' | 'results'
 
 export const stageOf = (n: CardNote): NoteStage => n.stage ?? (n.kind === 'comment' ? 'plan' : 'production')
 

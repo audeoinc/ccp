@@ -4,39 +4,42 @@
 作業の詳しい記録・経緯は [handover-archive/](handover-archive/README.md)、設計の判断と理由は [handover-archive/DECISIONS.md](handover-archive/DECISIONS.md)。**どちらも、必要なときだけ** ID(X47 など)や節の番号(「HANDOVER 6.13」など)で grep して読む。
 作る機能の一覧と順番は [BACKLOG.md](BACKLOG.md)。作業を終える前に、この文書を更新する(最後の章)。
 
-- 最終更新: 2026-10-30
+- 最終更新: 2026-11-03
 
 ---
 
 ## 1. いまどこにいるか
 
-- 開発・運用は、Cloud Run で動く 1 つの版だけ([GCP.md](GCP.md))。Power Apps 版は 2026-10-16 に廃止。利用先には Workbench 版の ZIP だけを渡す([RELEASE.md](RELEASE.md))。
+- 開発・運用は、Cloud Run で動く 1 つの版だけ([GCP.md](GCP.md))。Power Apps 版は 2026-10-16 に廃止。利用先には AWS 版の ZIP を渡す(`npm run release:aws`。Workbench 版の ZIP は 2026-11-03 に停止。[RELEASE.md](RELEASE.md))。
 - 何人か・何セッションかが、同じ `main` に push している(UI・結果・承認プロセス・BigQuery・文書などのセッション)。
 - 済んだ範囲: 一覧(L)・制作指示(P)・週(W。W8 は保留)・アラート(A)・結果(R)・承認(U1〜U6)・制作の依頼(PR)・X の多く(AB テスト・案から選ぶ・素材・画像のライブラリ・テンプレートの版・表示の大きさ・件名など)。状態の正は [BACKLOG.md](BACKLOG.md)。
 - 本番: どこまで反映したかは、印のタグ `deployed-gcp/*` で見る。本番の画面での操作・表と列の追加は、多くが未確認。
-- Workbench 版: 最新の公開は 5 章。
+- リリース ZIP: AWS 版の最新の公開は `20261103-661ce14`(Releases のタグ `aws-<版>`。見本のデータの直し 17165a3・remove-seed を含む)。Workbench 版の最後の公開は 5 章。
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
-- 2026-11-02 UI 1: X90 の塊 A(面の枠)・E(P40・G1/G2)・F(K1〜K3。「制作に渡す」はシンプルな制作の画面が渡す)を main に。**K5: 詳しい制作のページ(`ProductionPage.tsx`・`ProductionInfoPane.tsx`)を消した**(⋯ の入口・`PREF.productionSimple` も)。詳しくはアーカイブ 2026-10-28_ の末尾。X93(開いたときの表示の大きさを自動で決める。`settings.me.autoscale`)も main に。X87 段 ② の UI 1 の残りは続き
-- 2026-11-02 UI 3: X86 シンプルな制作の画面の追加分を main に(b046f54。AI の手直し・制作した HTML の版・要素を直す・ピン・左のバーの HTML の欄 `prod.htmlcode`(v1)・保存の流れを計画にそろえた: 打てば入る・自動で保存・↶)。未決: `prod.htmlcode` は FEATURE_FLAGS では「プレビューの切り替え・試す → 確定」、作ったのは「左のバー・自動で保存」(連絡係が確認中)。次は D(面の枠に載せる・AbHandoffSection・MaterialRows / ProductionChanges / PaneCrumbs・「渡されたもの」・件名とプリヘッダー・「企画が変わりました」・simple-finish.md の制作の穴)→ X89
-- 2026-11-02 UI 2: AI の出口(AI_OUTLET_PLAN の 7 章 1〜4)を main に。AI を呼ぶ 4 か所は `ccp/ai.py` の `generate` を通り、`AI_OUTLET_URL` があれば外の層(約束 版 1、失敗しても Gemini に回さない、同時の上限も効く)。文書 docs/AI_OUTLET.md・見本の層 tools/ai-outlet/sample_layer.py(ZIP に入る)・check の行・test_ai_outlet.py。塊 G(K4)の ProductPicker・HeroPicker は src/MaterialPickers.tsx に
-- 2026-11-02 UI 2: 塊 B(ペインの共通の部品)・C(制作の材料の部品。P11 LinkMaterialRows を含む)は main(利用者の OK)。X80 段 ②(商品ページの本文を残す。表 product_page_texts・ccp/page_text.py・productPageText.ts)は main。X80 段 ③(「詳しく」の文を AI が商品ページから書く・ページと重なる所の薄い印)も main(利用者の OK)。X80 段 ④(制作の写し・材料に詳しくの文とコピー、書き出す HTML は table で横 1 行・スマホで縦に積む)も main(利用者の OK。X80 は済み)。詳しくはアーカイブ 2026-10-28_ の末尾
-- 2026-10-30 連絡係: 「AI でテンプレートを作る」の窓の高さを開いたときのまま固定し、中身は窓の中でスクロール(開発へのリクエスト e3723ffb、案 A。見本で OK、本番に反映: deployed-gcp/20261030-132756、main 657ee9a)。e3723ffb への返信はまだ
-- 2026-10-30 AI の出口: Copilot Studio を CCP から呼ぶ検証の手順と結果 docs/MS_AI_VERIFY.md を main に(ブランチ claude/ai-outlet-b3c4ae。Azure OpenAI は想定しない)。Direct Line なら人のサインインなしで呼べ、T1〜T6 は JSON ○。Agents SDK は利用者ごとのサインインが要る(標準のハーネスのエージェントでだけ呼べる)。AI Builder の検証はこれから。Workbench の ZIP には入る(共同作業者が 96237dc で Power Platform・Copilot の言葉を許した)。測るプログラムは tools/ms-verify/(ブランチのみ。設定はリポジトリの外。npm run pack:ms-verify で ZIP。Workbench の ZIP には入らない)
+- 2026-11-04 連絡係: Copilot Studio の検証(docs/MS_AI_VERIFY.md・道具 tools/ms-verify/)。方式 1 Direct Line は文・画像とも使える(1 回 4MB まで)。方式 3 AI Builder は Power Automate の流れを窓口にすると文・画像とも通った(画像は 1 回 1 枚まで。流れの Image の欄を base64ToBinary にする)。方式 2 Agents SDK は利用者ごとのサインインが要る。残り: AI Builder で何枚も送る(T9)・道具をサーバーでも使える手直し
+- 2026-11-03 1 日の終わりの文書の更新(10-30〜11-03 の分): FEATURES・SOURCE_MAP・FEATURE_REASONS(F189〜F196・S15〜S18)・USER_STORIES・BACKLOG(X101 を DONE、X98 を ▶)・FLOWS 1.1・2.9。`source-map.drawio` は直していない
+- 2026-11-03 UI 1: W2 の SSO のサーバー側・入口の認証がないときの扱い(中継の印は 503。**Workbench・AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。SSO の画面(右上のメニューのログアウト・切れたときの案内 `src/gcp/loginExpired.ts`)も main に入れた(2026-11-04。**見た目は利用者が未確認**。Entra のある別の環境で利用者が確認する。ログインなしの置き先の見た目は変わらない)。残りは X104 を本物の DB で確認
+- 2026-11-04 UI 2: W1 データの入口の切れ目を main に(`ccp/datasource.py` の約束 3 つ・`bq.BigQuerySource`・契約テスト `test_contract_datasource.py`。取り込みの動きは変わらない)。W3 も main に(定期の取り込みは読む前に番を取る `TICK_LOCK_KEY`・健康診断の行「外へのつなぎ」)。詳しくはアーカイブ 2026-10-28_ の末尾
+- 2026-11-03 UI 2: settings.dataimport ①〜③・settings.ai・settings.setup の健康診断(サーバーと画面)・仕事の設定を DB に(`app_settings`)は main。次は初期設定の画面 → 設定の型。本番の `BQ_AUTO_SYNC=0` を消すかは利用者
+- 2026-11-03 UI 3: X56 (b)〜(d)・W5 契約テスト・見本のデータは人が明示したときだけ(`cli remove-seed`)は main。割り当てなし。残り物は AB の案 B の「詳しく」をプレビューに(`vs.details`)と、パックの商品の消し方の相談
+- 2026-11-03 W6 AWS 版の ZIP(`npm run release:aws`・`docs/AWS.md`)は main・公開済み(5 章)。最適化(optimize-survey の 1〜6)・X95 も済み
+- 2026-11-02 X86・X89・X90(K5 で詳しい制作のページを消した)・X80・X92〜X94 は main。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)
 
 ## 3. 次にやること
 
 BACKLOG の ☐ / ❓ / ▶ の行が正。
-1. **X81** シンプルにない機能を足す: 1・2・4・7・8・9 は main(UI 2)、3・6 は UI 1。残りは 5
-2. **X79 段 ⑤** 本番の移し替え(連絡係が反映とまとめて行う)
-3. **App.tsx の残り**(CalendarViews・memo)は UI 1 の C1 と重なるので、連絡係と合わせてから
-4. **本番で確かめる**: BigQuery の取り込み後の列 `source`・テンプレートの版・素材のライブラリ
-5. 保留・判断待ち: T2 は作らない・X59(テンプレートの管理のあと)・D1〜D5・U8・PR9
+1. **X98** SSO の画面は main(利用者が別の環境で見た目を確認する)。そのあと X97・X99・X100(置き先の差し込み口)と X96(引っ越し用のパックを消す)
+2. **X102** AWS 版: 利用者が試した結果を待つ。公開は人の指示で
+3. **X79** の残りは Workbench での移し替え(B13 と一緒)だけ
+4. **App.tsx の残り**(CalendarViews・memo)は UI 1 の C1 と重なるので、連絡係と合わせてから
+5. **本番で確かめる**: BigQuery の取り込み後の列 `source`・テンプレートの版・素材のライブラリ・定期の取り込み
+6. 保留・判断待ち: T2 は作らない・X59(テンプレートの管理のあと)・D1〜D5・U8・PR9
 
 ## 4. 落とし穴
 
-- **修正のたびに影響確認をする**(2026-10-23。テンプレートの表の作り直しで、シンプルな配信カードを壊した: セクションの番号がずれて見出し・コピーがずれた、画像の部品がボタンとして選ばれた。影響確認をしていなかった)。変える関数・型・プレビューの目印・データの形を grep して使っている所を一覧にし(src/simple/・制作・結果・AI・リンク先も)、番号や並び順で持つ保存済みの中身とのかね合いを確かめ、関係する画面を撮影用の画面で触ってから、確かめた範囲を分けて報告する。直す案は TEMPLATE_OBJECTS.md の 8 章
+- **修正のたびに影響確認をする**(2026-10-23。テンプレートの表の作り直しで、シンプルな配信カードを壊した: 番号がずれて見出し・コピーがずれた)。変える関数・型・プレビューの目印・データの形を grep して使っている所を一覧にし、番号や並び順で持つ保存済みの中身とのかね合いを確かめ、関係する画面を撮影用の画面で触ってから、確かめた範囲を分けて報告する。直す案は TEMPLATE_OBJECTS.md の 8 章
 - **同じ `main` に何人も push する。** push の前に `git fetch` → `git pull --rebase`。`src/App.tsx`・`src/CardDetail.tsx` は衝突しやすい。
 - **本番で試すデータは、本番のデータ(パック → PGlite の写し)から作る。** 2026-10-17 に seed.json のダミーで本番の週ごとの実績を消した(記録の 6.13)。`bq_import.py` を変えたら、パック → PGlite で `_write` と `_sum_stock` を呼ぶリハーサルを通す(X63 の記録の「リハーサル」)。
 - **SKU の表(`sku`・`sku_stock`)の見本は `source = sample`。** BigQuery の取り込みは見本を消さず在庫に数えない。DELETE は `source IS DISTINCT FROM ...` の形で書く(`<>` だと NULL の本物が消えない)。
@@ -51,9 +54,13 @@ BACKLOG の ☐ / ❓ / ▶ の行が正。
 - **本番のビルドは `cloudbuild.yaml`(層のキャッシュ)。** 画面のビルドがほかの場所のファイルを読むようにしたら、Dockerfile の COPY に足す。ほかの人の Cloud Build が動いていれば、終わってから反映する。
 - BigQuery の取り込みを手元で試すときの PGlite の手順は、記録の 2026-10-20_21.md の末尾(7 章)。
 
-## 5. 公開した Workbench 版
+## 5. 公開した版
 
-最新は `20261030-dfd1abf`(10-30 の締め。X87 の版の付け替え・X86 段 ①・X79 (e)(f)・X80 段 ①・X88・ZIP の言葉の緩和(Power Platform・Copilot 可)など。Releases のタグ `workbench-<版>`)。その前は `20261029-6d1baab`・`20261028-777505c`・`20261021-8f3dbca`。それより前の版と経緯は記録の 6.23 と末尾。新しく公開したら、ここを書き換える。
+- AWS 版: 最新は `20261103-661ce14`(2026-11-03。その前は 20261103-a638168)。新しく公開したら、ここを書き換える。
+
+### Workbench 版(2026-11-03 に停止)
+
+最後は `20261030-dfd1abf`(10-30 の締め。Releases のタグ `workbench-<版>`)。それより前の版と経緯は記録の 6.23 と末尾。
 
 ## 6. 動かし方・確かめ方
 

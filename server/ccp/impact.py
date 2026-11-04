@@ -79,12 +79,17 @@ def generate(cards: list[dict[str, Any]], results: list[dict[str, Any]]) -> tupl
         # 渡せる学びのうち、それぞれ 7 割の確率で選ぶ(学びごとの効き目を切り分けられるように、いつも同じ組み合わせにはしない)
         picked = [n for n in candidates if rng.random() < 0.7] or candidates[:1]
         ids = [str(n["id"]) for n in picked] if passed else []
+        # 渡せたのに選ばなかった学びは、わざと渡さなかったことにする(学びごとの比べ。X56 の (c))。乱数は引かない(ほかの見本の値を変えないため)
+        withheld = [str(n["id"]) for n in candidates if str(n["id"]) not in ids] if passed else []
         edited = 0
         for task in SAMPLE_TASKS:
             x = rng.random()
             adoption = "as_is" if x < 0.45 else "edited" if x < 0.85 else "rejected"
             edited += adoption == "edited"
-            runs.append({"delivery_card_id": cid, "task": task, "learning_ids": json.dumps(ids), "adoption": adoption, "sample": 1})
+            run = {"delivery_card_id": cid, "task": task, "learning_ids": json.dumps(ids), "adoption": adoption, "sample": 1}
+            if withheld:
+                run["withheld_ids"] = json.dumps(withheld)
+            runs.append(run)
         # 学びの効き目は足し合わせる(効く学びが多いほど、増分が増える。逆効果の学びは減らす)
         quality = sum(learning_quality(i) for i in ids)
         share = min(0.6, max(0.01, 0.1 + (quality if passed else 0) + (0.02 if edited >= 2 else 0) + (rng.random() - 0.5) * 0.08))
@@ -93,7 +98,7 @@ def generate(cards: list[dict[str, Any]], results: list[dict[str, Any]]) -> tupl
         holdout_users = round(recipients * 0.1 / 0.9)
         holdout_rpu = treated_revenue / recipients * (1 - share)
         treated_orders = round(orders * (2.5 + rng.random()))
-        lifts.append({
+        whole = {
             "delivery_card_id": cid,
             "holdout_rate": 0.1,
             "window_days": 7,
@@ -104,7 +109,25 @@ def generate(cards: list[dict[str, Any]], results: list[dict[str, Any]]) -> tupl
             "treated_revenue": round(treated_revenue, 2),
             "holdout_revenue": round(holdout_rpu * holdout_users, 2),
             "sample": 1,
-        })
+        }
+        lifts.append(whole)
+        # AB テストの配信は、案ごとの行も作る(X56 の (d))。送った群は案を送った人で、売上・注文は配信を通った売上の割合で分ける。送らなかった群は共通。
+        # 同じ案の結果の行が 2 つ(テストと、勝ち案を残りに送った分)あれば、1 つの案として足す
+        by_variant: dict[str, list[dict[str, Any]]] = {}
+        for v in rows:
+            if v.get("variant") and v.get("recipients"):
+                by_variant.setdefault(str(v["variant"]), []).append(v)
+        for variant, vs in by_variant.items():
+            v_users = sum(int(x.get("recipients") or 0) for x in vs)
+            v_orders = sum(int(x.get("orders") or 0) for x in vs)
+            v_revenue = sum(float(x.get("revenue") or 0) for x in vs)
+            lifts.append({
+                **whole,
+                "variant": variant,
+                "treated_users": v_users,
+                "treated_orders": round(treated_orders * (v_orders / orders if orders else 0)),
+                "treated_revenue": round(treated_revenue * (v_revenue / revenue if revenue else 0), 2),
+            })
     return runs, lifts
 
 

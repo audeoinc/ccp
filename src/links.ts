@@ -162,18 +162,94 @@ export function utmFor(links: Links, campaign: string, variant?: string | null, 
   return { ...base, campaign: variantCampaign(base.campaign, variant) }
 }
 
+// ---- URL の形(settings.shopurl。2026-11-02 利用者)
+// 利用先の EC サイトに合わせて、商品・カテゴリ・配信のページの URL を、コードを変えずに設定の形(パターン)で組む。
+// 形は会社の既定 → 国で上書き(countrySettings の brandFor)。既定は、設定に移す前にコードで組んでいた形
+
+/** URL の形で使える値 */
+export type UrlValue = 'shop' | 'product_code' | 'category' | 'campaign' | 'country'
+/** 形ごとに、埋められる値(商品の形に {campaign} があっても埋められないので、設定の画面で注意を出す) */
+export const URL_VALUES: Record<'product' | 'category' | 'campaign', UrlValue[]> = {
+  product: ['shop', 'product_code', 'country'],
+  category: ['shop', 'category', 'country'],
+  campaign: ['shop', 'campaign', 'country'],
+}
+
+/**
+ * 形の {名前} を値で埋める。値は URL 用にエンコードする({shop} だけは URL そのものなので、そのまま)。
+ * 値のない {名前}・知らない {名前} は、そのまま残す(設定の画面で注意を出し、打ち間違いに気づけるように)
+ */
+export function fillUrl(pattern: string, values: Partial<Record<UrlValue, string | null>>): string {
+  return pattern.replace(/\{([a-z_]+)\}/g, (all, k: string) => {
+    const v = values[k as UrlValue]
+    if (v == null || v === '') return all
+    return k === 'shop' ? v.replace(/\/+$/, '') : encodeURIComponent(v)
+  })
+}
+
+/** 形の中で、埋められない {名前}(知らない名前と、その形では使えない名前) */
+export const unfilledValues = (pattern: string, allowed: UrlValue[]): string[] =>
+  [...pattern.matchAll(/\{([^}]*)\}/g)].map((m) => m[1]).filter((k) => !allowed.includes(k as UrlValue))
+
+/** 形の中の決まった部分と、値の入る部分(設定の画面で、{ } を見せずに札で出すため) */
+export type UrlPatternPart = { text: string } | { value: UrlValue | string }
+export function urlPatternParts(pattern: string): UrlPatternPart[] {
+  const out: UrlPatternPart[] = []
+  let at = 0
+  for (const m of pattern.matchAll(/\{([^}]*)\}/g)) {
+    if (m.index > at) out.push({ text: pattern.slice(at, m.index) })
+    out.push({ value: m[1] })
+    at = m.index + m[0].length
+  }
+  if (at < pattern.length) out.push({ text: pattern.slice(at) })
+  return out
+}
+
+const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * 実際のページの URL を 1 つ貼ってもらい、その中の値(商品コード・カテゴリの値など)を見つけて、形を作る(settings.shopurl。2026-11-02 利用者)。
+ * 値は大文字・小文字を問わずに探す(前後が英数字でない所だけ。AB1 が AB12 の中に当たらないように)。URL 用に変換した形でも探す。
+ * 先頭が店の URL と同じなら、そこも {shop} にする。見つからなければ null
+ */
+export function learnUrlPattern(url: string, value: string, token: UrlValue, shop: string): { pattern: string; caseDiffers: boolean; shopMatched: boolean } | null {
+  let rest = url.trim()
+  if (!rest || !value) return null
+  const base = shop.trim().replace(/\/+$/, '')
+  const shopMatched = !!base && rest.toLowerCase().startsWith(base.toLowerCase()) && (rest.length === base.length || /[/?#]/.test(rest[base.length]))
+  if (shopMatched) rest = rest.slice(base.length)
+  let caseDiffers = false
+  let found = false
+  for (const v of [...new Set([value, encodeURIComponent(value)])]) {
+    const next = rest.replace(new RegExp(`(?<![A-Za-z0-9])${escapeRe(v)}(?![A-Za-z0-9])`, 'gi'), (m) => {
+      found = true
+      if (m !== v) caseDiffers = true
+      return `{${token}}`
+    })
+    if (found) {
+      rest = next
+      break
+    }
+  }
+  if (!found) return null
+  return { pattern: (shopMatched ? '{shop}' : '') + rest, caseDiffers, shopMatched }
+}
+
+/** カテゴリの URL に入れる値(英数字とハイフン。英数字が残らない名前は、名前のまま) */
+const categoryValue = (category: string) => slug(category) || category
+
 /** 種類から作る、既定のリンク先。custom は既定がない(配信カードで必ず決める) */
 export function defaultUrl(kind: LinkKind, campaign: string, category?: string, country?: string | null): string {
-  const shop = shopUrl(country)
+  const b = brandFor(country)
   switch (kind) {
     case 'top':
-      return shop
+      return b.shopUrl
     case 'category':
-      return category ? `${shop}/c/${slug(category) || encodeURIComponent(category)}` : shop
+      return category ? fillUrl(b.categoryUrlPattern, { shop: b.shopUrl, category: categoryValue(category), country }) : b.shopUrl
     case 'custom':
       return ''
     default:
-      return `${shop}/campaign/${campaign}`
+      return fillUrl(b.campaignUrlPattern, { shop: b.shopUrl, campaign, country })
   }
 }
 
@@ -187,8 +263,21 @@ export const HEADER_LINKS = [
 ] as const
 export const headerLinkUrl = (category: string, country?: string | null) => defaultUrl('category', '', category, country)
 
-/** 商品のページ(商品の市場の店の URL) */
-export const productUrl = (p?: Product) => (p?.product_code ? `${shopUrl(productMarket(p))}/p/${p.product_code}` : '')
+/**
+ * 商品のページ。商品に URL(page_url。取り込みで入る・制作の写しで固めたもの)があれば、それを使う。
+ * なければ、商品の市場の国の形で組む(商品の page_url → 国の形 → 全社の形 → 既定)
+ */
+export function productUrl(p?: Product): string {
+  if (p?.page_url?.trim()) return p.page_url.trim()
+  if (!p?.product_code) return ''
+  const market = productMarket(p)
+  const b = brandFor(market)
+  return fillUrl(b.productUrlPattern, { shop: b.shopUrl, product_code: p.product_code, country: market })
+}
+
+/** 形の見本(設定の画面)。商品の URL を、商品の page_url を使わずに形だけで組む */
+export const productUrlByPattern = (pattern: string, shop: string, productCode: string, country?: string | null) => fillUrl(pattern, { shop, product_code: productCode, country })
+export const categoryUrlByPattern = (pattern: string, shop: string, category: string, country?: string | null) => fillUrl(pattern, { shop, category: categoryValue(category), country })
 
 /** 計測用のパラメーターを付けた URL(URL として読めないときは、そのまま返す)。content はリンクの場所ごと(UTM の版 1 の写しでは渡さない) */
 export function withUtm(url: string, utm: Links['utm'], content?: string): string {
@@ -232,14 +321,16 @@ export interface LinkSlot {
 export function linkSlots(templateId: EmailTemplateId, items: Item[], products: Product[], campaign: string, country?: string | null, scheme = UTM_SCHEME): LinkSlot[] {
   const tpl = getTemplate(templateId)
   const sections = sectionsOf(templateId)
-  // セクションのカテゴリ: そのセクションの商品で、いちばん多いカテゴリ(ボタンのリンク先が「カテゴリのページ」のときに使う)
+  // セクションのカテゴリ: そのセクションの商品で、いちばん多いカテゴリ(ボタンのリンク先が「カテゴリのページ」のときに使う)。
+  // 値は選択肢の値(outer など)。画面の言葉のラベルだと、日本語と English で URL が変わるため(settings.shopurl。2026-11-02 利用者)
   const categoryOf = (sectionIndex: number): string | undefined => {
     const sec = sections[sectionIndex]
     if (!sec) return undefined
     const [from, to] = sectionRange(sections, sec, items.length)
     const counts = new Map<string, number>()
     for (const it of items.slice(from, to)) {
-      const name = optionLabel(products.find((p) => p.id === it.productId)?.category_name)
+      const p = products.find((x) => x.id === it.productId)
+      const name = p?.category || optionLabel(p?.category_name)
       if (name) counts.set(name, (counts.get(name) ?? 0) + 1)
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]

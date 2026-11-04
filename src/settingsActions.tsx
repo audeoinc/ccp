@@ -10,6 +10,7 @@ import {
   CalendarClockRegular,
   DeleteRegular,
   DocumentBulletListRegular,
+  HeartPulseRegular,
   ImageMultipleRegular,
   LayoutColumnTwoRegular,
   LightbulbFilamentRegular,
@@ -27,6 +28,9 @@ import {
   CountryLearningsPanel,
   CountryPoliciesPanel,
   CountryTemplatesPanel,
+  AiSettingsPanel,
+  SettingsHealthPanel,
+  DataImportPanel,
   DevRequestsDialog,
   FeaturesManager,
   HelpFaqAdmin,
@@ -60,6 +64,8 @@ import { myName } from './history'
 import { confirmDialog } from './confirm'
 import { locale, tr, useT } from './i18n'
 import { useFeature } from './featureFlags'
+import { useCanManage } from './dataImportState'
+import { clearProductDataCache } from './useProductData'
 
 const useStyles = makeStyles({
   exportDone: { color: tokens.colorPaletteGreenForeground1 },
@@ -104,6 +110,10 @@ export function useSettingsActions(ctx: {
   // 国の項目の公開・非公開(X87)。使う学びは学び(v3)が前提なので、決まり・アラートの基準(v1)と別の ID
   const rulesOn = useFeature('settings.country.rules')
   const learningsOn = useFeature('settings.country.learnings')
+  const dataImportOn = useFeature('settings.dataimport')
+  const aiSettingsOn = useFeature('settings.ai')
+  const setupOn = useFeature('settings.setup')
+  const canManage = useCanManage()
   // ⚙ の「データと画像を書き出す」の様子(作っている間は何も届かないので、押したことと進み具合を、その行に出す)
   const [exportState, setExportState] = useState<{ kind: 'working'; bytes: number } | { kind: 'done'; bytes: number } | { kind: 'error'; message: string } | null>(null)
   // 見本の SKU を作っている間(X63。数千行になることがあるので、終わるまで押せなくする)
@@ -214,7 +224,7 @@ export function useSettingsActions(ctx: {
       label: t('差出人の名前・店の URL・計測用の値(utm)', 'Sender name, shop URL, and tracking values (utm)'),
       description: t('全社の既定を、この国だけ変えるときに入れます。空の欄は全社の値を使います。', 'Override the company defaults for this country. Empty fields use the company values.'),
       icon: <SendRegular />,
-      render: (co, name) => <Later spin><BrandPanel country={co} countryName={name} /></Later>,
+      render: (co, name) => <Later spin><BrandPanel country={co} countryName={name} products={products} /></Later>,
     },
     {
       id: 'brand',
@@ -222,7 +232,7 @@ export function useSettingsActions(ctx: {
       label: t('差出人の名前・店の URL・計測用の値(utm)', 'Sender name, shop URL, and tracking values (utm)'),
       description: t('受信箱・メールの上の帯・アプリの通知に出す差出人の名前と、リンクの既定・商品のページの元になる店の URL、すべてのリンクに付ける utm_source・utm_medium(メール・アプリ)。国で上書きできます。', 'The sender name shown in the inbox, the email header and app notifications, the shop URL used for default links and product pages, and the utm_source and utm_medium (email and app) added to every link. Countries can override them.'),
       icon: <SendRegular />,
-      render: () => <Later spin><BrandPanel country="" /></Later>,
+      render: () => <Later spin><BrandPanel country="" products={products} /></Later>,
     },
     {
       id: 'policies',
@@ -257,17 +267,67 @@ export function useSettingsActions(ctx: {
       icon: <PeopleTeamRegular />,
       render: () => <Later spin><PeopleManager inline /></Later>,
     },
+    // 設定の状態(settings.setup の健康診断)。足りない設定と直し方を 1 行ずつ。管理する人だけ(⚙ の赤い点から、ここに来る)
     {
-      id: 'bq',
-      section: 'data',
-      label: bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery'),
-      description: t('在庫・商品のデータを、すぐに読み直します(開いたときにも自動で確認します)。', 'Re-read stock and product data now (also checked automatically on open).'),
-      icon: <ArrowSyncRegular />,
-      disabled: bqBusy,
-      secondary: (bq && bqStockTime(bq)) ?? '',
-      hidden: !bq?.configured,
-      onOpen: () => void runBqSync(true),
+      id: 'health',
+      section: 'company',
+      label: t('設定の状態', 'Settings health'),
+      description: t('サーバーの設定が足りているか。足りない所と直し方を出します。', 'Whether the server settings are complete, with what is missing and how to fix it.'),
+      icon: <HeartPulseRegular />,
+      hidden: !(setupOn && canManage),
+      render: (_co, _name, go) => (
+        <Later spin>
+          <SettingsHealthPanel go={go} />
+        </Later>
+      ),
     },
+    // AI の設定(settings.ai。モデル・考える深さ・同時の上限・AI の出口)。管理する人だけに見せる(ほかの人には項目ごと出さない)
+    {
+      id: 'aiSettings',
+      section: 'company',
+      label: t('AI の設定', 'AI settings'),
+      description: t('Gemini のモデル・考える深さ・同時に呼ぶ数、AI の出口。', 'Gemini model, thinking, concurrency and the AI outlet.'),
+      icon: <AiIcon size={16} />,
+      hidden: !(aiSettingsOn && canManage),
+      render: () => (
+        <Later spin>
+          <AiSettingsPanel />
+        </Later>
+      ),
+    },
+    // 管理する人には、出力ごとの状態・記録・確認だけ・定期の取り込みの管理の画面(settings.dataimport)。
+    // ほかの人と、機能を公開していないときは、これまでどおりの「今すぐ取り込む」だけ。
+    // 管理の画面は、全社の 1 項目に(⚙ の赤い点から、畳んだ開発・管理を開かずにたどれるように。中身を描く項目は、開発・管理では見出しなしで並ぶため)
+    dataImportOn && canManage
+      ? {
+          id: 'bq',
+          section: 'company',
+          label: t('データの取り込み', 'Data import'),
+          description: t('BigQuery の出力ごとの状態・記録。今すぐ取り込む・確認だけ・定期の取り込み。', 'Status and history per BigQuery output. Import now, check only, scheduled import.'),
+          icon: <ArrowSyncRegular />,
+          secondary: (bq && bqStockTime(bq)) ?? '',
+          render: () => (
+            <Later spin>
+              <DataImportPanel
+                onImported={() => {
+                  clearProductDataCache()
+                  void loadProducts()
+                }}
+              />
+            </Later>
+          ),
+        }
+      : {
+          id: 'bq',
+          section: 'data',
+          label: bqBusy ? t('BigQuery から取り込み中…', 'Importing from BigQuery…') : t('BigQuery から取り込む', 'Import from BigQuery'),
+          description: t('在庫・商品のデータを、すぐに読み直します(開いたときにも自動で確認します)。', 'Re-read stock and product data now (also checked automatically on open).'),
+          icon: <ArrowSyncRegular />,
+          disabled: bqBusy,
+          secondary: (bq && bqStockTime(bq)) ?? '',
+          hidden: !bq?.configured,
+          onOpen: () => void runBqSync(true),
+        },
     {
       id: 'metrics',
       section: 'data',

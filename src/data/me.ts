@@ -6,8 +6,8 @@ import { appPath } from '../appRoot'
 export interface Me {
   /** ログインしている人のメールアドレス(ログインがなければ null) */
   email: string | null
-  /** iap = IAP のログイン / env = 手元の CCP_DEV_USER_EMAIL */
-  source: 'iap' | 'env' | null
+  /** oidc = CCP の中のログイン(Entra ID などの SSO。ログアウトできる) / iap = IAP のログイン / env = 手元の CCP_DEV_USER_EMAIL */
+  source: 'oidc' | 'iap' | 'env' | null
   /** そのメールアドレスに当たるユーザー(users)。登録がなければ null */
   user: { id: string; name: string; role?: string } | null
 }

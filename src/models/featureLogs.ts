@@ -3,7 +3,7 @@
 export interface FeatureLogFields {
   /** 機能の ID か、版の公開なら version:v1 の形 */
   feature_id: string
-  action?: 'retarget' | 'publish' | 'unpublish' | 'stop' | 'early' | 'follow'
+  action?: 'retarget' | 'publish' | 'unpublish' | 'stop' | 'early' | 'follow' | 'value'
   before_value?: string
   after_value?: string
   reason?: string

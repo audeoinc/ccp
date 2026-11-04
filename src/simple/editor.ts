@@ -16,7 +16,7 @@ import type { ProductSelection } from '../aiSelect'
 import type { ThemeSuggestion } from '../aiDraft'
 import type { PreviewZoom } from './usePreviewNav'
 import type { useCardEditor } from '../useCardEditor'
-import type { CampaignBandSlots } from '../CampaignBand'
+import type { StageCampaign } from './StageFrame'
 
 type CardEditor = ReturnType<typeof useCardEditor>
 
@@ -46,6 +46,8 @@ export interface AiPreview {
   /** 文言の案(件名・見出し・セクションなど)。保存する中身は変えず、プレビューと受信箱の行にだけ写す(dirty にしない) */
   texts?: WholeTexts
   heroId?: string
+  /** URL から選んだ画像(content.hero.fromurl)。まだライブラリにないので、画像の URL と名前で写す */
+  heroUrl?: { src: string; name: string }
   /** テンプレートの選び直しで、乗せているテンプレート */
   templateId?: EmailTemplateId
   /** 枠の商品の案。key が空なら空いた枠への案で、at の位置(押した空いた枠)に写す */
@@ -132,8 +134,8 @@ export interface SimpleExtras {
   setHero: (id: string | undefined, reason: string) => void
   /** 持っている画像を上げる(file を渡すと、そのファイルを上げながら開く) */
   uploadHero: (file?: File) => void
-  /** 文言をまとめて変える(配信の全体への AI の依頼。入れたものだけ変える) */
-  applyTexts: (t: WholeTexts) => void
+  /** URL のページから選んだ画像を、写してライブラリに入れ、メイン画像にする(content.hero.fromurl。確定のとき) */
+  heroFromUrl: (pick: { src: string; name: string; page: string }) => Promise<void>
   linkSpots: LinkSlot[]
   /** リンクの場所の、計測用のパラメーター(utm)つきの URL(⑤ リンク先・プレビューのリンクと同じ。AB の案の印つき。X81 の 8) */
   linkUrlOf: (slot: LinkSlot) => string
@@ -182,8 +184,8 @@ export interface SimpleExtras {
   /** 「⋯」の中身(すべて AI で下書き・保存して次へ・結果を見る + 複製・取りやめ・削除) */
   menu: ReactNode
   stageNav?: ReactNode
-  /** キャンペーンの帯(X79。キャンペーンに入っている配信だけ)。引数は、案の段に置く AB の案の切り替えと、＋ のメニューに入れる「AB テストを足す」。帯があるときは、AB の案を題の帯に置かない */
-  campaignBand?: (slots: CampaignBandSlots) => ReactNode
+  /** キャンペーンの帯(X79。キャンペーンに入っている配信だけ)。案の段・＋ のメニューの「AB テストを足す」・× は、画面の側が足す。帯があるときは、AB の案を題の帯に置かない */
+  campaignBand?: StageCampaign
   /** 配信の画面に出す名前(キャンペーンに入っている配信は「キャンペーン名 + チャネル」で、直せない) */
   campaignName?: string
   // ---- プレビュー(倍率の計算は CardDetail のまま。箱の ref は、別の引数で渡して、この画面の箱に付ける)

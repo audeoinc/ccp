@@ -19,7 +19,6 @@ export const formatAges = (list: AgeBand[]): string => AGE_BANDS.filter((a) => l
  * 選べる値はチャネルで少し違う: 「同じ施策のメールを開いていない人」(notOpenedEmail)は、アプリからメールを開かなかった人に送るための区分なのでアプリだけ、
  * 「前回のメールを開いていない人」(notOpenedLast)はメールだけ
  */
-export const AUDIENCES = ['all', 'members', 'inactive30', 'notOpenedEmail', 'notOpenedLast'] as const
 export type AudienceChannel = 'email' | 'push'
 /** そのチャネルで選べる送る相手 */
 export const audiencesFor = (channel: AudienceChannel): string[] =>

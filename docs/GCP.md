@@ -101,7 +101,9 @@ cd server && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r 
 
 # 3. テーブルの作成と初期データ(DB が起動している間に)
 .venv/Scripts/python.exe -m ccp.cli migrate
-.venv/Scripts/python.exe -m ccp.cli seed --reset      # server/seed.json を入れる
+# 見本のデータ(server/seed.json)は、開発の手元・試しの環境だけ。BigQuery から商品を入れる環境では入れない
+# (見本の商品が合わず取り込みが止まる。BigQuery の出力を設定してあれば seed は止まる。入れてしまったら remove-seed)
+.venv/Scripts/python.exe -m ccp.cli seed --reset
 .venv/Scripts/python.exe -m ccp.cli counts
 
 # 4. 画面をビルドして、サーバーを起動(http://localhost:8080 。Basic 認証のユーザー名は何でもよい)
@@ -206,7 +208,7 @@ echo '{"ts": 1791288000}' | gcloud storage cp - gs://<バケット名>/state/kee
 - **本番の反映との関係**: 見本のビルドのタグは `ccp-preview`。`scripts/deploy-gcp.mjs` が待つ `service_contents-planner` は付けないので、見本のビルドが走っていても、本番の反映は待たされない。
 - **GitHub とのつなぎ**: 1 代目の Cloud Build GitHub アプリ(コンソールの「リポジトリを接続」で、利用者が許可した)。2 代目のつなぎは、Cloud Build の管理用のアカウントにシークレットを作る広い権限が要るので使わなかった。
 - **手で流すとき**: `gcloud builds triggers run ccp-preview --branch <ブランチ>`(`gcloud builds submit` で手元から流すと、`ccp-preview-build` がソースを置くバケットを読めずに止まる。その権限は付けていない)。
-- 本番だけの仕組みなので、Workbench 版の ZIP には入れない(`preview/`・`cloudbuild-preview.yaml` は `release-workbench.mjs` で外している)。
+- 本番だけの仕組みなので、利用先に渡す ZIP には入れない(`preview/`・`cloudbuild-preview.yaml` は `release.mjs` で外している)。
 
 ## 画像の差し替え(商品・ヒーロー画像)
 

@@ -1,4 +1,4 @@
-import { useRef, type ClipboardEvent, type ReactNode, type RefObject } from 'react'
+import { useMemo, useRef, type ClipboardEvent, type ReactNode, type RefObject } from 'react'
 import { Avatar, Button, Popover, PopoverSurface, Spinner, makeStyles, mergeClasses, tokens, type PositioningImperativeRef, type PositioningVirtualElement } from '@fluentui/react-components'
 import { DismissRegular, SendRegular } from '@fluentui/react-icons'
 import { AutoTextarea } from './AutoTextarea'
@@ -8,6 +8,10 @@ import { ResizeHandles } from './ResizeHandles'
 import { useFloatSize } from './floatLayout'
 import { useFloatMove } from './floatMove'
 import { PREF } from './prefKeys'
+import { getUiScale } from './uiScale'
+
+/** 画面の下のほうのピンで、フロートの下に空けておく高さ(px。書く欄と数件のやり取りが入る) */
+const PIN_ROOM = 360
 
 const useStyles = makeStyles({
   // 縦に並べ、中身は枠の幅に収める(長い場所の文・入力欄が、枠の外へ押し広げないように)。大きさは、右・下の端をつかんで変えられる。
@@ -92,11 +96,20 @@ export function PinThreadView(p: Props) {
   const size = useFloatSize(PREF.pinFloatSize, surfaceRef, { w: 280, h: 200 })
   // 題の行をつかんで動かす(ピンの横に出たフロートが、確かめたい所を隠すため。2026-10-26 利用者)
   const move = useFloatMove(surfaceRef)
+  // 画面の下のほうのピンでは、開いたときに、書くのに要る高さの分だけ上にずらして置く。
+  // 置いたあとは動かさず(pinned)、伸びた分は下へ・画面の下に着いたら中をスクロールする(autoSize)。
+  // 位置を合わせ直す形だと、打つ・下の端を引くたびにフロートが上へずれ、手の動きと逆になった(2026-11-03 利用者)
+  const lift = useMemo(() => {
+    if (!p.target) return 0
+    const top = p.target.getBoundingClientRect().top
+    const room = window.innerHeight - top - 12
+    return Math.max(0, Math.min(PIN_ROOM, window.innerHeight - 24) - room) / getUiScale()
+  }, [p.target])
   if (!p.target) return null
   return (
     <Popover
       open
-      positioning={{ target: p.target, positioningRef: p.positioningRef, position: 'after', align: 'top', offset: 8 }}
+      positioning={{ target: p.target, positioningRef: p.positioningRef, position: 'after', align: 'top', offset: { mainAxis: 8, crossAxis: -lift }, pinned: true, autoSize: 'height' }}
       withArrow
       trapFocus={false}
       onOpenChange={(ev, d) => {

@@ -56,7 +56,7 @@
 | `src/settings.ts` | トグルの値 `simpleCard.on`(`loadSimpleCard` / `saveSimpleCard`) |
 | `src/App.tsx` | ヘッダーのツールバーにトグル |
 
-新しいファイルは `src/` の下なので、Workbench 版の ZIP の規則(`scripts/release-workbench.mjs` の `RULES`)は足さなくてよい。この文書も `docs/` なので入る(本番の名前を書かない)。
+新しいファイルは `src/` の下なので、利用先に渡す ZIP の規則(`scripts/release.mjs` の `RULES`)は足さなくてよい。この文書も `docs/` なので入る(本番の名前を書かない)。
 
 ## 5. 部品を選ぶ仕組み
 

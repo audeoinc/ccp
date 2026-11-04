@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { setActiveAiCard } from './aiSelect'
 import { filled, insertAt, joinSections, replaceSection } from './slots'
 import { useStableCallback } from './useStableCallback'
 import {
@@ -14,7 +15,7 @@ import {
   Spinner,
   Text,
 } from '@fluentui/react-components'
-import { ArrowNextRegular, DataBarVerticalRegular, DismissRegular, SaveRegular } from '@fluentui/react-icons'
+import { ArrowNextRegular, DataBarVerticalRegular, SaveRegular } from '@fluentui/react-icons'
 import { locale, tr, useT } from './i18n'
 import { AiIcon } from './AiMark'
 import { EmptyDraftCta } from './EmptyDraftCta'
@@ -48,6 +49,7 @@ import { LearningEffectFloat, Later } from './lazyViews'
 import type { LearningCardData } from './learningCards'
 import { CardMenu } from './CardMenu'
 import { HeroUploadDialog } from './HeroUploadDialog'
+import { addHeroFromUrl } from './heroFromUrl'
 import { AbCompare } from './AbCompare'
 import { templateUse } from './templateUse'
 import { allVariants, nextVariant, ownsAnyText, ownsHero, ownsImages, ownsProducts, ownsSubject, setVariantImage, withVariantImages } from './abTest'
@@ -63,7 +65,7 @@ import { settlePendingTrial } from './trial'
 import { nextStepOf, type NextStep } from './simple/nextStep'
 import { useUndo } from './simple/useUndo'
 import { AbSettings } from './simple/AbSettings'
-import { CampaignBand, type CampaignBandSlots } from './CampaignBand'
+import type { StageCampaign } from './simple/StageFrame'
 import { usePreviewZoom } from './simple/usePreviewZoom'
 import { CampaignApprove } from './CampaignApprove'
 import { AddCampaignCardDialog, CampaignMenu } from './CampaignDialogs'
@@ -207,6 +209,12 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const linkVariant = ab ? active : null
   // utm_campaign の既定値は、配信日 + 配信カードの ID(links.ts の「UTM の決まり」)。リンク先のページの名前(linkCampaign)とは分ける
   const utmCampaign = campaignId(card?.id, form.scheduledAt)
+  // AI の依頼の記録(ai_runs)を、この配信のものとして残す(開いている間だけ。X56 の (b))
+  const cardId = card?.id ?? null
+  useEffect(() => {
+    setActiveAiCard(cardId)
+    return () => setActiveAiCard(null)
+  }, [cardId])
   // utm_source・utm_medium は、設定(店の見せ方)の国・チャネルの値。配信カードに上書きがあれば、そちら(設定を変えたら描き直す)
   useCountrySettings()
   const linkUtm = utmFor(links, utmCampaign, linkVariant, utmFixedFor(form.country, form.channel))
@@ -613,7 +621,8 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
   const [aiPreview, setAiPreview] = useState<AiPreview | null>(null)
   // これまでの学びの件数(シンプルな画面の「目印」に出す)
   const [learnCount, setLearnCount] = useState(0)
-  const shownHero = aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
+  // URL から選んで試している画像は、まだライブラリにないので、その場の形で写す(確定で写してライブラリに入れる)
+  const shownHero = aiPreview?.heroUrl ? ({ id: `url:${aiPreview.heroUrl.src}`, name: aiPreview.heroUrl.name, image_url: aiPreview.heroUrl.src } as HeroImage) : aiPreview?.heroId ? heroes.find((h) => h.id === aiPreview.heroId) : hero
   const previewItem = aiPreview?.item
   const previewSection = aiPreview?.section
   const previewDetail = aiPreview?.detail
@@ -681,27 +690,23 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
     }
     return save({ after: 'stay' })
   }
-  const campaignBand =
+  // キャンペーンの帯の中身(案の段・× は、面の枠 StageFrame が入れる)
+  const campaignBand: StageCampaign | undefined =
     card && campaign && onSwitchCard
-      ? (slots: CampaignBandSlots) => (
-          <CampaignBand
-            campaign={campaign}
-            card={card}
-            allCards={allCards ?? []}
-            onSwitch={(id) => void switchCard(id)}
-            slots={slots}
-            busy={saving}
-            actions={
-              <>
-                <CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />
-                <CampaignMenu campaign={campaign} cards={allCards ?? []} weeks={weeks} beforeRun={saveBeforeBulk} onChanged={onSaved} busy={saving} />
-                {/* 閉じる ×: フロートのいちばん上の右の角(キャンペーンの帯の 1 段目の右の端。2026-10-27 利用者)。ボタンなので、題の行でつかんで動かす動き(floatMove)には入らない */}
-                <Button type="button" appearance="subtle" icon={<DismissRegular />} onClick={() => void closeSimple()} aria-label={t('閉じる', 'Close')} />
-              </>
-            }
-            onAddCard={() => setAddingCard(true)}
-          />
-        )
+      ? {
+          campaign,
+          card,
+          allCards: allCards ?? [],
+          onSwitch: (id) => void switchCard(id),
+          busy: saving,
+          actions: (
+            <>
+              <CampaignApprove campaign={campaign} cards={allCards ?? []} alertsOf={alertsOf} beforeRun={saveBeforeBulk} onChanged={onSaved} onOpenCard={(id) => void switchCard(id)} busy={saving} />
+              <CampaignMenu campaign={campaign} cards={allCards ?? []} weeks={weeks} beforeRun={saveBeforeBulk} onChanged={onSaved} busy={saving} />
+            </>
+          ),
+          onAddCard: () => setAddingCard(true),
+        }
       : undefined
   const addCardDialog = addingCard && campaign && (
     <AddCampaignCardDialog
@@ -1064,18 +1069,15 @@ export function CardDetail({ card, defaults, draft, onCreated, onReopen, onHeroe
           setHeroReason(reason)
         },
         uploadHero: (file?: File) => setHeroUpload(file ?? true),
-        applyTexts: (x) => {
-          setForm((f) => ({
-            ...f,
-            ...(x.subject !== undefined ? { subject: x.subject } : {}),
-            ...(x.preheader !== undefined ? { preheader: x.preheader } : {}),
-            ...(x.headline !== undefined ? { headline: x.headline } : {}),
-            ...(x.copy !== undefined ? { copy: x.copy } : {}),
-            ...(x.pushTitle !== undefined ? { pushTitle: x.pushTitle } : {}),
-            ...(x.pushBody !== undefined ? { pushBody: x.pushBody } : {}),
-          }))
-          if (x.sectionTitles) setSectionTitles(x.sectionTitles)
-          if (x.sectionCopies) setSectionCopies(x.sectionCopies)
+        heroFromUrl: async (pick) => {
+          try {
+            const h = await addHeroFromUrl({ ...pick, market: cardMarket(form.country), me: myName() || form.owner, cardId: card?.id })
+            await onHeroesChanged?.()
+            setHeroId(h.id)
+            setHeroReason(tr('URL のページから選んだ', 'Picked from a page URL'))
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
+          }
         },
         linkSpots,
         linkUrlOf,

@@ -22,9 +22,9 @@ import {
   MessageBarBody,
   SearchBox,
   Select,
+  SpinButton,
   Spinner,
   Switch,
-  Textarea,
   Tooltip,
   Tree,
   TreeItem,
@@ -33,6 +33,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components'
+import { AutoTextarea } from './AutoTextarea'
 import { ArrowUndoRegular, LockClosedRegular } from '@fluentui/react-icons'
 import { FEATURES, FEATURE_AREAS, FEATURE_GROUPS, VERSION_ORDER, type FeatureDef, type FeatureVersion } from './features'
 import {
@@ -43,6 +44,8 @@ import {
   reloadFeatureSettings,
   retargeted,
   setViewingAsUser,
+  switchOn,
+  switchValue,
   settingsLoaded,
   useFeatureVersion,
   versionCounts,
@@ -76,6 +79,7 @@ const useStyles = makeStyles({
   warn: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteDarkOrangeForeground1 },
   aside: { display: 'flex', alignItems: 'center', columnGap: '6px' },
   select: { minWidth: '96px' },
+  spin: { width: '72px' },
   hit: { fontWeight: tokens.fontWeightBold, color: tokens.colorBrandForeground1 },
   log: { display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr)', columnGap: '12px', rowGap: '4px', fontSize: tokens.fontSizeBase200, alignItems: 'baseline' },
 })
@@ -171,6 +175,22 @@ export function FeaturesManager() {
       const before = versionOf(f)
       await writeOverride(f.id, { version: v === f.version ? '' : v })
       await writeLog({ feature_id: f.id, action: 'retarget', before_value: before, after_value: v })
+    })
+
+  /** スイッチの機能(features の switch)を入れる・切る。版の公開とは関係なく、ここで入れたときだけ動く(入 = 先に出す) */
+  const toggleSwitch = (f: FeatureDef, on: boolean) =>
+    void run(async () => {
+      const before = modeOf(f.id)
+      await writeOverride(f.id, { mode: on ? 'early' : 'follow', reason: '' })
+      await writeLog({ feature_id: f.id, action: on ? 'early' : 'follow', before_value: before, after_value: on ? 'early' : 'follow' })
+    })
+  /** スイッチの数(割合など)を変える */
+  const changeSwitchValue = (f: FeatureDef, v: number) =>
+    void run(async () => {
+      const before = String(switchValue(f.id))
+      if (before === String(v)) return
+      await writeOverride(f.id, { value: String(v) })
+      await writeLog({ feature_id: f.id, action: 'value', before_value: before, after_value: String(v) })
     })
 
   /** 上書きを変える。止める・先に出すは、理由を書く窓を開く */
@@ -291,6 +311,36 @@ export function FeaturesManager() {
     </span>
   )
 
+  /** スイッチの機能の行の右: 入・切と、一緒に決める数 */
+  const switchControls = (f: FeatureDef) => {
+    const p = f.switch?.param
+    return (
+      <span className={s.aside}>
+        {p && (
+          <>
+            <span className={s.note}>{p.label()}</span>
+            <SpinButton
+              size="small"
+              className={s.spin}
+              value={switchValue(f.id)}
+              min={p.min}
+              max={p.max}
+              step={5}
+              disabled={busy || !canEdit}
+              aria-label={p.label()}
+              onChange={(_, d) => {
+                const v = d.value ?? Number(d.displayValue)
+                if (v != null && Number.isFinite(v)) changeSwitchValue(f, Math.min(p.max, Math.max(p.min, Math.round(v))))
+              }}
+            />
+            <span className={s.note}>{p.unit}</span>
+          </>
+        )}
+        <Switch checked={switchOn(f.id)} disabled={busy || !canEdit} label={switchOn(f.id) ? t('入', 'On') : t('切', 'Off')} aria-label={f.label()} onChange={(_, d) => toggleSwitch(f, d.checked)} />
+      </span>
+    )
+  }
+
   if (!settingsLoaded()) return <Spinner size="tiny" />
   const affected = pending ? affectedBy(pending.id) : []
   return (
@@ -349,14 +399,19 @@ export function FeaturesManager() {
                           <TreeItem key={f.id} itemType="leaf" value={f.id}>
                             <TreeItemLayout
                               aside={
-                                <span className={s.aside}>
-                                  {!locked && versionSelect(f)}
-                                  {stateBadge(f.id, f)}
-                                  {!locked && modeSelect(f.id, true)}
-                                </span>
+                                // スイッチの機能は、版で出し分けない(入・切だけ)
+                                f.switch ? (
+                                  switchControls(f)
+                                ) : (
+                                  <span className={s.aside}>
+                                    {!locked && versionSelect(f)}
+                                    {stateBadge(f.id, f)}
+                                    {!locked && modeSelect(f.id, true)}
+                                  </span>
+                                )
                               }
                             >
-                              <span className={mergeClasses(s.row, !isPublic(f.id) && !locked && s.off)}>
+                              <span className={mergeClasses(s.row, (f.switch ? !switchOn(f.id) : !isPublic(f.id) && !locked) && s.off)}>
                                 <span>{marked(f.label(), hits?.[f.label() === f.names[0] ? 0 : 1])}</span>
                                 <span className={s.id}>{marked(f.id, hits?.[2])}</span>
                                 {missing.length > 0 && <span className={s.warn}>{t(`前提が非公開: ${missing.join('、')}`, `Prerequisite not public: ${missing.join(', ')}`)}</span>}
@@ -404,7 +459,7 @@ export function FeaturesManager() {
                 </MessageBar>
               )}
               <Field label={t('理由(記録に残ります)', 'Reason (kept in the log)')} required>
-                <Textarea value={reason} onChange={(_, d) => setReason(d.value)} placeholder={pending?.mode === 'stop' ? t('例: 保存できない不具合のため、直るまで止める', 'e.g. A save bug; stop until fixed') : t('例: 一部の担当者に先に使ってもらうため', 'e.g. Let some team members try it first')} />
+                <AutoTextarea heightKey="FeaturesManager.reason" rows={2} value={reason} onChange={(_, d) => setReason(d.value)} placeholder={pending?.mode === 'stop' ? t('例: 保存できない不具合のため、直るまで止める', 'e.g. A save bug; stop until fixed') : t('例: 一部の担当者に先に使ってもらうため', 'e.g. Let some team members try it first')} />
               </Field>
             </DialogContent>
             <DialogActions>
@@ -424,8 +479,15 @@ export function FeaturesManager() {
 function LogRow({ log: l }: { log: FeatureLog }) {
   const t = useT()
   const what = l.feature_id.startsWith('version:') ? l.feature_id.slice('version:'.length) : nameOf(l.feature_id)
-  const action =
-    l.action === 'publish'
+  const sw = FEATURES.find((f) => f.id === l.feature_id)?.switch
+  const action = sw
+    ? // スイッチの機能は、入れた・切った・数を変えた
+      l.action === 'value'
+      ? t(`${sw.param?.label() ?? '数'}を ${l.before_value} → ${l.after_value}${sw.param?.unit ?? ''}`, `${sw.param?.label() ?? 'value'} ${l.before_value} → ${l.after_value}${sw.param?.unit ?? ''}`)
+      : l.action === 'early'
+        ? t('入れた', 'turned on')
+        : t('切った', 'turned off')
+    : l.action === 'publish'
       ? t('公開にした', 'published')
       : l.action === 'unpublish'
         ? t('非公開にした', 'unpublished')

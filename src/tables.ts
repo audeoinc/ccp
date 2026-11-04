@@ -696,5 +696,3 @@ export function parsePart(raw: unknown): TablePart | null {
 /** 部品を保存する形にする(既定の値は書かない) */
 export const storedPart = (p: TablePart): TablePart => parsePart(p) ?? p
 
-/** 表に箱・ボタン・テキストが 1 つもないか(空のセクションは、保存しない) */
-export const isBlankTable = (sec: Section) => isTable(sec) && partsOf(sec).every((p) => p.type === 'empty')

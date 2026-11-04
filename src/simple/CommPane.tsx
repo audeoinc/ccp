@@ -37,10 +37,12 @@ import { weekKeyOf } from '../weekLock'
 import { anchorOfPart, partOfAnchor, type PartRef } from './parts'
 import { Linkify } from '../LinkText'
 import { useFeature } from '../featureFlags'
+import { ListHeader } from '../ListHeader'
+import { useJustAdded } from '../useJustAdded'
 
 const useStyles = makeStyles({
-  // やり取り: 絞り込み・流れ・書く欄(承認の様子・変更の記録は、描くときに行を替える)
-  root: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) auto', height: '100%', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
+  // やり取り: 見出し(絞り込みと「＋ やり取りを始める」)・流れ(承認の様子・変更の記録は、描くときに行を替える)
+  root: { display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', height: '100%', minHeight: 0, backgroundColor: tokens.colorNeutralBackground1 },
   top: { display: 'grid', rowGap: '10px', padding: '12px 12px 10px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   track: { display: 'flex', alignItems: 'center', columnGap: '4px' },
   stepIcon: { fontSize: '18px', flexShrink: 0 },
@@ -53,7 +55,7 @@ const useStyles = makeStyles({
   whoText: { flexGrow: 1, minWidth: 0, fontSize: tokens.fontSizeBase300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   actions: { display: 'flex', columnGap: '6px', flexWrap: 'wrap' },
-  bar: { display: 'flex', alignItems: 'center', columnGap: '6px', padding: '6px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
+  bar: { display: 'grid', padding: '6px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` },
   handoff: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', columnGap: '4px', border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, cursor: 'pointer', maxWidth: '50%', overflow: 'hidden', whiteSpace: 'nowrap' },
   stream: { overflowY: 'auto', minHeight: 0, padding: '8px 12px', display: 'grid', alignContent: 'start', rowGap: '10px' },
   item: { display: 'grid', gridTemplateColumns: '20px 24px minmax(0, 1fr) auto', columnGap: '8px', alignItems: 'start', fontSize: tokens.fontSizeBase300, cursor: 'pointer', borderRadius: tokens.borderRadiusMedium, padding: '2px', ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
@@ -66,7 +68,10 @@ const useStyles = makeStyles({
   quiet: { display: 'flex', alignItems: 'center', columnGap: '8px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, padding: '0 2px', minWidth: 0 },
   replies: { display: 'grid', rowGap: '6px', gridColumn: '3 / -1', paddingTop: '4px' },
   reply: { fontSize: tokens.fontSizeBase200, padding: '4px 8px', borderRadius: tokens.borderRadiusMedium, backgroundColor: tokens.colorNeutralBackground1 },
-  composer: { display: 'grid', rowGap: '6px', padding: '8px 12px 12px', borderTop: `1px solid ${tokens.colorNeutralStroke2}` },
+  // 書いている 1 枚(一覧のいちばん上に開く。ほかの 1 枚と同じ大きさの枠にして、何を足すのかが分かるように)
+  composer: { display: 'grid', rowGap: '6px', padding: '8px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorBrandStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
+  composeActions: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', columnGap: '6px' },
+  composeHint: { marginRight: 'auto', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   chips: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
   chip: { display: 'inline-flex', alignItems: 'center', columnGap: '4px', padding: '2px 8px', borderRadius: '999px', border: `1px solid ${tokens.colorNeutralStroke1}`, backgroundColor: 'transparent', fontFamily: 'inherit', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, cursor: 'pointer' },
   chipOn: { backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1, borderTopColor: tokens.colorBrandStroke2, borderRightColor: tokens.colorBrandStroke2, borderBottomColor: tokens.colorBrandStroke2, borderLeftColor: tokens.colorBrandStroke2 },
@@ -177,7 +182,9 @@ export interface CommCounts {
 /**
  * シンプルな配信カードのコミュニケーションのペイン(SU1 段階 d。2026-10-22 利用者と決めた)。
  * テキストでごちゃごちゃさせないため、(1) 状態の道のりと、次に動く人を顔で、(2) 書き込み・タスク・承認・変更を 1 本の流れに(変更は畳む)、
- * (3) 書く欄は 1 つ(場所はプレビューで選んでいる部品から自動で付ける)。データと保存は今のプロセスのペインと同じ(card_notes・承認の窓口・引き継ぎの欄)
+ * (3) 書く欄は 1 つ(場所はプレビューで選んでいる部品から自動で付ける)。データと保存は今のプロセスのペインと同じ(card_notes・承認の窓口・引き継ぎの欄)。
+ * 書く欄は、見出しの右の「＋ やり取りを始める」で、一覧のいちばん上に 1 枚として開く(2026-11-03 利用者: 一覧はコメントごとの 1 枚なのに、
+ * 下に固定の欄はチャットの次の一言に見えて粒度が合わず、下の端を引くと上に伸びて手の動きと逆だった)。押さないあいだは出さない
  */
 export function CommPane(props: Props) {
   const s = useStyles()
@@ -198,6 +205,8 @@ export function CommPane(props: Props) {
   const [text, setText] = useState('')
   const [assignee, setAssignee] = useState('')
   const [asTask, setAsTask] = useState(false)
+  const [composing, setComposing] = useState(false)
+  const justAdded = useJustAdded()
   // タスクとして書くのは、タスクを公開しているときだけ(X87。書いたタスクは、そのまま並べる)
   const tasksOn = useFeature('collab.tasks')
   const [replyText, setReplyText] = useState('')
@@ -315,7 +324,17 @@ export function CommPane(props: Props) {
       setText('')
       setAsTask(false)
       setAssignee('')
+      setComposing(false)
+      // 送った 1 枚は、少しのあいだ印を付ける(画面の部品の決まり 1。新しい順なので、もともといちばん上に出る)
+      justAdded.mark(createdId)
     }
+  }
+  const cancelCompose = () => {
+    setComposing(false)
+    setText('')
+    setAsTask(false)
+    setAssignee('')
+    setError(null)
   }
   const sendReply = async (root: CardNote) => {
     const body = replyText.trim()
@@ -368,6 +387,73 @@ export function CommPane(props: Props) {
 
   const userNames = activeUsers(people).map((u) => u.name ?? '').filter(Boolean)
   const names = userNames.length > 0 ? userNames : props.people
+
+  // 書いている 1 枚(「＋ やり取りを始める」で、一覧のいちばん上に開く)。場所の札・宛先・タスクの印と、送る・やめる
+  const composer = (
+    <div className={s.composer}>
+      <div className={s.chips}>
+        <Tooltip content={place ? t('プレビューで選んでいる部品に書きます(番号の点が付きます)', 'Posts on the part selected in the preview (adds a numbered dot)') : t('部品を選ばずに書くと、配信の全体への書き込みです', 'With no part selected, it is about the whole delivery')} relationship="description">
+          <span className={mergeClasses(s.chip, !!place && s.chipOn)}>
+            <LocationRegular />
+            {place ? partName(props.part, props.sectionLabel) : t('全体', 'Whole')}
+          </span>
+        </Tooltip>
+        <Popover positioning="below-start">
+          <PopoverTrigger disableButtonEnhancement>
+            <button type="button" className={mergeClasses(s.chip, !!assignee && s.chipOn)}>
+              <MentionRegular />
+              {assignee || t('宛先', 'To')}
+            </button>
+          </PopoverTrigger>
+          <PopoverSurface>
+            <div className={s.people}>
+              <Button size="small" appearance="subtle" onClick={() => setAssignee('')}>{t('宛先なし', 'No one')}</Button>
+              {names.map((n) => (
+                <Button key={n} size="small" appearance={assignee === n ? 'primary' : 'subtle'} onClick={() => setAssignee(n)} style={{ justifyContent: 'flex-start' }}>
+                  {n}
+                </Button>
+              ))}
+            </div>
+          </PopoverSurface>
+        </Popover>
+        {tasksOn && (
+          <button type="button" className={mergeClasses(s.chip, asTask && s.chipOn)} onClick={() => setAsTask(!asTask)}>
+            <TaskListSquareLtrRegular />
+            {t('タスク', 'Task')}
+          </button>
+        )}
+      </div>
+      {error && (
+        <MessageBar intent="error" layout="multiline">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
+      <AutoTextarea heightKey="CommPane.text"
+        size="small"
+        rows={2}
+        autoFocus
+        value={text}
+        disabled={working}
+        placeholder={t('質問・指摘・相談を書く', 'Write a question, feedback or note')}
+        onChange={(_, d) => setText(d.value)}
+        onKeyDown={(ev) => {
+          if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+            ev.preventDefault()
+            void post()
+          }
+        }}
+      />
+      <div className={s.composeActions}>
+        <span className={s.composeHint}>{t('Ctrl + Enter で送る', 'Ctrl + Enter to send')}</span>
+        <Button size="small" onClick={cancelCompose} disabled={working}>
+          {t('やめる', 'Cancel')}
+        </Button>
+        <Button size="small" appearance="primary" icon={<SendRegular />} disabled={working || !text.trim()} onClick={() => void post()}>
+          {t('送る', 'Send')}
+        </Button>
+      </div>
+    </div>
+  )
 
   // 変更の記録(中身の項目の変更・差し替えの理由・ステータスの変化。新しい順。「⋯」の「変更の履歴…」と同じもの。X1)
   if (props.section === 'history')
@@ -473,19 +559,32 @@ export function CommPane(props: Props) {
 
   return (
     <div className={s.root}>
-      {/* 2. 絞り込み(参考の素材・制作の担当と締め切りは、制作向けなので「渡すもの」の側に置く) */}
+      {/* 2. 絞り込みと「＋ やり取りを始める」(参考の素材・制作の担当と締め切りは、制作向けなので「渡すもの」の側に置く) */}
       <div className={s.bar}>
-        {/* 絞り込みは、一覧を切り替えるタブ(ARCHITECTURE の X75: Fluent の TabList の small、名前(件数)、0 件でも出す) */}
-        <TabList size="small" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as typeof filter)}>
-          <Tab value="open">{t(`未解決(${openCount + taskCount})`, `Open (${openCount + taskCount})`)}</Tab>
-          <Tab value="all">{t(`すべて(${allCount})`, `All (${allCount})`)}</Tab>
-        </TabList>
+        <ListHeader
+          title={
+            // 絞り込みは、一覧を切り替えるタブ(ARCHITECTURE の X75: Fluent の TabList の small、名前(件数)、0 件でも出す)
+            <TabList size="small" selectedValue={filter} onTabSelect={(_, d) => setFilter(d.value as typeof filter)}>
+              <Tab value="open">{t(`未解決(${openCount + taskCount})`, `Open (${openCount + taskCount})`)}</Tab>
+              <Tab value="all">{t(`すべて(${allCount})`, `All (${allCount})`)}</Tab>
+            </TabList>
+          }
+          addLabel={t('やり取りを始める', 'Start a thread')}
+          addDisabled={composing}
+          onAdd={() => setComposing(true)}
+        />
       </div>
 
       {/* 3. 1 本の流れ */}
       <div className={s.stream}>
+        {composing && composer}
+        {error && !composing && (
+          <MessageBar intent="error" layout="multiline">
+            <MessageBarBody>{error}</MessageBarBody>
+          </MessageBar>
+        )}
         {loading && <Spinner size="tiny" />}
-        {!loading && rows.length === 0 && <span className={s.empty}>{filter === 'open' ? t('未解決のやり取りはありません', 'Nothing open') : t('まだやり取りはありません', 'No activity yet')}</span>}
+        {!loading && rows.length === 0 && !composing && <span className={s.empty}>{filter === 'open' ? t('未解決のやり取りはありません', 'Nothing open') : t('まだやり取りはありません', 'No activity yet')}</span>}
         {rows.map((r) => {
           if (r.kind === 'event') {
             const e = r.event
@@ -505,7 +604,7 @@ export function CommPane(props: Props) {
           const isOpen = openId === n.id
           const num = numbers.get(n.id)
           return (
-            <div key={n.id} className={mergeClasses(s.item, isOpen && s.itemOpen)} onClick={() => open(n)}>
+            <div key={n.id} className={mergeClasses(s.item, isOpen && s.itemOpen, justAdded.freshClass(n.id))} onClick={() => open(n)}>
               {num ? <span className={mergeClasses(s.pin, !!n.resolved && s.pinDone)}>{num}</span> : task ? <TaskListSquareLtrRegular style={{ marginTop: 2 }} /> : <span />}
               <Avatar size={24} name={n.author || '?'} initials={initials(n.author)} color="colorful" />
               <div style={{ minWidth: 0 }}>
@@ -551,63 +650,6 @@ export function CommPane(props: Props) {
         })}
       </div>
 
-      {/* 4. 書く欄は 1 つ。場所は、プレビューで選んでいる部品 */}
-      <div className={s.composer}>
-        <div className={s.chips}>
-          <Tooltip content={place ? t('プレビューで選んでいる部品に書きます(番号の点が付きます)', 'Posts on the part selected in the preview (adds a numbered dot)') : t('部品を選ばずに書くと、配信の全体への書き込みです', 'With no part selected, it is about the whole delivery')} relationship="description">
-            <span className={mergeClasses(s.chip, !!place && s.chipOn)}>
-              <LocationRegular />
-              {place ? partName(props.part, props.sectionLabel) : t('全体', 'Whole')}
-            </span>
-          </Tooltip>
-          <Popover positioning="above-start">
-            <PopoverTrigger disableButtonEnhancement>
-              <button type="button" className={mergeClasses(s.chip, !!assignee && s.chipOn)}>
-                <MentionRegular />
-                {assignee || t('宛先', 'To')}
-              </button>
-            </PopoverTrigger>
-            <PopoverSurface>
-              <div className={s.people}>
-                <Button size="small" appearance="subtle" onClick={() => setAssignee('')}>{t('宛先なし', 'No one')}</Button>
-                {names.map((n) => (
-                  <Button key={n} size="small" appearance={assignee === n ? 'primary' : 'subtle'} onClick={() => setAssignee(n)} style={{ justifyContent: 'flex-start' }}>
-                    {n}
-                  </Button>
-                ))}
-              </div>
-            </PopoverSurface>
-          </Popover>
-          {tasksOn && (
-            <button type="button" className={mergeClasses(s.chip, asTask && s.chipOn)} onClick={() => setAsTask(!asTask)}>
-              <TaskListSquareLtrRegular />
-              {t('タスク', 'Task')}
-            </button>
-          )}
-        </div>
-        {error && (
-          <MessageBar intent="error" layout="multiline">
-            <MessageBarBody>{error}</MessageBarBody>
-          </MessageBar>
-        )}
-        <div className={s.input}>
-          <AutoTextarea heightKey="CommPane.text"
-            size="small"
-            rows={1}
-            value={text}
-            disabled={working}
-            placeholder={eligible.length > 0 ? t('書き込む(差し戻しの理由にもなります)', 'Write (also used as the reason when requesting changes)') : t('書き込む', 'Write')}
-            onChange={(_, d) => setText(d.value)}
-            onKeyDown={(ev) => {
-              if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
-                ev.preventDefault()
-                void post()
-              }
-            }}
-          />
-          <Button size="small" appearance="primary" icon={<SendRegular />} disabled={working || !text.trim()} onClick={() => void post()} aria-label={t('書き込む', 'Post')} />
-        </div>
-      </div>
     </div>
   )
 }

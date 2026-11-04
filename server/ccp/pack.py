@@ -42,11 +42,17 @@ IMG_URL = re.compile(r"^/img/(products|heroes|parts)/([A-Za-z0-9_-]+\.(?:jpg|jpe
 router = APIRouter(dependencies=[Depends(require_db)])
 
 
+# 書き出さない表(BigQuery の場所など、その環境の設定。ほかの環境に持ち込まない)
+NOT_EXPORTED = {"app_settings"}
+
+
 async def read_tables() -> dict[str, list[dict[str, Any]]]:
-    """すべてのテーブルの行を、画面と同じ形で読む"""
+    """すべてのテーブルの行を、画面と同じ形で読む(仕事の設定 app_settings は、環境ごとのものなので、パックに入れない)"""
     out: dict[str, list[dict[str, Any]]] = {}
     async with db() as conn:
         for t in sc.load().creation_order():
+            if t.name in NOT_EXPORTED:
+                continue
             rows = (await conn.execute(text(f"SELECT * FROM {t.pg} ORDER BY created_on, id"))).mappings().all()
             out[t.name] = [t.to_api(dict(r)) for r in rows]
     return out
@@ -166,8 +172,9 @@ def read_pack(path: Path) -> tuple[dict[str, Any], list[tuple[str, bytes]]]:
 # 開発へのリクエストは、使っている環境で書かれるので、本番のパックで入れ替えても残す(参照先の配信が消えると、配信への参照だけが空になる)
 # 「？ 聞く」の質問とよく聞かれる質問も、その環境で聞かれたものなので残す(Workbench の FAQ は Workbench で積む。2026-10-28 利用者)
 KEEP_ON_REPLACE = {"dev_requests", "dev_request_votes", "help_questions", "help_faqs", "help_faq_builds"}
-# その環境だけのもの(取り込まない・消さない)。機能の公開・非公開(X87)は、本番と Workbench で別々に決めるので、パックの値で変えない
-ENV_ONLY = {"feature_settings", "feature_versions", "feature_logs"}
+# その環境だけのもの(取り込まない・消さない)。機能の公開・非公開(X87)は、本番と Workbench で別々に決めるので、パックの値で変えない。
+# 仕事の設定(app_settings。BigQuery の場所・AI のモデル)も、環境ごとに違うので同じ
+ENV_ONLY = {"feature_settings", "feature_versions", "feature_logs", "app_settings"}
 # 人の設定(user_prefs。ST6)は残さない: ユーザー(users)と一緒に置き換わり、消えたユーザーの設定は参照先がなくなるため
 
 

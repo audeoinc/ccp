@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
-import { Avatar, Badge, Button, Field, Input, Select, Spinner, Textarea, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Avatar, Badge, Button, Field, Input, Select, Spinner, Tooltip, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { ArrowReplyRegular, ChatRegular, CheckmarkCircleFilled, CheckmarkCircleRegular, CheckmarkRegular, ChevronDownRegular, ChevronRightRegular, DeleteRegular, DismissRegular, EditRegular, TaskListLtrRegular } from '@fluentui/react-icons'
 import { Linkify } from './LinkText'
 import { CardNotesService, type CardNote } from './data/cardNotes'
@@ -16,6 +16,9 @@ import { confirmDialog } from './confirm'
 import { PersonInput } from './PersonInput'
 import { typo } from './typo'
 import { useFeature } from './featureFlags'
+import { ListHeader } from './ListHeader'
+import { useJustAdded } from './useJustAdded'
+import { AutoTextarea } from './AutoTextarea'
 
 const useStyles = makeStyles({
   root: { display: 'grid', rowGap: '8px', minWidth: 0 },
@@ -57,6 +60,8 @@ const useStyles = makeStyles({
   own: { display: 'inline-flex', columnGap: '2px', marginLeft: 'auto' },
   actions: { display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' },
   form: { display: 'grid', rowGap: '6px' },
+  // 書いている 1 枚(「＋ やり取りを始める」で、一覧のいちばん上に開く。ほかの 1 枚と同じ枠で)
+  compose: { display: 'grid', rowGap: '6px', padding: '10px 12px', borderRadius: tokens.borderRadiusMedium, border: `1px solid ${tokens.colorBrandStroke2}`, backgroundColor: tokens.colorNeutralBackground1 },
   formRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '8px', rowGap: '6px' },
   hint: typo.caption,
   error: { fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteRedForeground1 },
@@ -144,6 +149,9 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
   const [target, setTarget] = useState('')
   const [to, setTo] = useState('')
   const [body, setBody] = useState('')
+  // 書く 1 枚を開いているか(押さないあいだは、書く欄を出さない。2026-11-03 利用者)
+  const [composing, setComposing] = useState(false)
+  const justAdded = useJustAdded()
   // スレッドごとの返信の下書き(開いている返信の欄だけ、キーがある)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   // 編集中の 1 件と、その下書き
@@ -228,7 +236,12 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         body: body.trim(),
         resolved: 0,
       })
-      if (res.success) setBody('')
+      if (res.success) {
+        setBody('')
+        setComposing(false)
+        // 送った 1 枚は、少しのあいだ印を付ける(画面の部品の決まり 1。未解決の新しい順なので、もともといちばん上に出る)
+        justAdded.mark(res.data?.id)
+      }
       return res
     })
 
@@ -359,9 +372,8 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         </div>
         {editing?.id === n.id ? (
           <div className={styles.form}>
-            <Textarea
+            <AutoTextarea heightKey="CommentsPanel.edit" rows={2}
               size="small"
-              resize="vertical"
               autoFocus
               // 書き足すことが多いので、入力の位置を末尾にする(既定では先頭になる)
               onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
@@ -416,7 +428,7 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
       </button>
     ) : null
     return (
-      <div key={id} data-thread-id={id} className={mergeClasses(styles.thread, !resolved && styles.threadOpen, focus?.noteId === id && styles.focusedThread)}>
+      <div key={id} data-thread-id={id} className={mergeClasses(styles.thread, !resolved && styles.threadOpen, focus?.noteId === id && styles.focusedThread, justAdded.freshClass(id))}>
         {entry(
           n,
           24,
@@ -436,9 +448,8 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
         )}
         {replying && (
           <div className={styles.form}>
-            <Textarea
+            <AutoTextarea heightKey="CommentsPanel.reply" rows={2}
               size="small"
-              resize="vertical"
               autoFocus
               placeholder={t('返信を書く(例: 商品を入れ替えました)', 'Write a reply (e.g. replaced the product)')}
               value={drafts[id]}
@@ -525,24 +536,32 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
 
   return (
     <div className={styles.root}>
-      <div hidden={compact}>
-        <div className={styles.head}>
-          <ChatRegular />
-          {t('やり取り', 'Conversation')}
-          {open > 0 && <Badge appearance="tint" color="warning" size="small">{t(`未解決 ${open}`, `${open} open`)}</Badge>}
-        </div>
-        <div className={styles.caption}>
-          {t(
-            '質問・指摘・相談を書き、返信でやり取りして、決着したら解決にします。宛先を入れると、その人に返事を求めます。その場で保存します(配信カードの「保存」は不要です)。',
-            'Post questions, feedback or notes, discuss in replies, and resolve when settled. Add a recipient to ask that person for a reply. Saved right away (no need to press Save).',
-          )}
-        </div>
-      </div>
+      {/* 見出しの右に「＋ やり取りを始める」。押すと、一覧のいちばん上に、書ける 1 枚が開く(画面の部品の決まり 1。2026-11-03 利用者) */}
+      <ListHeader
+        icon={<ChatRegular />}
+        title={
+          <>
+            {t('やり取り', 'Conversation')}
+            {open > 0 && <Badge appearance="tint" color="warning" size="small">{t(`未解決 ${open}`, `${open} open`)}</Badge>}
+          </>
+        }
+        caption={
+          compact
+            ? undefined
+            : t(
+                '質問・指摘・相談を書き、返信でやり取りして、決着したら解決にします。宛先を入れると、その人に返事を求めます。その場で保存します(配信カードの「保存」は不要です)。',
+                'Post questions, feedback or notes, discuss in replies, and resolve when settled. Add a recipient to ask that person for a reply. Saved right away (no need to press Save).',
+              )
+        }
+        addLabel={t('やり取りを始める', 'Start a thread')}
+        addDisabled={!cardId || composing}
+        onAdd={() => setComposing(true)}
+      />
       {!cardId && <div className={styles.caption}>{t('配信カードを保存すると、書き込めます。', 'Save the delivery card to post.')}</div>}
       {cardId && notes === null && <Spinner size="tiny" />}
       {error && <div className={styles.error}>{error}</div>}
-      {cardId && (
-        <div className={styles.form}>
+      {cardId && composing && (
+        <div className={styles.compose}>
           <div className={styles.formRow}>
             <Field label={t('宛先(任意)', 'To (optional)')} size="small">
               <PersonInput value={to} onChange={setTo} people={people} placeholder={t('返事を求める人', 'Who should reply')} />
@@ -559,9 +578,11 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             )}
           </div>
           {pinStage && <span className={styles.hint}>{t('場所を指して書くときは、プレビューを右クリック(または「コメントを置く」)。', 'To point at a spot, right-click the preview (or use "Place comment").')}</span>}
-          <Textarea
+          <AutoTextarea
+            heightKey="CommentsPanel.body"
             size="small"
-            resize="vertical"
+            rows={2}
+            autoFocus
             placeholder={t('例: セールの終わりは日曜 23:59 ですか? / 前日のメールと商品がかぶっています', 'e.g. Does the sale end Sunday 11:59 PM? / Same products as the previous day')}
             value={body}
             onChange={(_, d) => setBody(d.value)}
@@ -570,15 +591,20 @@ export function CommentsPanel({ cardId, productIds, products, people, cardName, 
             })}
           />
           <div className={styles.actions}>
-            <Button size="small" appearance="primary" disabled={busy || !body.trim() || !me} onClick={() => void add()}>
-              {t('書き込む', 'Post')}
-            </Button>
-            <span className={styles.hint}>{me ? t('Ctrl + Enter で書き込む', 'Ctrl + Enter to post') : t('右上で、だれでログインするかを選ぶと、書き込めます', 'Choose who is signed in at the top right to post')}</span>
+            <span className={styles.hint}>{me ? t('Ctrl + Enter で送る', 'Ctrl + Enter to send') : t('右上で、だれでログインするかを選ぶと、書き込めます', 'Choose who is signed in at the top right to post')}</span>
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', columnGap: 6 }}>
+              <Button size="small" disabled={busy} onClick={() => { setComposing(false); setBody(''); setTo('') }}>
+                {t('やめる', 'Cancel')}
+              </Button>
+              <Button size="small" appearance="primary" disabled={busy || !body.trim() || !me} onClick={() => void add()}>
+                {t('送る', 'Send')}
+              </Button>
+            </span>
           </div>
         </div>
       )}
       {roots.map(thread)}
-      {cardId && notes && roots.length === 0 && <div className={styles.caption}>{t('まだ書き込みはありません。', 'Nothing posted yet.')}</div>}
+      {cardId && notes && roots.length === 0 && !composing && <div className={styles.caption}>{t('まだ書き込みはありません。', 'Nothing posted yet.')}</div>}
     </div>
   )
 }

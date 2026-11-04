@@ -105,7 +105,7 @@ if (publish) {
   console.log(`公開しました: タグ ${tag}`)
 }
 
-// ---- ZIP の読み書き(Node の標準だけ。scripts/release-workbench.mjs と同じ作り。時刻は 0 にして、同じコミットから同じ ZIP ができるように)
+// ---- ZIP の読み書き(Node の標準だけ。scripts/release.mjs と同じ作り。時刻は 0 にして、同じコミットから同じ ZIP ができるように)
 function makeZip(list) {
   const local = []
   const central = []

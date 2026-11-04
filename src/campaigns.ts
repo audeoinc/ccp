@@ -7,7 +7,7 @@ import type { Campaign } from './models/campaigns'
 import { DeliveryCardChannel, type DeliveryCard, type DeliveryCardFields } from './models/deliveryCards'
 import { statusRank } from './status'
 import { isCancelled } from './cancel'
-import { localDate, ymd } from './dates'
+import { localDate } from './dates'
 import { optionLabel, tr } from './i18n'
 
 type CardLike = Pick<DeliveryCard, 'id' | 'campaign_id' | 'status' | 'cancelled_at' | 'country' | 'scheduled_at'>
@@ -71,18 +71,6 @@ export function cardDisplayName(
   if (!card.campaign_id) return card.name
   const campaign = 'get' in campaigns ? campaigns.get(card.campaign_id) : campaigns.find((c) => c.id === card.campaign_id)
   return campaign?.name.trim() ? cardNameFor(campaign.name, card.channel) : card.name
-}
-
-/**
- * キャンペーンの配信日を動かしたときの、子のカードの新しい日時(ISO)。日付だけを変え、時刻(ブラウザの時刻)はそのまま。
- * 日時のないカードは、そのまま空
- */
-export function movedScheduledAt(scheduledAt: string | undefined, newDay: string): string | undefined {
-  if (!scheduledAt) return scheduledAt
-  const at = new Date(scheduledAt)
-  const [y, m, d] = newDay.split('-').map(Number)
-  const moved = new Date(y, m - 1, d, at.getHours(), at.getMinutes(), at.getSeconds(), at.getMilliseconds())
-  return ymd(moved) === newDay ? moved.toISOString() : scheduledAt
 }
 
 /**

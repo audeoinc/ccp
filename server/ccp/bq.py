@@ -3,12 +3,14 @@
 いまは「つながるか・出力の場所と列が仕様どおりか」を確かめるところまで(python -m ccp.cli check の「■ BigQuery」)。
 取り込み(B2 以降)は、これを土台に足す。
 
-接続は、Workbench のサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
-出力の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)は、利用先の名前を含むので、コードにもリポジトリにも書かず、環境変数で渡す:
+接続は、サーバーのサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
+出力の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)は、利用先の名前を含むので、コードにもリポジトリにも書かず、
+⚙ →「データの取り込み」で DB に持つ(appsettings.py のまとめ bq。2026-11-03 までは環境変数。DB にまだなければ、一度だけ写す):
   BQ_SPU / BQ_SKU / BQ_SKU_STOCK / BQ_WEEKLY / BQ_FORECAST   5 つの出力(BIGQUERY_EXPORT.md の 2〜6 章)
   BQ_RANKING   販売チャネルごとの販売順位(BIGQUERY_EXPORT.md の 9 章。結果の画面で使う)
   BQ_<名前>_WATCH   出力がビューのとき、更新を見る元のテーブル(ビューの最終更新の日時は、元のデータが変わっても変わらないため)
   BQ_PROJECT       問い合わせ(ジョブ)を走らせるプロジェクト。なければ GOOGLE_CLOUD_PROJECT
+値は appsettings.get を通して読む(呼ぶ側の窓口・定期の取り込みが、先に appsettings.ensure で DB から読んでおく)。
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from . import appsettings
 from .creds import get_credentials
 
 
@@ -37,7 +40,7 @@ OUTPUTS: tuple[Output, ...] = (
     Output(
         "spu", "BQ_SPU", "SPU",
         ("market", "product_code", "name", "as_of"),
-        ("category", "category_path", "gender", "season", "price", "description", "sales_trend", "units_4w", "revenue_4w", "revenue_yoy", "views_4w", "cvr_4w",
+        ("category", "category_path", "gender", "page_url", "season", "price", "description", "sales_trend", "units_4w", "revenue_4w", "revenue_yoy", "views_4w", "cvr_4w",
          "rating", "review_count", "last_review_at", "review_texts", "lift_hot", "lift_cold", "lift_rain", "hot_days", "cold_days", "rain_days", "weather_basis"),
     ),
     Output("sku", "BQ_SKU", "SKU", ("market", "sku_code", "product_code", "as_of"), ("color", "color_hex", "size", "length", "price", "units_4w")),
@@ -50,12 +53,12 @@ OUTPUTS: tuple[Output, ...] = (
 
 def location(o: Output) -> str | None:
     """出力の場所(設定がなければ None)。`project.dataset.table` の形。バッククォートは外す"""
-    v = (os.getenv(o.env) or "").strip().strip("`")
+    v = str(appsettings.get("bq", o.name) or "").strip().strip("`")
     return v or None
 
 
 def watch_location(o: Output) -> str | None:
-    v = (os.getenv(f"{o.env}_WATCH") or "").strip().strip("`")
+    v = str(appsettings.get("bq", f"{o.name}_watch") or "").strip().strip("`")
     return v or None
 
 
@@ -64,7 +67,7 @@ def configured() -> list[Output]:
 
 
 def job_project() -> str | None:
-    return os.getenv("BQ_PROJECT") or os.getenv("GOOGLE_CLOUD_PROJECT") or None
+    return appsettings.get("bq", "project") or os.getenv("GOOGLE_CLOUD_PROJECT") or None
 
 
 def client() -> Any:
@@ -72,6 +75,31 @@ def client() -> Any:
     from google.cloud import bigquery
 
     return bigquery.Client(project=job_project(), credentials=get_credentials())
+
+
+class BigQuerySource:
+    """データの入口(datasource.DataSource)の BigQuery のアダプター"""
+
+    def __init__(self, bq_client: Any):
+        self._client = bq_client
+
+    def columns(self, where: str) -> list[str]:
+        return [f.name for f in (getattr(self._client.get_table(where), "schema", None) or [])]
+
+    def last_updated(self, where: str, watch: str | None = None) -> datetime | None:
+        # ビューの最終更新は、元のデータの更新を表さないので、更新を見る元の表の日時を使う(なければ分からない)
+        t = self._client.get_table(where)
+        if (getattr(t, "table_type", "") or "") == "TABLE":
+            return getattr(t, "modified", None)
+        return getattr(self._client.get_table(watch), "modified", None) if watch else None
+
+    def read_rows(self, where: str, columns: list[str]) -> list[dict[str, Any]]:
+        sql = f"SELECT {', '.join(f'`{c}`' for c in columns)} FROM `{where}`"
+        return [{k.lower(): v for k, v in dict(r).items()} for r in self._client.query(sql).result()]
+
+    def kind(self, where: str) -> str:
+        """表かビューか(画面で「更新の合図に見る表は要りません」と言うため。入口の約束の外。ほかのアダプターにはなくてよい)"""
+        return getattr(self._client.get_table(where), "table_type", "") or ""
 
 
 def account() -> str:

@@ -183,6 +183,11 @@ class DataWriteTest(Base):
 class PeopleAdminTest(Base):
     """ユーザー・承認グループなどの書き込みは、ログインしているときは管理者だけ(ログインなしは、だれでも)"""
 
+    def setUp(self) -> None:
+        super().setUp()
+        # 管理する人が 1 人はいる(いなければ、最初の管理者を作るために、ログインした人に任せる。下の test_first_admin)
+        self.admin = self.store.add("users", name="管理する人", email="admin@example.com", status="active", role="admin")
+
     def signed_in(self, email: str):  # noqa: ANN201
         p = mock.patch.dict(os.environ, {"CCP_DEV_USER_EMAIL": email})
         p.start()
@@ -217,10 +222,61 @@ class PeopleAdminTest(Base):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(self.store.row("users", self.other)["name"], "名前を直した")
 
+    def test_first_admin_can_be_made_while_there_is_none(self) -> None:
+        # ログインを入れたばかりで、管理する人がまだいない置き先: だれもユーザーを足せない、とならないように
+        self.store.row("users", self.admin)["status"] = "inactive"
+        self.signed_in("newcomer@example.com")
+        r = self.client.post("/api/data/users", json={"name": "最初の管理者", "email": "newcomer@example.com", "role": "admin"})
+        self.assertEqual(r.status_code, 200, r.text)
+        # 管理者ができたあとは、ほかの人はもう書けない
+        self.signed_in("req@example.com")
+        self.assertEqual(self.client.post("/api/data/users", json={"name": "x"}).status_code, 403)
+
     def test_other_tables_are_not_limited(self) -> None:
         self.signed_in("req@example.com")
         r = self.client.post("/api/data/delivery_cards", json={"name": "冬の特集"})
         self.assertEqual(r.status_code, 200, r.text)
+
+
+class DevtoolsDeveloperOnlyTest(Base):
+    """開発用の画面(/dev/・/api/dev/)は、ログインしていれば開発者だけ(X103)。ログインがなければ、いまの運用のまま開く"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        from ccp import main
+
+        p = mock.patch.dict(os.environ, {"CCP_DEVTOOLS": "1", "CCP_AUTH": "", "OIDC_ISSUER": "", "APP_PASSWORD": ""})
+        p.start()
+        self.addCleanup(p.stop)
+        self.dev = self.store.add("users", name="開発する人", email="dev@example.com", status="active", is_developer=1)
+        self.main_client = TestClient(main.app)
+
+    def signed_in(self, email: str) -> None:
+        p = mock.patch.dict(os.environ, {"CCP_DEV_USER_EMAIL": email})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_signed_out_keeps_working(self) -> None:
+        self.assertNotEqual(self.main_client.get("/api/dev/status").status_code, 403)
+
+    def test_non_developer_is_refused_on_the_server(self) -> None:
+        self.signed_in("req@example.com")
+        r = self.main_client.get("/api/dev/status")
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.json()["ok"], False)
+        self.assertIn("開発者だけ", r.json()["error"])
+        self.assertEqual(self.main_client.get("/dev/").status_code, 403)
+        # 登録のない人も
+        self.signed_in("stranger@example.com")
+        self.assertEqual(self.main_client.get("/api/dev/status").status_code, 403)
+
+    def test_developer_can_open(self) -> None:
+        self.signed_in("DEV@example.com")
+        self.assertNotEqual(self.main_client.get("/api/dev/status").status_code, 403)
+
+    def test_other_pages_are_not_limited(self) -> None:
+        self.signed_in("req@example.com")
+        self.assertNotEqual(self.main_client.get("/api/me").status_code, 403)
 
 
 class BasicAuthTest(unittest.TestCase):
@@ -228,7 +284,8 @@ class BasicAuthTest(unittest.TestCase):
         from ccp import main
 
         self.main = main
-        p = mock.patch.object(main, "APP_PASSWORD", "secret-for-test")
+        # 画面のパスワードは、入口の認証の差し込み口(identity.py)が、依頼のたびに設定から読む
+        p = mock.patch.dict(os.environ, {"APP_PASSWORD": "secret-for-test", "CCP_AUTH": "", "OIDC_ISSUER": ""})
         p.start()
         self.addCleanup(p.stop)
         self.client = TestClient(main.app)

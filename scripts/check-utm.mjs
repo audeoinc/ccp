@@ -118,7 +118,41 @@ export async function checkUtm(server) {
   same(problems, '取り込み: 要素ごと', got.links.els, { 'sec_hero.image': 5, 'btn_top1.label': 2, btn_both: 1, 'box_a2.price': 4, 'box_a2.image': 1, 'box_zz.image': 1 })
   same(problems, '取り込み: 引けない content', got.unknown, ['box_zz.image', '?'])
 
-  return { problems, ok: 'utm OK(付ける・制作の写し・読む)', title: '計測用のパラメーター(utm_content)が、例と合いません' }
+  // 店の URL の形(settings.shopurl): 値はエンコードして埋め、{shop} はそのまま。埋められない {名前} は残す。既定の形は、設定に移す前と同じ URL
+  same(problems, 'fillUrl', [
+    links.fillUrl('{shop}/p/{product_code}', { shop: 'https://s.example.com/', product_code: 'A B/1' }),
+    links.fillUrl('{shop}/item?id={product_code}&lang={country}', { shop: 'https://s.example.com', product_code: 'X1', country: 'JP' }),
+    links.fillUrl('{shop}/c/{category}/{sku}', { shop: 'https://s.example.com', category: 'men' }),
+    links.fillUrl('{shop}/{campaign}', { shop: 'https://s.example.com' }),
+  ], ['https://s.example.com/p/A%20B%2F1', 'https://s.example.com/item?id=X1&lang=JP', 'https://s.example.com/c/men/{sku}', 'https://s.example.com/{campaign}'])
+  same(problems, '埋められない値', [links.unfilledValues('{shop}/p/{product_code}/{campaign}/{x}', links.URL_VALUES.product), links.unfilledValues('{shop}/c/{category}', links.URL_VALUES.category)], [['campaign', 'x'], []])
+  same(problems, '既定の形の URL', [links.productUrl(products[0]), links.defaultUrl('category', 'c', 'Men', 'JP'), links.defaultUrl('campaign', '20261026-card1234', undefined, 'JP')], [
+    'https://shop.example.com/p/AB-1',
+    'https://shop.example.com/c/men',
+    'https://shop.example.com/campaign/20261026-card1234',
+  ])
+  // 実際のページの URL を 1 つ貼ると、値を見つけて形を作る(大文字・小文字を問わない・前後が英数字の所は当てない・先頭が店の URL なら {shop})
+  same(problems, 'learnUrlPattern', [
+    links.learnUrlPattern('https://shop.example.com/products/ab123.html', 'AB123', 'product_code', 'https://shop.example.com'),
+    links.learnUrlPattern('https://www.example.org/item/?id=AB123&ref=AB1234', 'AB123', 'product_code', 'https://shop.example.com'),
+    links.learnUrlPattern('https://shop.example.com/p/AB1234', 'AB123', 'product_code', 'https://shop.example.com'),
+    links.learnUrlPattern('https://shop.example.com/c/Outer/', 'outer', 'category', 'https://shop.example.com/'),
+  ], [
+    { pattern: '{shop}/products/{product_code}.html', caseDiffers: true, shopMatched: true },
+    { pattern: 'https://www.example.org/item/?id={product_code}&ref=AB1234', caseDiffers: false, shopMatched: false },
+    null,
+    { pattern: '{shop}/c/{category}/', caseDiffers: true, shopMatched: true },
+  ])
+  same(problems, '形の札', links.urlPatternParts('{shop}/p/{product_code}.html'), [{ value: 'shop' }, { text: '/p/' }, { value: 'product_code' }, { text: '.html' }])
+  // 商品の URL があれば、それが先。utm は ? のある URL にも & でつながる
+  const own = { ...products[0], id: 'P9', page_url: 'https://www.example.org/goods?id=9' }
+  same(problems, '商品の page_url が先', new URL(links.withUtm(links.productUrl(own), { source: 's' })).search, '?id=9&utm_source=s')
+  // 制作の写しには、そのときの商品の URL を固める(あとで形を変えても、渡した配信の URL が変わらない)
+  same(problems, '写しに固めた商品の URL', s3.products.map((p) => p.page_url), products.map((p) => links.productUrl(p)))
+  const moved = snap.setProducts(s3, [...s3.productIds, own.id], [own])
+  same(problems, '写しに足した商品の URL', moved.products.at(-1)?.page_url, 'https://www.example.org/goods?id=9')
+
+  return { problems, ok: 'utm OK(付ける・制作の写し・読む・店の URL の形)', title: '計測用のパラメーター(utm_content)・店の URL の形が、例と合いません' }
 }
 
 // 単独で流したとき

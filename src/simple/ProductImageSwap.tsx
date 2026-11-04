@@ -18,6 +18,7 @@ import { AiIcon } from '../AiMark'
 import type { SimpleEditor } from './editor'
 import { useFeature } from '../featureFlags'
 import { FeatureBadge } from '../FeatureBadge'
+import { useSmallImages } from './smallImages'
 
 /** AI の依頼の記録(ai_runs)の種類。画像の案は学びを使わないので、結果の面の「学びあり / なし」の比べには入れない(src/impact.ts) */
 export const IMAGE_SUGGEST_TASK = 'suggest_product_image'
@@ -70,6 +71,8 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
   const [asking, setAsking] = useState(false)
   const [own, setOwn] = useState('')
   const [busy, setBusy] = useState(false)
+  // アイコン・ロゴのような小さい画像は、並びから外す(メイン画像の「URL から選ぶ」と同じ判定。下の一言で見られる)
+  const small = useSmallImages()
   const [over, setOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   // いまの AI の案の記録(ai_runs の id)。確定したときに、案から選んだか(as_is)・ほかを選んだか(rejected)を書く(X64 の f)
@@ -85,6 +88,7 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
     setLoading(true)
     setError(null)
     setPage(null)
+    small.reset()
     setAngles([])
     setPicks(null)
     try {
@@ -102,6 +106,7 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
     setError(null)
     setAngles([])
     setPicks(null)
+    small.reset()
     setPage({ sample: false, page: '', images: imgs, stored: true })
   }
   // 初めて開いたら: 取り込んだ商品の画像があれば、それを並べる(Workbench は EC サイトを読めないため)。なければ、商品の URL のページを読む
@@ -299,11 +304,16 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
               <button
                 key={img.src}
                 type="button"
-                className={mergeClasses(s.tile, (trial.trial ? trial.trial.key === img.src : current === img.src) && s.tileOn)}
+                className={mergeClasses(
+                  s.tile,
+                  (trial.trial ? trial.trial.key === img.src : current === img.src) && s.tileOn,
+                  // 選んでいる画像・AI が勧めた画像は、小さくても隠さない
+                  small.hiddenClass(img.src, rank >= 0 || (trial.trial ? trial.trial.key === img.src : current === img.src)),
+                )}
                 title={pick?.reason ?? img.alt}
                 onClick={() => tryImage(img.src, img.alt || t(`画像 ${i + 1}`, `Image ${i + 1}`), page.stored ? t('取り込んだ画像', 'Imported image') : url.trim(), img, i)}
               >
-                <img className={s.thumb} src={appPath(img.src)} alt={img.alt} draggable={false} />
+                <img className={s.thumb} src={appPath(img.src)} alt={img.alt} draggable={false} onLoad={small.onLoad(img.src)} />
                 <span className={s.marks}>
                   {img.main && <Badge size="small" appearance="filled" color="informative">{t('メイン', 'Main')}</Badge>}
                   {rank >= 0 && <Badge size="small" appearance="filled" color="brand">{t(`AI ${rank + 1}`, `AI ${rank + 1}`)}</Badge>}
@@ -325,6 +335,7 @@ export function ProductImageSwap({ editor: e, itemKey, open, onOpenChange, hideT
             : t('取り込んだ画像がありません。「ほかの画像」のタブから選べます', 'No imported images. Use the Other image tab.')}
         </div>
       )}
+      {!loading && small.note}
       <span className={s.caption}>
         {aiOn
           ? t('押すとプレビューで試せます(確定で入れ替え)。AI は、画像ごとのアングルを見分け、配信のテーマ・見出し・コピーに合う画像を勧めます', 'Click to try it in the preview (Apply to switch). AI tells each image’s angle and recommends ones that fit the theme, headline and copy.')

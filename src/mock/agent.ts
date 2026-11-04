@@ -192,6 +192,22 @@ export function mockAgent(message: string): string {
     })
   }
 
+  // 結果の AI の読み(X89): いちばん押された部品と、AB の勝ち案から、決まった形の文を作る
+  if (task === 'read_result') {
+    const k = (p.kpis ?? {}) as { clickRate?: number | null; revenue?: number }
+    const top = ((p.clicks as { name: string; share: number }[] | undefined) ?? [])[0]
+    const ab = p.ab as { winner?: string | null; lift?: number | null; confidence?: string } | null
+    const pct = (v?: number | null) => `${((v ?? 0) * 100).toFixed(1)}%`
+    const reading = [
+      top ? (en ? `${top.name} drew ${pct(top.share)} of clicks; click rate ${pct(k.clickRate)}.` : `${top.name}がクリックの ${pct(top.share)} を集めた(クリック率 ${pct(k.clickRate)})。`) : en ? `Click rate ${pct(k.clickRate)}.` : `クリック率は ${pct(k.clickRate)}。`,
+      ...(ab?.winner
+        ? [ab.confidence === 'sure' || ab.confidence === 'likely' ? (en ? `Variant ${ab.winner} leads by ${pct(ab.lift)}.` : `案 ${ab.winner} が ${pct(ab.lift)} 上回った。`) : en ? `Variant ${ab.winner} leads, but too early to call.` : `案 ${ab.winner} が上だが、まだ決められない。`]
+        : []),
+    ]
+    const next = [top ? (en ? `Put a similar element where ${top.name} sits in the next delivery.` : `次の配信でも、${top.name}の位置に同じ種類の要素を置く。`) : en ? 'Add a clear button near the top.' : '上のほうに、目立つボタンを置く。']
+    return J({ reading, next })
+  }
+
   // 結果の振り返り: 過去の平均との差が大きい位置・数字から、決まった形の文を作る
   if (task === 'review_results') {
     type Pos = { key: string; now: number; past: number }
@@ -429,26 +445,6 @@ export function mockAgent(message: string): string {
           ? ja ? `配信日に在庫 ${x.weeksLeft ?? '-'} 週分。今週・前週の訴求は ${seen(x)} 回。` : `${x.weeksLeft ?? '-'} weeks of stock on the day; featured ${seen(x)} times this/last week.`
           : ja ? `在庫 ${x.stock ?? '-'} で、「${req}」に合います。` : `Stock ${x.stock ?? '-'}; fits "${req}".`
     return J({ mode: 'update', reply: ja ? `「${req}」に合う候補を 3 つ選びました。` : `Here are three picks for "${req}".`, ideas: picks.map((x) => ({ code: x.code, why: why(x) })) })
-  }
-
-  // シンプルな配信カードで、配信の全体を AI に頼む(SU1 段階 b)。見出し・コピーと、あればセクションの見出しを替えた案を 2 つ
-  if (task === 'suggest_whole_rewrite') {
-    const req = String(p.request ?? '')
-    const cur = (p.current ?? {}) as { headline?: string; copy?: string; subject?: string; section_titles?: string[] }
-    const ja = hasJa(cur.headline ?? '') || hasJa(req)
-    if (/[?？]|どう思/.test(req)) return J({ mode: 'answer', reply: ja ? '全体としてテーマに沿っています。見出しをもう少し短くすると、メリハリが出ます。' : 'It follows the theme well. A shorter headline would add punch.' })
-    const heroes = (p.heroes as { code?: string }[] | undefined) ?? []
-    const titles = (cur.section_titles ?? []).filter(Boolean)
-    const ideas = ja
-      ? [
-          { title: 'やわらかく', why: `「${req}」に合わせ、語りかける言い方にそろえました。`, changes: { headline: '今年の秋も、重ね着で', copy: '肌寒い朝も、ふわっと軽いニットで気分よく。', ...(cur.subject ? { subject: '秋の重ね着、そろいました' } : {}), ...(titles.length ? { section_titles: titles.map((x) => `${x}をゆるっと`) } : {}) } },
-          { title: '季節を前に', why: '季節の言葉を先に出し、画像も明るいものにしました。', changes: { headline: '秋、はじまる', copy: '色づく季節に、いちばん似合う一枚を。', ...(heroes[0]?.code ? { hero_code: heroes[0].code } : {}) } },
-        ]
-      : [
-          { title: 'Laid-back', why: `Rewritten in a relaxed voice for "${req}".`, changes: { headline: 'Easy Layers for Fall', copy: 'Soft knits and light jackets for those cool mornings.', ...(cur.subject ? { subject: 'Your easy fall layers are here' } : {}), ...(titles.length ? { section_titles: titles.map((x) => `Easy ${x}`) } : {}) } },
-          { title: 'Season first', why: 'Leads with the season and uses a brighter image.', changes: { headline: 'Fall Starts Here', copy: 'The one layer that suits the season best.', ...(heroes[0]?.code ? { hero_code: heroes[0].code } : {}) } },
-        ]
-    return J({ mode: 'update', reply: ja ? `「${req}」の方向で、全体を直す案を 2 つ考えました。` : `Two ways to rework the whole delivery for "${req}".`, ideas })
   }
 
   if (task === 'suggest_push') {

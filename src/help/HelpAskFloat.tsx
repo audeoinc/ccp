@@ -289,6 +289,7 @@ export function HelpAskFloat({ open, onClose, part, onClearPart }: Props) {
               <AutoTextarea
                 className={s.grow}
                 heightKey="helpAsk.question"
+                growUp
                 rows={2}
                 value={text}
                 placeholder={t('例: 週の配信をまとめて作るには?', 'e.g. How do I create a week of deliveries at once?')}

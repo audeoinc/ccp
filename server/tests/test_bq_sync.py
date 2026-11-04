@@ -36,6 +36,7 @@ class SyncTest(unittest.TestCase):
                      "sku": [{"market": "JP", "sku_code": "S1", "product_code": "P1", "as_of": MODIFIED}]}
         self.issues: dict[str, list[bv.Issue]] = {}
         self.prev: dict = {}
+        self.settings = bq_import.parse_settings(None)
         self.write = mock.AsyncMock(return_value="入れ替えた")
         self.sum_stock = mock.AsyncMock()
         patches = [
@@ -47,6 +48,8 @@ class SyncTest(unittest.TestCase):
             mock.patch.object(bv, "fetch", side_effect=self.fetch),
             mock.patch.object(bv, "validate", side_effect=lambda name, rows, ctx, now=None: list(self.issues.get(name, []))),
             mock.patch.object(bq_import, "latest", mock.AsyncMock(side_effect=lambda: self.prev)),
+            mock.patch.object(bq_import, "load_settings", mock.AsyncMock(side_effect=lambda: self.settings)),
+            mock.patch.dict(bq_import._checked, clear=True),
             mock.patch.object(bq_import, "status", mock.AsyncMock(return_value={"outputs": []})),
             mock.patch.object(bq_import, "_db_context", mock.AsyncMock(return_value=[])),
             mock.patch.object(bq_import, "_write", self.write),
@@ -62,8 +65,8 @@ class SyncTest(unittest.TestCase):
             raise got
         return got
 
-    def sync(self, force: bool = True) -> dict:
-        return asyncio.run(bq_import.sync(force))
+    def sync(self, force: bool = True, **kw) -> dict:  # noqa: ANN003
+        return asyncio.run(bq_import.sync(force, **kw))
 
     def records(self) -> dict[str, str]:
         return {r["source"]: r["status"] for r in self.store.rows("bq_imports")}
@@ -112,6 +115,57 @@ class SyncTest(unittest.TestCase):
         self.sync()
         r = self.sync(force=False)
         self.assertEqual(r["skipped"], "recent")
+
+    def test_records_trigger_and_actor(self) -> None:
+        self.sync(trigger="manual", actor="Ken")
+        rows = self.store.rows("bq_imports")
+        self.assertEqual({(r["trigger"], r["actor"], r["repeat_count"]) for r in rows}, {("manual", "Ken", 1)})
+
+    def test_only_reads_the_named_outputs(self) -> None:
+        r = self.sync(only=["sku"])
+        self.assertEqual([i["name"] for i in r["imported"]], ["sku"])
+        self.assertEqual(set(bq_import._checked), {"sku"})
+
+    def test_same_failure_is_counted_not_added(self) -> None:
+        # 前の記録と同じ理由で止めたときは、記録を足さずに、回数と確かめた日時を進める
+        self.issues["sku"] = [bv.Issue(bv.NG, "sku", "キーが重なっています")]
+        message = bv.Issue(bv.NG, "sku", "キーが重なっています").text()
+        rid = self.store.add("bq_imports", source="sku", status="error", message=message, repeat_count=2)
+        self.prev = {"sku": {"id": rid, "status": "error", "message": message, "repeat_count": 2}}
+        self.sync(trigger="auto")
+        rows = self.store.rows("bq_imports", source="sku")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["repeat_count"], 3)
+        self.assertEqual(rows[0]["trigger"], "auto")
+
+    def test_open_reads_nothing_when_auto_is_on(self) -> None:
+        self.settings = bq_import.parse_settings({"enabled": True})
+        with mock.patch.dict("os.environ", {"BQ_AUTO_SYNC": ""}):
+            r = self.sync(force=False, trigger="open")
+        self.assertEqual(r["skipped"], "auto")
+        self.write.assert_not_awaited()
+
+
+class TickTurnTest(unittest.TestCase):
+    """サーバーが 2 台以上でも、定期の取り込みで BigQuery を読むのは 1 台だけ"""
+
+    def _tick(self, got: bool) -> tuple[object, mock.AsyncMock]:
+        store = FakeStore()
+        store.statements += [(r"^SELECT pg_try_advisory_xact_lock", lambda s, m, p: Result([Row({"got": got})]))]
+        sync = mock.AsyncMock()
+        settings = {**bq_import.parse_settings(None), "enabled": True}
+        with store.patch("ccp.bq_import"), mock.patch.object(bq_import, "env_disabled", return_value=False), mock.patch.object(bq_import.appsettings, "loaded", return_value=True), mock.patch.object(bq_import.appsettings, "ensure", mock.AsyncMock()), mock.patch.object(bq_import.appsettings, "raw", return_value=settings), mock.patch.object(bq, "configured", return_value=[SPU]), mock.patch.object(bq_import, "_pick", return_value=[SPU]), mock.patch.object(bq_import, "due", return_value=["spu"]), mock.patch.object(bq_import, "latest", mock.AsyncMock(return_value={})), mock.patch.object(bq_import, "sync", sync):
+            return asyncio.run(bq_import.tick()), sync
+
+    def test_reads_when_it_has_the_turn(self) -> None:
+        got, sync = self._tick(True)
+        self.assertEqual(got, ["spu"])
+        sync.assert_awaited_once()
+
+    def test_skips_when_another_server_has_the_turn(self) -> None:
+        got, sync = self._tick(False)
+        self.assertEqual(got, [])
+        sync.assert_not_awaited()
 
 
 if __name__ == "__main__":

@@ -81,6 +81,10 @@ export interface SnapshotVariant {
 }
 
 /** variantIds: B・C 案の商品 ID(メールの並び順。AB テストで商品を比べるとき) */
+/** この配信で替えた商品の画像(商品の id → 画像の URL)を、商品に当てる。写しを作る前に通す(制作・結果の面で、計画と同じ画像で見せるため) */
+export const withCardImages = (products: Product[], images?: Map<string, string>): Product[] =>
+  images?.size ? products.map((p) => (images.has(p.id) ? { ...p, image_url: images.get(p.id) } : p)) : products
+
 export function buildSnapshot(card: DeliveryCard, productIds: string[], products: Product[], heroes: HeroImage[], variantIds?: Partial<Record<VariantKey, string[]>>): Snapshot {
   const picked = Object.fromEntries(CARD_KEYS.map((k) => [k, card[k]])) as Snapshot['card']
   // utm_source・utm_medium は、依頼したときの設定の値を写しに入れておく(あとで設定を変えても、依頼した配信の URL が黙って変わらないように。
@@ -103,7 +107,7 @@ export function buildSnapshot(card: DeliveryCard, productIds: string[], products
     takenAt: new Date().toISOString(),
     card: picked,
     productIds,
-    products: products.filter((p) => used.has(p.id)),
+    products: products.filter((p) => used.has(p.id)).map(freezeUrl),
     hero,
     utm: UTM_SCHEME,
     ...withDetails(slotDetailsOf(card.id, productIds)),
@@ -423,12 +427,21 @@ export function setHero(s: Snapshot, hero: HeroImage | null): Snapshot {
   return { ...s, card: { ...s.card, hero_image_id: hero?.id }, hero }
 }
 
+/**
+ * 写しの商品に、そのときの商品ページの URL を固める(settings.shopurl)。あとで設定の URL の形を変えても、渡した配信・送った配信の URL が変わって見えないように。
+ * 固める前の古い写しは page_url がないので、productUrl がいまの形で組む
+ */
+const freezeUrl = (p: Product): Product => {
+  const url = productUrl(p)
+  return url ? { ...p, page_url: url } : p
+}
+
 /** 掲載商品の並びを替えた、新しい写し(新しく載せた商品は、その時の中身を写しに足す) */
 export function setProducts(s: Snapshot, productIds: string[], all: Product[]): Snapshot {
   const known = new Map(s.products.map((p) => [p.id, p]))
   for (const id of productIds) if (!known.has(id)) {
     const p = all.find((x) => x.id === id)
-    if (p) known.set(id, p)
+    if (p) known.set(id, freezeUrl(p))
   }
   return { ...s, productIds, products: productIds.map((id) => known.get(id)).filter((p): p is Product => !!p).filter((p, i, a) => a.indexOf(p) === i), details: moveDetails(s, productIds) }
 }

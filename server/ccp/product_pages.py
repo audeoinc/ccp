@@ -392,6 +392,9 @@ def _largest(srcset: str) -> str:
 
 # 飾り・ロゴ・計測用の小さな画像の目印(本物のページの多くで、商品の画像と見分けられる)
 NOISE = re.compile(r"(logo|icon|sprite|badge|banner|pixel|tracking|spacer|avatar|flag|payment|social)", re.I)
+# 色見本(カラーチップ)。利用者が主に外したいもの(2026-11-02)。chip は商品名(potato-chips・チップス など)に当たらないよう、
+# 英字の単語の境目(パスの区切り・- _ . など)で、単数の chip だけを見る。色見本と分かる組み合わせ(color-chips)は複数形も
+SWATCH = re.compile(r"(?<![a-z])(swatch(es)?|colou?r[-_ ]?chips?|chip)(?![a-z])|色見本|カラーチップ", re.I)
 
 
 def original_size(url: str) -> str:
@@ -426,7 +429,8 @@ def extract(html: str, base: str) -> list[dict[str, str]]:
             continue
         # 大きさの指定(?width=)は外して、元の大きさの画像を拾う(同じ画像の大きさ違いも、1 つにまとまる)
         absolute = original_size(urljoin(base, src))
-        if absolute in seen or NOISE.search(urlparse(absolute).path) or NOISE.search(f.get("alt") or ""):
+        path, alt = urlparse(absolute).path, f.get("alt") or ""
+        if absolute in seen or NOISE.search(path) or NOISE.search(alt) or SWATCH.search(path) or SWATCH.search(alt):
             continue
         if f.get("width") is not None and f["width"] < 120:
             continue

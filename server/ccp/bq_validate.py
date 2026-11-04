@@ -14,7 +14,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable
 
-from . import bq, schema as sc
+from . import bq, datasource, schema as sc
+from .datasource import DataSource
 
 NG, WARN = "NG", "注意"
 MARKET = re.compile(r"^[A-Z]{2}$")
@@ -223,25 +224,26 @@ def has_ng(issues: list[Issue]) -> bool:
     return any(i.level == NG for i in issues)
 
 
-def fetch(o: bq.Output, client: Any) -> list[dict[str, Any]]:
+def fetch(o: bq.Output, source: DataSource) -> list[dict[str, Any]]:
     """出力の行を、すべて読む(仕様の列だけ。数百〜数千行なので、まとめて読む)"""
-    from google.cloud import bigquery  # noqa: F401 — パッケージがないときに、ここで分かるように
-
-    where = bq.location(o)
-    t = client.get_table(where)
-    have = {f.name.lower(): f.name for f in (getattr(t, "schema", None) or [])}
-    cols = [have[c] for c in (*o.required, *o.optional) if c in have]
-    sql = f"SELECT {', '.join(f'`{c}`' for c in cols)} FROM `{where}`"
-    return [{k.lower(): v for k, v in dict(r).items()} for r in client.query(sql).result()]
+    where = bq.location(o) or ""
+    have = {c.lower(): c for c in source.columns(where)}
+    return source.read_rows(where, [have[c] for c in (*o.required, *o.optional) if c in have])
 
 
 def run_cli() -> int:
     """python -m ccp.cli bq-check: 設定された出力を読み、値まで確かめて表示する。NG の数を返す(何も変えない)"""
+    import asyncio
+
+    from . import appsettings
+
+    # 表の場所は DB にある(⚙ →「データの取り込み」)。DB を読めなければ、環境変数の場所で確かめる
+    asyncio.run(appsettings.ensure_cli())
     outputs = bq.configured()
     if not outputs:
-        print("BQ_SPU などの設定がありません(server/workbench.env.example を見て、出力の場所を設定してください)")
+        print("BigQuery の表の場所が設定されていません(⚙ →「データの取り込み」で、出力の場所を入れてください)")
         return 1
-    client = bq.client()
+    source = datasource.open()
     print(f"接続のアカウント: {bq.account()} / ジョブのプロジェクト: {bq.job_project() or '(なし)'}")
     rows: dict[str, list[dict[str, Any]]] = {}
     ng = 0
@@ -250,7 +252,7 @@ def run_cli() -> int:
             print(f"■ {o.label}: {o.env} の設定がありません(確かめない)")
             continue
         try:
-            rows[o.name] = fetch(o, client)
+            rows[o.name] = fetch(o, source)
         except Exception as e:  # noqa: BLE001 — 読めない理由を、そのまま見せる
             print(f"■ {o.label}: 読めません({type(e).__name__}: {e})")
             ng += 1
