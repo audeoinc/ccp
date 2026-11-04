@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-04 UI 2: X109 固定の選択肢をやめた(`products` の `category`・`season`・`gender` を text に。B7 も閉じた)。
 - 2026-11-04 UI 2: `ui2-secrets`(初期設定の画面・秘密の設定・設定の型)を main に。コンテナの対策: `CCP_ENV_FILE` の 3 つの置き方(既定は注意・パス指定・`off` で欄を閉じる)、健康診断の組 `file`、docs/AWS.md の「コンテナで動かすとき」。
 - 2026-11-04 UI 2: X108 差分の一覧を main に(`npm run client:diff`。AWS_CUSTOMIZE の 5.2 の最初に置いた)。X109 は形を連絡係に提案済み。
 - 2026-11-04 UI 2: X107 書き出さない変更を止める確認を main に(`scripts/check-client-changes.mjs`。ZIP に入る `server/schema.base.json` と比べる。開発側にはこのファイルがないので何もしない)。

@@ -155,9 +155,6 @@ def validate(name: str, rows: list[dict[str, Any]], context: dict[str, list[dict
             c.range(rows, col, -1, None)
             c.range(rows, col, None, 5, WARN)  # 売上 +500% を超える反応は、計算の誤り(日数が少ない など)を疑う
         c.check(WARN, "description が 500 字を超えています(AI に渡すときに長すぎる)", rows, lambda r: len(str(r.get("description") or "")) > 500)
-        for col in ("category", "season"):
-            allowed = sc.load().table("products").by_name[col].choices or []
-            c.values(rows, col, allowed, WARN, "(いまの CCP は決まった選択肢で持つ。BACKLOG の B7)")
         c.check(WARN, "category_path の区切りが ' > ' ではありません", rows, lambda r: bool(r.get("category_path")) and ">" in str(r["category_path"]) and " > " not in str(r["category_path"]))
         c.check(WARN, "review_count があるのに rating が空です", rows, lambda r: (_num(r.get("review_count")) or 0) > 0 and r.get("rating") is None)
 

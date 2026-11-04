@@ -46,10 +46,25 @@ class SpuTest(unittest.TestCase):
         self.assertIn("cvr_4w", ng)
         self.assertIn("rating", ng)
 
-    def test_unknown_category_is_only_a_warning(self) -> None:
-        issues = validate("spu", [spu("P01", category="Knitwear")], now=NOW)
+    def test_category_and_season_are_not_fixed(self) -> None:
+        # 値は相手ごとに違うので、知らない値でも注意を出さない(X109)
+        issues = validate("spu", [spu("P01", category="Knitwear", season="SS26")], now=NOW)
         self.assertFalse(has_ng(issues))
-        self.assertIn("category", messages(issues, WARN))
+        self.assertNotIn("Knitwear", messages(issues, WARN))
+        self.assertNotIn("SS26", messages(issues, WARN))
+
+    def test_open_columns_keep_values_and_market_stays_fixed(self) -> None:
+        from ccp import bq_import, schema as sc
+
+        t = sc.load().table("products")
+        # 前の画面が送る表示名は保存しない。知らない値は断らない
+        self.assertEqual(t.to_db({"category": "Knitwear", "season": "SS26", "gender": "F", "category_name": "x"}), {"category": "Knitwear", "season": "SS26", "gender": "F"})
+        with self.assertRaises(sc.BadRequest):
+            t.to_db({"market": "XX"})
+        self.assertEqual(bq_import.gender_of("Ladies"), "womens")
+        self.assertEqual(bq_import.gender_of(" kids "), "kids")
+        self.assertIsNone(bq_import.gender_of(""))
+        self.assertIsNone(bq_import.gender_of(None))
 
     def test_stale_as_of_warns(self) -> None:
         issues = validate("spu", [spu("P01", as_of=datetime(2026, 9, 1, tzinfo=timezone.utc))], now=NOW)

@@ -51,12 +51,14 @@ export type ProductGender = keyof typeof ProductGender
 export interface ProductFields {
   name: string
   product_code?: string
-  category?: ProductCategory
+  /** 相手ごとに違う値を持てる(固定の選択肢にしない。ProductCategory は、知っている値の表示名) */
+  category?: string
   price?: number
   /** 元の価格(セールの前の価格。任意)。テンプレートの箱で「セール」の見せ方を選んだとき、取り消し線で出す */
   regular_price?: number
   stock?: number
-  season?: ProductSeason
+  /** 相手ごとに違う値を持てる(ProductSeason は、知っている値の表示名) */
+  season?: string
   sales_trend?: ProductSalesTrend
   rating?: number
   weather?: ProductWeather
@@ -71,7 +73,8 @@ export interface ProductFields {
   /** カテゴリの階層(上の段から ' > ' でつないだもの) */
   category_path?: string
   /** 性別(mens / womens / unisex)。ない商品は、どの対象にも出す */
-  gender?: ProductGender
+  /** 相手ごとに違う値を持てる。mens / womens / unisex のときだけ、配信の対象で絞る(src/target.ts) */
+  gender?: string
   units_4w?: number
   revenue_4w?: number
   /** 直近 4 週の売上 ÷ 前年の同じ 4 週 */

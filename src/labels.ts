@@ -7,8 +7,8 @@ import {
 } from './models/products'
 import { HeroImagePurpose, HeroImageSeason, type HeroImage } from './models/heroImages'
 
-// 選択肢の表示名(○○_name の項目)は、値から求める
-const pick = (map: Record<string, string>, value?: string, name?: string) => name || (value === undefined ? undefined : map[value])
+// 選択肢の表示名(○○_name の項目)は、値から求める。固定の選択肢でない列(カテゴリなど)の知らない値は、そのまま出す
+const pick = (map: Record<string, string>, value?: string, name?: string) => name || (value === undefined ? undefined : (map[value] ?? value))
 
 export function withProductLabels(p: Product): Product {
   return {

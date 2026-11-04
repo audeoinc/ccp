@@ -215,7 +215,7 @@ export function ProductsView({ cards, cardProducts, products, from, to, onOpenCa
       const p = r.product!
       const path = (p.category_path ?? '').split('>').map((x) => x.trim()).filter(Boolean)
       // 階層がなければ、カテゴリの表示名(トップス など)
-      const name = path.length > 0 ? path.slice(0, 2).join(' > ') : p.category ? optionLabel(ProductCategory[p.category] ?? p.category) : '—'
+      const name = path.length > 0 ? path.slice(0, 2).join(' > ') : p.category ? optionLabel((ProductCategory as Record<string, string>)[p.category] ?? p.category) : '—'
       const key = `${r.market}:${name}`
       const g = cat.get(key) ?? {
         ...r, key, product: undefined, label: name, sub: r.market, productCount: 0, placements: [], email: 0, app: 0, future: 0, lastDate: undefined,

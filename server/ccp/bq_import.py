@@ -165,9 +165,10 @@ _GENDER = {
 
 
 def gender_of(v: Any) -> str | None:
-    """SPU の gender を、CCP の値(mens / womens / unisex)に読み替える。読めない値・空は None(商品は、どの対象にも出る)"""
+    """SPU の gender を、CCP の値(mens / womens / unisex)に読み替える。読み替えられない値は、捨てずにそのまま持つ(表示に使う。対象の絞り込みではどの対象にも出す)。
+    空は None(商品は、どの対象にも出る)"""
     key = re.sub(r"[^a-z]", "", str(v or "").lower())
-    return _GENDER.get(key)
+    return _GENDER.get(key) or (str(v).strip() or None if v is not None else None)
 
 
 def _values(table: str, row: dict[str, Any], cols: list[str]) -> dict[str, Any]:
