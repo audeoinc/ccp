@@ -81,54 +81,29 @@ async def seed(reset: bool, with_bq: bool = False) -> None:
             print(f"{t.pg}: {len(rows)} 件")
 
 
-def _seed_ids(t: sc.Table) -> list:
-    return [sc.coerce("uuid", r["id"]) for r in seeddata.load().get(t.name, [])]
-
-
 async def remove_seed(yes: bool) -> None:
-    """見本の行(seed.json の ID)を消す。見本でない行が見本を参照していれば、消さない(参照の消し方しだいで、本物の行も消えるか、途中で止まるため)"""
-    schema = sc.load()
-    order = schema.creation_order()
+    """見本の行(seed.json の ID)を消す。見本でない行が見本を参照していれば、消さない(画面の ⚙ →「データの取り込み」と同じ中身)"""
     async with cli_conn(write=yes) as conn:
-        found: dict[str, int] = {}
-        for t in order:
-            ids = _seed_ids(t)
-            if ids:
-                n = (await conn.execute(text(f"SELECT count(*) FROM {t.pg} WHERE id = ANY(:ids)"), {"ids": ids})).scalar_one()
-                if n:
-                    found[t.name] = n
-        if not found:
+        got = await seeddata.survey(conn)
+        if not got["found"]:
             print("見本の行はありません")
             return
         print("見本の行(server/seed.json の ID):")
-        for name, n in found.items():
-            print(f"  {schema.tables[name].pg}: {n} 件")
-        used = []
-        for t in order:
-            for lk in t.lookups:
-                ref_ids = _seed_ids(schema.tables[lk.ref])
-                if lk.ref not in found or not ref_ids:
-                    continue
-                n = (await conn.execute(
-                    text(f"SELECT count(*) FROM {t.pg} WHERE {lk.pg} = ANY(:ref) AND NOT (id = ANY(:own))"),
-                    {"ref": ref_ids, "own": _seed_ids(t)},
-                )).scalar_one()
-                if n:
-                    used.append(f"  {t.pg}.{lk.pg}: {n} 件が見本の {schema.tables[lk.ref].pg} を使っています")
-        if used:
+        for name, n in got["found"].items():
+            print(f"  {name}: {n} 件")
+        if got["used"]:
             print()
             print("見本でない行が、見本を使っています。消すと、その行も消えるか、途中で止まるので、消しません:")
-            print("\n".join(used))
+            for u in got["used"]:
+                print(f"  {u['table']}.{u['column']}: {u['count']} 件が見本の {u['ref']} を使っています")
             print("画面で、その行から見本を外す(配信の商品を入れ替える など)か、その行を消してから、もう一度実行してください")
             sys.exit(1)
         if not yes:
             print()
             print("数えただけです。消すときは --yes を付けて実行してください")
             return
-        for t in reversed(order):
-            if t.name in found:
-                await conn.execute(text(f"DELETE FROM {t.pg} WHERE id = ANY(:ids)"), {"ids": _seed_ids(t)})
-    print("見本の行を消しました。BigQuery の出力が設定してあれば、次の取り込み(または ⚙ の「いま取り込む」)で商品が入ります")
+        await seeddata.remove(conn, got["found"])
+    print("見本の行を消しました。BigQuery の出力が設定してあれば、次の取り込み(または ⚙ の「今すぐ取り込む」)で商品が入ります")
 
 
 async def counts() -> None:

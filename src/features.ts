@@ -254,6 +254,8 @@ export const FEATURES: FeatureDef[] = [
   { id: 'settings.policy', group: 'area.settings.company', ...named('方針・決まりの編集', 'Edit policies and rules'), version: 'v4', size: 'S' },
   // データの取り込みの管理(BigQuery → PostgreSQL)と、サーバーの中で回す定期の取り込み。管理する人だけ(2026-11-03 利用者)
   { id: 'settings.dataimport', group: 'area.settings.company', ...named('データの取り込みの管理(出力ごとの状態・記録・今すぐ取り込む・確認だけ・定期の取り込み)', 'Data import management (status per output, history, import now, check only, scheduled import)'), version: 'MVP', size: 'M' },
+  // 取り込んだデータの一覧。だれでも読むだけ。見本を消すのは、データの取り込みの管理の側だけ(X105。2026-11-03 利用者)
+  { id: 'settings.datalist', group: 'area.settings.company', ...named('取り込んだデータの一覧(6 つの出力・商品のページ・見本の印・検索・CSV)', 'Imported data list (6 outputs, product pages, sample marks, search, CSV)'), version: 'MVP', size: 'M' },
   // AI の設定(モデル・考える深さ・同時の上限・AI の出口の URL と待ち時間)を DB と管理画面で持つ。鍵は環境のまま。管理する人だけ(2026-11-03 利用者)
   { id: 'settings.ai', group: 'area.settings.company', ...named('AI の設定(モデル・考える深さ・同時に呼ぶ数・AI の出口)', 'AI settings (model, thinking, concurrency, AI outlet)'), version: 'MVP', size: 'S' },
   // 設定の健康診断(⚙ →「設定の状態」)・初期設定の画面・秘密を書くだけの欄・設定の型。忘れても設定できるように(2026-11-03 利用者)

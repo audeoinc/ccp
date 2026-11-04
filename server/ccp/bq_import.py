@@ -538,7 +538,8 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
 async def history(source: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     """取り込みの記録(新しい順)。表の場所を変えた記録(app_settings のまとめ bq)も、その出力の記録にまぜる(status = settings)"""
     limit = max(1, min(int(limit), 300))
-    where = "WHERE source = :source " if source else ""
+    # 見本を消した記録(datalist.py。source = sample)は、商品(SPU)の記録にまぜて出す(取り込みが通るようになった理由が、記録から分かるように)
+    where = ("WHERE source IN (:source, 'sample') " if source == "spu" else "WHERE source = :source ") if source else ""
     async with db() as conn:
         rows = (await conn.execute(text(
             f"SELECT source, status, source_modified, data_as_of, row_count, message, imported_at, checked_at, repeat_count, trigger, actor FROM bq_imports {where}ORDER BY imported_at DESC LIMIT {limit}"

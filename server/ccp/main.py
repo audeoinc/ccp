@@ -30,6 +30,7 @@ from .settings_template import router as template_router
 from .setup import router as setup_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
+from .datalist import router as datalist_router
 from . import devimages, devtools
 from .help import router as help_router
 from . import identity
@@ -163,6 +164,7 @@ app.include_router(assets_router)
 app.include_router(pack_router)
 app.include_router(product_images_router)
 app.include_router(bq_router)
+app.include_router(datalist_router)
 # 設定の状態は /api/settings/health。/api/settings/{まとめ} より先に置く(health をまとめの名前と読ませない)
 app.include_router(health_router)
 app.include_router(secrets_router)
