@@ -16,7 +16,7 @@ AWS 版の ZIP を受け取って、サーバーで CCP を立ち上げる・設
 5. 最初の管理者を作る(3.6)
 6. ⚙ →「データの取り込み」で BigQuery の表の場所を入れて取り込む(4 章)。⚙ →「AI の設定」でモデルを確かめる(5 章)
 7. ⚙ →「設定の状態」で、全部の行が「済み」になったのを見る(6 章)
-8. 新しい版が届いたら、`scripts/workbench.sh update`(8 章)
+8. 新しい版が届いたら、`vendor` に入れて `main` にマージし、`scripts/workbench.sh update`(8 章)
 
 ## 2. 用意するもの(CCP の外で、サーバーを立てる人の作業)
 
@@ -81,7 +81,7 @@ gcloud iam workload-identity-pools create-cred-config \
 
 ### 3.1 リポジトリを取得する
 
-ZIP を利用先の Git に入れ(`CCP AWS 版 <版>` でコミット)、サーバーで取得します。
+ZIP を利用先の Git に入れ(`CCP AWS 版 <版>` でコミット)、サーバーで取得します。CCP がリポジトリの中のフォルダ(`ccp/`)にあるときは、以下のコマンドをそのフォルダで実行します。
 
 ```bash
 git clone <利用先の Git の URL> ~/ccp
@@ -294,8 +294,8 @@ ID トークンに `email` を足す・ログインできる人を絞る、な�
 
 ## 8. 更新の手順(新しい版が届いたとき)
 
-1. 新しい版の ZIP を、利用先の Git に入れる(`CCP AWS 版 <版>` でコミット)。
-2. サーバーで:
+1. 新しい版の ZIP をブランチ `vendor` に入れ、`main` にマージして確認する。**総入れ替えはしません**(AWS 側の調整を残すため)。手順は [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の 5 章です。
+2. 人の指示があったら、サーバーで:
 
    ```bash
    cd ~/ccp
@@ -340,12 +340,13 @@ ID トークンに `email` を足す・ログインできる人を絞る、な�
 1. `scripts/workbench.sh check`(または ⚙ →「設定の状態」)の `[NG]` の行を見る。
 2. `scripts/workbench.sh log` で、サーバーのログの最後を見る。
 3. [WORKBENCH.md](WORKBENCH.md) の 5 章「よくあるつまずき」の表も見る。
-4. それでも直らなければ、`check` の出力とログの最後を、開発の担当に伝える(**サーバーの上でコードを直さない**。次の版で上書きされる)。
+4. それでも直らなければ、`check` の出力とログの最後を、開発の担当に伝える(**サーバーの上でコードを直さない**。`update` が止まる。AWS 側の調整は [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の手順で行う)。
 
 ## 10. 関係する文書
 
 | 文書 | 中身 |
 |---|---|
+| [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) | スキーマ・画面を AWS 側で変える決まりと、新しい版の取り込み(マージ)の手順 |
 | [WORKBENCH.md](WORKBENCH.md) | コマンドの意味・引っ越し用のパック・環境変数の全部の一覧(付録 A)など、この文書の補足 |
 | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) | BigQuery から出してもらう出力と列の仕様(利用先のデータの担当に渡す) |
 | [BIGQUERY.md](BIGQUERY.md) | BigQuery からの取り込みの仕組み |
