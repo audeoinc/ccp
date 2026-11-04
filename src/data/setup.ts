@@ -72,5 +72,7 @@ export const SetupService = {
   /** 確かめて、通ったときだけ書く */
   save: (step: SetupStepId, values: Record<string, string>) => call<SetupResult>('POST', `/api/setup/save/${step}`, values),
   skip: (step: SetupStepId) => call<SetupState>('POST', `/api/setup/skip/${step}`),
+  /** ほかのサーバーの設定の型を読み込む(DB の段のあと) */
+  importTemplate: (template: unknown) => call<{ dropped: string[]; pending: boolean }>('POST', '/api/setup/template', template),
   finish: () => call<{ needed: boolean }>('POST', '/api/setup/finish'),
 }

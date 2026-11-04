@@ -24,7 +24,7 @@
 - 2026-11-03 UI 3: X56 (b)〜(d)・W5 契約テスト・見本のデータは人が明示したときだけ(`cli remove-seed`)は main。割り当てなし。残り物は AB の案 B の「詳しく」をプレビューに(`vs.details`)と、パックの商品の消し方の相談
 - 2026-11-03 W6 AWS 版の ZIP(`npm run release:aws`・`docs/AWS.md`)は main・公開済み(5 章)。最適化(optimize-survey の 1〜6)・X95 も済み
 - 2026-11-02 X86・X89・X90(K5 で詳しい制作のページを消した)・X80・X92〜X94 は main。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)
-- 2026-11-03 UI 2: settings.setup の 1 段目(健康診断・⚙「設定の状態」)、2 段目(初期設定の画面。見本は `?setup=1`・合言葉 `sample-key`)、データの取り込みの場所の言い方を、見本のブランチ ui2-setup に(利用者の OK 待ち。最後 19badf9)。秘密の設定(⚙。`ccp/secretstore.py`)は見本 ui2-secrets(ui2-setup の上)。次は 設定の型 → W1 データの入口の切れ目(W5 の契約テストの形にそろえる) → W3。詳しくはアーカイブ 2026-10-28_ の末尾
+- 2026-11-03 UI 2: settings.setup の 1 段目(健康診断・⚙「設定の状態」)、2 段目(初期設定の画面。見本は `?setup=1`・合言葉 `sample-key`)、データの取り込みの場所の言い方を、見本のブランチ ui2-setup に(利用者の OK 待ち。最後 19badf9)。秘密の設定(`ccp/secretstore.py`)と設定の型(`ccp/settings_template.py`。読み込むと BigQuery は確認待ち)は見本 ui2-secrets(ui2-setup の上)。次は W1 データの入口の切れ目(W5 の契約テストの形にそろえる) → W3。詳しくはアーカイブ 2026-10-28_ の末尾
 
 ## 3. 次にやること
 

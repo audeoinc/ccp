@@ -284,6 +284,23 @@ async def skip(step: str, request: Request) -> dict[str, Any]:
     return {"success": True, "data": _view()}
 
 
+@router.post("/template")
+async def load_template(request: Request) -> dict[str, Any]:
+    """ほかのサーバーの設定の型を読み込む。DB に書くので、DB の段のあと"""
+    if not active():
+        return _closed()
+    if not _key_ok(request):
+        return _need_key()
+    if not _state["db_ok"]:
+        return {"success": False, "error": {"message": "DB の段が済んでいません"}}
+    from . import appsettings, settings_template
+
+    try:
+        return {"success": True, "data": await settings_template.apply((await request.json()) or {}, "初期設定")}
+    except appsettings.Invalid as e:
+        return {"success": False, "error": {"message": str(e), "code": "bad_template"}}
+
+
 @router.post("/finish")
 async def finish(request: Request) -> dict[str, Any]:
     """DB の段が済んでいれば、初期設定を終えて、ふつうに動き始める(起動し直さない)。健康診断の結果を返す"""

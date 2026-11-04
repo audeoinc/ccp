@@ -227,6 +227,8 @@ async def _sync(out: _Out) -> None:
     from . import bq
     from .bq_import import SETTINGS_NAME, env_disabled, latest, parse_settings
 
+    if appsettings.pending():
+        out.add("sync", "warn", "設定の型から写した BigQuery の表の場所が、確認待ちです。確認が通るまで取り込みません", "⚙ →「データの取り込み」の「確認して使い始める」を押す", goto="dataimport")
     if env_disabled():
         out.add("sync", "warn", "定期の取り込みは、環境変数(BQ_AUTO_SYNC=0)で止めています(画面の入・切は効きません)", "画面で決めるには、サーバーの設定からその行を消して、起動し直す", "dataimport")
     elif parse_settings(appsettings.raw(SETTINGS_NAME))["enabled"]:

@@ -56,6 +56,11 @@ export const SetupService: typeof Real = {
     steps[step].skipped = true
     return { data: view() }
   },
+  importTemplate: async (template) => {
+    await wait()
+    if ((template as { kind?: string })?.kind !== 'ccp-settings-template') return { error: '設定の型のファイルではありません' }
+    return { data: { dropped: [], pending: true } }
+  },
   finish: async () => {
     finished = true
     return { data: { needed: false } }

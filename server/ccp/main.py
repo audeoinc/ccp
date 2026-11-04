@@ -26,6 +26,7 @@ from .approvals import router as approvals_router
 from .appsettings import router as appsettings_router
 from .health import router as health_router
 from .secretstore import router as secrets_router
+from .settings_template import router as template_router
 from .setup import router as setup_router
 from .assets import router as assets_router
 from .bq_import import router as bq_router
@@ -157,6 +158,7 @@ app.include_router(bq_router)
 # 設定の状態は /api/settings/health。/api/settings/{まとめ} より先に置く(health をまとめの名前と読ませない)
 app.include_router(health_router)
 app.include_router(secrets_router)
+app.include_router(template_router)
 app.include_router(setup_router)
 app.include_router(appsettings_router)
 app.include_router(policies_router)

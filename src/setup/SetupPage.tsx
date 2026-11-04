@@ -18,6 +18,7 @@ import {
   tokens,
 } from '@fluentui/react-components'
 import { CheckmarkCircleRegular, PlugConnectedRegular, SaveRegular } from '@fluentui/react-icons'
+import { TemplateFileButton } from './TemplateFileButton'
 import { SetupService, setSetupKey, type SetupResult, type SetupState, type SetupStep, type SetupStepId } from '../data/setup'
 import { useT } from '../i18n'
 import { typo } from '../typo'
@@ -186,6 +187,7 @@ export function SetupPage() {
   const [open, setOpen] = useState<SetupStepId | 'finish' | null>(null)
   const [error, setError] = useState('')
   const [finishing, setFinishing] = useState(false)
+  const [imported, setImported] = useState(false)
 
   const take = useCallback((st: SetupState) => {
     setState(st)
@@ -265,7 +267,22 @@ export function SetupPage() {
               )}
             </span>
             {state?.file && <span className={s.note}>{t(`値は ${state.file} に書きました(秘密を含むので、人に渡さない・Git に入れない)。`, `Values were written to ${state.file} (contains secrets; do not share or commit).`)}</span>}
+            <span className={s.note}>{t('ほかのサーバーと同じ設定にするなら、そのサーバーの ⚙ →「設定の状態」で書き出した設定の型を読み込めます(AI の設定と BigQuery の表の場所。秘密と DB のつなぎ先は入っていません)。', 'To match another server, import the template exported from its Settings → Settings health (AI settings and BigQuery locations; secrets and the database connection are not included).')}</span>
+            {imported && <MessageBar intent="success" layout="multiline"><MessageBarBody>{t('設定の型を読み込みました。BigQuery の表の場所は、始めたあとに ⚙ →「データの取り込み」で確認するまで、取り込みません。', 'Template imported. BigQuery locations are not imported from until you confirm them in Settings → Data import after starting.')}</MessageBarBody></MessageBar>}
             <div className={s.actions}>
+              <TemplateFileButton
+                disabled={!dbDone || finishing}
+                onError={setError}
+                onPick={(template) => {
+                  setError('')
+                  void SetupService.importTemplate(template).then((r) => {
+                    if (r.data) setImported(true)
+                    else setError(r.error ?? '')
+                  })
+                }}
+              >
+                {t('設定の型を読み込む', 'Import a settings template')}
+              </TemplateFileButton>
               {finishing && <Spinner size="extra-tiny" />}
               <Button appearance="primary" icon={<CheckmarkCircleRegular />} disabled={!dbDone || finishing} onClick={() => void finish()}>
                 {t('始める', 'Start')}

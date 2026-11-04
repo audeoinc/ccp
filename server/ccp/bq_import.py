@@ -396,6 +396,9 @@ async def sync(force: bool = False, only: list[str] | None = None, trigger: str 
     global _last_check
     if not bq.configured():
         return {"configured": False, "imported": [], "failed": [], "outputs": []}
+    # 設定の型から写した表の場所は、確認が通るまで読まない(ほかのリージョンの表を取り込まないように)
+    if appsettings.pending():
+        return {"configured": True, "imported": [], "failed": [], "skipped": "template", **(await status())}
     async with _lock:
         if trigger == "open":
             # 自動が「入」なら、開いたときは読まない(定期の取り込みが読む。二重に読まないため)

@@ -27,6 +27,8 @@ export interface SettingsView {
   copiedFromEnvAt?: string | null
   history: SettingsChange[]
   choices: { thinking?: string[] }
+  /** 設定の型から写した BigQuery の表の場所が、確認待ち */
+  pendingTemplate?: { exportedAt?: string } | null
 }
 
 /** いま使える Gemini のモデル(サーバーが Vertex AI から読み、1 日覚える) */

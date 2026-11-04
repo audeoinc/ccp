@@ -52,6 +52,8 @@ const mockServices = (): Plugin => ({
     if (/(?:^|\/)data\/setup$/.test(source)) return fileURLToPath(new URL('./src/mock/setup.ts', import.meta.url))
     // 秘密の設定(src/data/secrets)も、値を持たない身代わりに
     if (/(?:^|\/)data\/secrets$/.test(source)) return fileURLToPath(new URL('./src/mock/secrets.ts', import.meta.url))
+    // 設定の型(src/data/settingsTemplate)も、身代わりに
+    if (/(?:^|\/)data\/settingsTemplate$/.test(source)) return fileURLToPath(new URL('./src/mock/settingsTemplate.ts', import.meta.url))
     // 設定の健康診断(src/data/health)も、見本の結果を返す身代わりに
     if (/(?:^|\/)data\/health$/.test(source)) return fileURLToPath(new URL('./src/mock/health.ts', import.meta.url))
     // だれが開いているか(src/data/me)は、ログインなしの身代わりに

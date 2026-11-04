@@ -6,6 +6,7 @@ import { Badge, Button, MessageBar, MessageBarBody, Spinner, makeStyles, tokens 
 import { ArrowClockwiseRegular, ArrowRightRegular } from '@fluentui/react-icons'
 import { HealthService, type HealthItem, type HealthReport } from './data/health'
 import { setHealthCounts } from './healthState'
+import { SettingsTemplateSection } from './SettingsTemplateSection'
 import { locale, useT } from './i18n'
 import { typo } from './typo'
 
@@ -128,6 +129,7 @@ export function SettingsHealthPanel({ go }: { go: (id: string) => void }) {
           'Running python -m ccp.cli check on the server shows the same rows. Rows without "Fix" are fixed in the server settings (file or environment variables).',
         )}
       </span>
+      <SettingsTemplateSection go={go} />
     </div>
   )
 }

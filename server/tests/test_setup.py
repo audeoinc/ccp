@@ -158,3 +158,70 @@ class SecretsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TemplateTest(unittest.TestCase):
+    """設定の型: 秘密を入れない・読み込むと確認待ち・確認待ちのあいだは取り込まない"""
+
+    def setUp(self) -> None:
+        from ccp import appsettings, settings_template
+
+        self.a, self.t = appsettings, settings_template
+        self.saved: dict = {}
+
+        async def fake_save(name, value, by, changes):  # noqa: ANN001
+            self.saved[name] = value
+
+        for p in (
+            mock.patch.object(appsettings, "save", fake_save),
+            mock.patch.object(appsettings, "ensure", mock.AsyncMock()),
+            mock.patch.object(appsettings, "_rows", {}),
+        ):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _template(self, **groups) -> dict:
+        return {"kind": self.t.KIND, "version": self.t.VERSION, "exportedAt": "2026-11-04T00:00:00Z", "dropped": [], "groups": groups}
+
+    def test_export_has_no_secrets_and_drops_url_with_token(self) -> None:
+        env = {"APP_PASSWORD": "pw-for-test", "AI_OUTLET_TOKEN": "tok-for-test", "DATABASE_URL": "postgresql://u:db-pw@h/d"}
+        self.a._rows["ai"] = {"value": {"outlet_url": "https://layer.example/ask?code=url-secret"}}
+        with mock.patch.dict(os.environ, env):
+            out = self.t.build()
+        text = str(out)
+        for secret in ("pw-for-test", "tok-for-test", "db-pw", "url-secret"):
+            self.assertNotIn(secret, text)
+        self.assertEqual(out["dropped"], ["ai.outlet_url"])
+
+    def test_import_turns_scheduled_off_and_marks_pending(self) -> None:
+        tpl = self._template(ai={"model": "gemini-3.5-flash"}, bq={"project": "p", "spu": "p.d.spu"}, **{"bq.sync": {"enabled": True}})
+        result = asyncio.run(self.t.apply(tpl, "test"))
+        self.assertTrue(result["pending"])
+        self.assertFalse(self.saved["bq.sync"]["enabled"])
+        self.assertEqual(self.saved["bq"]["spu"], "p.d.spu")
+        self.assertIn(self.a.PENDING, self.saved)
+
+    def test_import_keeps_the_outlet_url_it_did_not_carry(self) -> None:
+        self.a._rows["ai"] = {"value": {"outlet_url": "https://here.example/ask"}}
+        tpl = self._template(ai={"model": "gemini-3.5-flash", "outlet_url": ""})
+        tpl["dropped"] = ["ai.outlet_url"]
+        asyncio.run(self.t.apply(tpl, "test"))
+        self.assertEqual(self.saved["ai"]["outlet_url"], "https://here.example/ask")
+
+    def test_import_refuses_other_files_without_writing(self) -> None:
+        for bad in ({"kind": "other"}, {"kind": self.t.KIND, "version": 99}, self._template(bq={"spu": "no dots"})):
+            with self.assertRaises(self.a.Invalid):
+                asyncio.run(self.t.apply(bad, "test"))
+        self.assertEqual(self.saved, {})
+
+    def test_sync_does_not_read_while_pending(self) -> None:
+        from ccp import bq, bq_import
+
+        self.a._rows[self.a.PENDING] = {"value": {"exportedAt": "x"}}
+        with mock.patch.object(bq, "configured", return_value=[object()]), mock.patch.object(bq, "client") as client, mock.patch.object(bq_import, "status", mock.AsyncMock(return_value={})):
+            out = asyncio.run(bq_import.sync(True, None, "button"))
+        self.assertEqual(out["skipped"], "template")
+        client.assert_not_called()
+        # 解くと、空の行が最新になる
+        self.a._rows[self.a.PENDING] = {"value": {}}
+        self.assertIsNone(self.a.pending())

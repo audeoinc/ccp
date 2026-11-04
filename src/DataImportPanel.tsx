@@ -31,8 +31,10 @@ import {
   TableRow,
   makeStyles,
   tokens,
+  MessageBarActions,
 } from '@fluentui/react-components'
 import { ArrowSyncRegular, ChevronDownRegular, ChevronRightRegular, MoreHorizontalRegular, SearchRegular } from '@fluentui/react-icons'
+import { SettingsTemplateService } from './data/settingsTemplate'
 import { DataImportService, type ImportCheck, type ImportOutput, type ImportRecord, type ImportStatus } from './data/dataImport'
 import { setImportStatus } from './dataImportState'
 import { bqOutputLabel } from './gcp/bq'
@@ -274,9 +276,21 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
     // 止めた理由は、その行の下に出る。ここでは、どの出力かだけを言う
     if (r.data.failed.length)
       setNotice({ intent: 'warning', text: t('取り込めなかった出力があります(前のデータのまま使います): ', 'Some outputs were not imported (the previous data is kept): ') + r.data.failed.map((f) => label(f.name)).join(t('・', ', ')) })
+    else if (r.data.skipped === 'template') setNotice({ intent: 'warning', text: t('設定の型から写した表の場所が確認待ちなので、取り込みませんでした。上の「確認して使い始める」を押してください。', 'Not imported: locations copied from a template await confirmation. Press "Check and start using" above.') })
     else if (r.data.skipped === 'busy') setNotice({ intent: 'warning', text: t('ほかの取り込みの最中です。少し待ってから押してください', 'Another import is running. Try again shortly') })
     else if (r.data.imported.length) setNotice({ intent: 'success', text: t('取り込みました: ', 'Imported: ') + r.data.imported.map((x) => label(x.name)).join(t('・', ', ')) })
     else setNotice({ intent: 'success', text: t('読み直しました(取り込むデータはありませんでした)', 'Checked (nothing to import)') })
+  }
+
+  // 設定の型から写した表の場所の確認。いまの場所を読んで、NG がなければ取り込めるようになる
+  const confirmTemplate = async () => {
+    setBusy('*')
+    setNotice(null)
+    const r = await SettingsTemplateService.confirm()
+    setBusy(null)
+    if (!r.data) return setNotice({ intent: 'error', text: r.error ?? '' })
+    await loc.reload()
+    setNotice({ intent: 'success', text: t('確認が通りました。取り込めるようになりました。定期の取り込みは切のままなので、使うなら入にしてください。', 'Check passed. Importing is enabled. Scheduled import stays off; turn it on if you use it.') })
   }
 
   const check = async (names?: string[]) => {
@@ -358,6 +372,16 @@ export function DataImportPanel({ onImported }: { /** 取り込めたら、商�
               'Stopped by an environment variable (BQ_AUTO_SYNC=0). The switch here has no effect. To control it here, remove that line from the server settings and restart.',
             )}
           </MessageBarBody>
+        </MessageBar>
+      )}
+      {loc.view?.pendingTemplate && (
+        <MessageBar intent="warning" layout="multiline">
+          <MessageBarBody>{t('表の場所は、ほかのサーバーの設定の型から写したものです。ここのリージョンの表か確認するまで、取り込みません。行を開いて場所を直してから、確認してください。', 'These locations were copied from another server’s template. Nothing is imported until you confirm they are right for this region. Open a row to correct a location, then confirm.')}</MessageBarBody>
+          <MessageBarActions>
+            <Button size="small" disabled={!!busy} onClick={() => void confirmTemplate()}>
+              {t('確認して使い始める', 'Check and start using')}
+            </Button>
+          </MessageBarActions>
         </MessageBar>
       )}
       {notice && (
