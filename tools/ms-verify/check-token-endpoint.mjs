@@ -26,6 +26,14 @@ if (sdk) {
   console.log('Agents SDK 用の接続先だったので、Direct Line のトークン エンドポイントを組み立てて試す')
 }
 
+// 別のエージェントを試すとき: --schema-name <設定の名前>(例: COPILOT_SCHEMA_GH)の値で、URL のスキーマ名を差し替える(同じ環境のホストのまま)
+const schemaKey = process.argv.includes('--schema-name') ? process.argv[process.argv.indexOf('--schema-name') + 1] : null
+if (schemaKey) {
+  if (!env[schemaKey]) throw new Error(`設定が空です: ${schemaKey}(${ENV_FILE})`)
+  url = new URL(url.pathname.replace(/(\/botsbyschema\/)[^/]+/, `$1${encodeURIComponent(env[schemaKey])}`) + url.search, url.origin)
+  console.log(`スキーマ名を設定の ${schemaKey} に差し替えて試す`)
+}
+
 const res = await fetch(url)
 const text = await res.text()
 let body = {}

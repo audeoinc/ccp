@@ -31,7 +31,7 @@ const TARGETS = {
     about: 'AWS などの Linux のサーバーで動かす CCP',
     guide: 'docs/AWS.md',
     // 手順書・操作のスクリプト・設定の見本がないと、立ち上げられない(作り忘れ・規則の書き違いで落ちたら、ここで止める)
-    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'docs/AWS.md', 'docs/WORKBENCH.md', 'docs/DATA_TABLES.md', 'docs/API.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
+    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'server/schema.base.json', 'docs/AWS.md', 'docs/AWS_CUSTOMIZE.md', 'docs/WORKBENCH.md', 'docs/DATA_TABLES.md', 'docs/API.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
   },
   workbench: {
     name: 'Workbench 版',
@@ -88,7 +88,7 @@ const RULES = [
   ['include', /^server\/tests\//],
   ['include', /^server\/(requirements(-tools)?\.txt|schema\.json|seed\.json|workbench\.env\.example)$/],
   // 道具(Workbench の操作・npm run verify の確認・初期データ・文書の生成)
-  ['include', /^scripts\/(workbench\.sh|check-(schema|approvals|policy|save|readiness|utm|parts|slots|template-ai|scale)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
+  ['include', /^scripts\/(workbench\.sh|schema-overlay\.mjs|client-diff\.mjs|check-(schema|client-changes|approvals|policy|save|readiness|utm|parts|slots|template-ai|scale)\.mjs|verify\.mjs|export-seed\.mjs|feature-reasons\.py|flows-sheet\.py)$/],
   // 文書(Workbench の手引き・設計・機能・開発の経緯・バックログ・ソースマップ)
   ['include', /^docs\//],
 ]
@@ -206,6 +206,10 @@ for (const [path, f] of files) {
     if (next !== text) f.data = Buffer.from(next)
   }
 }
+
+// 届いたままのデータ定義の写し。利用先が共通の列を変えたかを、verify がこれと比べる(check-client-changes.mjs)。
+// 開発側には置かない(開発側の変更は止めない)。版を取り込むと一緒に新しくなるので、新しい版の変更では止まらない
+files.set('server/schema.base.json', { data: files.get('server/schema.json').data, mode: 0o644 })
 
 // 表と列・API の一覧を、ZIP に入る中身から作る(手で書く文書にすると、列や API を足したときに古くなるため。
 // 利用先の Claude が、利用者に聞かれて答える・調べるのに使う)

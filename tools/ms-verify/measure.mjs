@@ -8,12 +8,14 @@
 //                                 プロンプトは名前(AIB_PROMPT_NAME。既定「CCP AI 出口の検証 中継」)で探し、頼みの文を入力 request に入れる
 //                                 (Predict は外から直接呼べず「Source is null」で断られた。手順書 15.5)
 //   node measure.mjs --via flow   方式 3 を、Power Automate の流れを窓口にして呼ぶ(AIB_FLOW_URL に {"request": …} を POST し、{"text": …} を受け取る)
+//   node measure.mjs --via dl --secret-name DIRECT_LINE_SECRET_GH   別のエージェントの鍵(設定の別の名前)で送る
 //   node measure.mjs --runs 5     どれも 5 回ずつ送る
 //   node measure.mjs --only T3    T3 だけ
 //   node measure.mjs --model "GPT Chat Latest"   記録に書くモデルの名前(設定の MODEL_LABEL より優先)
 //   node measure.mjs --only T6 --image images/<写真>.jpg   T6 を、画像を付けて送る(写真は各自で用意する。リポジトリには入れない)
 //   node measure.mjs --only T9 --image a.jpg --image b.jpg …   T9 は画像を何枚も付ける(--image を並べる。最大 8 枚)。T6〜T8 は 1 枚
 //   node measure.mjs --only T9 --image … --theme "…" --product "…" --strengths "…"   T9 の配信と商品を、写真に合わせる
+//   node measure.mjs --via flow --pad --only T9 --image …   流れの画像の欄の足りない分を白い画像で埋める(空の欄は断られるため)
 //   node measure.mjs --self-test  つながずに、確かめの仕組みだけを試す
 //
 // モデルはエージェントの画面で選ぶ(つなぎ方からは分からない)。選んだ名前を MODEL_LABEL か --model で渡し、記録に残す。
@@ -25,6 +27,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import zlib from 'node:zlib'
 import { fileURLToPath } from 'node:url'
 import { TESTS, SAMPLES, IMAGE_TESTS } from './tests.mjs'
 
@@ -54,6 +57,9 @@ if (args.includes('--self-test')) {
 }
 
 const via = opt('--via') ?? 'sdk'
+// 別のエージェントの Direct Line の鍵を、設定の別の名前で持つとき(例: --secret-name DIRECT_LINE_SECRET_GH)。いつもの鍵を書き換えずに済む
+const DL_SECRET_NAME = opt('--secret-name') ?? 'DIRECT_LINE_SECRET'
+if (!/^[A-Z_]+$/.test(DL_SECRET_NAME)) throw new Error(`--secret-name は大文字と _ だけの名前です: ${DL_SECRET_NAME}`)
 if (!['sdk', 'dl', 'aib', 'flow'].includes(via)) throw new Error(`--via は sdk・dl・aib・flow です: ${via}`)
 
 function readEnv() {
@@ -64,7 +70,7 @@ function readEnv() {
     if (m) env[m[1]] = m[2]
   }
   const need =
-    via === 'dl' ? ['DIRECT_LINE_SECRET'] : via === 'flow' ? ['AIB_FLOW_URL'] : via === 'aib' ? ['TENANT_ID', 'AIB_CLIENT_ID', 'AIB_CLIENT_SECRET', 'DATAVERSE_URL'] : ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'TENANT_ID', 'APP_CLIENT_ID']
+    via === 'dl' ? [DL_SECRET_NAME] : via === 'flow' ? ['AIB_FLOW_URL'] : via === 'aib' ? ['TENANT_ID', 'AIB_CLIENT_ID', 'AIB_CLIENT_SECRET', 'DATAVERSE_URL'] : ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'TENANT_ID', 'APP_CLIENT_ID']
   const missing = need.filter((k) => !env[k])
   if (missing.length) throw new Error(`設定が空です: ${missing.join(', ')}(${ENV_FILE})`)
   return env
@@ -268,14 +274,63 @@ async function askOnceAib(dv, prompt, images) {
 
 // ---- 方式 3 の窓口: Power Automate の流れ。流れの URL には署名の鍵が入ることがあるので、URL は画面に出さない
 // 画像は、Power Automate のファイルの形({"$content-type", "$content": base64})で image に入れる。
-// 画像は別の流れ(画像の入力を持つプロンプト)に送るので、URL は AIB_FLOW_IMAGE_URL。プロンプトの画像の入力は 1 つなので、1 枚だけ
-async function askOnceFlow(url, prompt, images) {
-  if (images.length > 1) throw new Error('流れで送れる画像は 1 枚まで(プロンプトの画像の入力が 1 つのため)')
-  const payload = { request: prompt }
-  if (images.length) {
-    const [, mime, b64] = images[0].contentUrl.match(/^data:([^;]+);base64,(.*)$/)
-    payload.image = { '$content-type': mime, '$content': b64 }
+// 画像は別の流れ(画像の入力を持つプロンプト)に送るので、URL は AIB_FLOW_IMAGE_URL。
+// 送れる枚数はプロンプトの画像の入力の数(AIB_FLOW_IMAGE_MAX。既定 1)。1 枚目は imageBase64、何枚もなら imageBase64_1〜_N にも入れる
+// プロンプトの画像の入力は、空(null)だと「入力パラメーターがモデルに対して無効です」で断られる(手順書 15.8)。
+// --pad を付けると、足りない欄を小さな白い画像で埋め、頼みの文に「空の画像は無視する」と足す(層が枚数の違いを吸収する形の試し)
+function blankPng(size = 64) {
+  const crc = (buf) => {
+    let c = ~0
+    for (const b of buf) {
+      c ^= b
+      for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1))
+    }
+    return ~c >>> 0
   }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4)
+    len.writeUInt32BE(data.length)
+    const td = Buffer.concat([Buffer.from(type), data])
+    const c = Buffer.alloc(4)
+    c.writeUInt32BE(crc(td))
+    return Buffer.concat([len, td, c])
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(size, 0)
+  ihdr.writeUInt32BE(size, 4)
+  ihdr[8] = 8 // 8 ビット
+  ihdr[9] = 0 // グレー
+  const raw = Buffer.alloc((size + 1) * size, 0xff)
+  for (let y = 0; y < size; y++) raw[y * (size + 1)] = 0 // 各行の先頭はフィルターなし
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+  return png.toString('base64')
+}
+
+async function askOnceFlow(url, prompt, images, max = 1, pad = false) {
+  if (images.length > max) throw new Error(`流れで送れる画像は ${max} 枚まで(プロンプトの画像の入力の数。${ENV_FILE} の AIB_FLOW_IMAGE_MAX)`)
+  if (pad && images.length && images.length < max) {
+    prompt += `\n画像 ${images.length}〜画像 ${max - 1} は、枠を埋めるための空の白い画像です。無視し、images にも picks にも書かない。`
+  }
+  const payload = { request: prompt }
+  if (pad && images.length && images.length < max) {
+    const blank = blankPng()
+    for (let i = images.length; i < max; i++) payload[`imageBase64_${i + 1}`] = blank
+  }
+  images.forEach((img, i) => {
+    const [, mime, b64] = img.contentUrl.match(/^data:([^;]+);base64,(.*)$/)
+    // 流れの Image の欄には base64ToBinary(triggerBody()?['imageBase64']) を式で入れる。
+    // 欄は受けた中身を自分で base64 にするので、base64 の文をそのまま入れると 2 重に包まれて読めない(MS_AI_VERIFY.md 15.8)
+    if (i === 0) {
+      payload.image = { '$content-type': mime, '$content': b64 }
+      payload.imageBase64 = b64
+    }
+    if (max > 1) payload[`imageBase64_${i + 1}`] = b64
+  })
   const t0 = performance.now()
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
   const body = await res.text()
@@ -299,7 +354,7 @@ let ask
 if (via === 'flow') {
   ask = (prompt, images) => {
     if (images.length && !env.AIB_FLOW_IMAGE_URL) throw new Error(`画像の流れの URL がありません(${ENV_FILE} の AIB_FLOW_IMAGE_URL)`)
-    return askOnceFlow(images.length ? env.AIB_FLOW_IMAGE_URL : env.AIB_FLOW_URL, prompt, images)
+    return askOnceFlow(images.length ? env.AIB_FLOW_IMAGE_URL : env.AIB_FLOW_URL, prompt, images, Number(env.AIB_FLOW_IMAGE_MAX ?? 1), args.includes('--pad'))
   }
 } else if (via === 'aib') {
   // トークンとプロンプトの ID は 1 度だけ取る(層でも使い回す形)。表の「会話を始める」は 0 にし、取った秒数はここに出す
@@ -310,7 +365,7 @@ if (via === 'flow') {
   ask = (prompt, images) => askOnceAib(dv, prompt, images)
 } else if (via === 'dl') {
   // 窓口は、チャネルの画面に出る URL(地域ごとに違うことがある)。なければ既定の窓口
-  const dl = { base: `${(env.DIRECT_LINE_ENDPOINT || 'https://directline.botframework.com').replace(/\/+$/, '').replace(/\/v3\/directline$/, '')}/v3/directline`, secret: env.DIRECT_LINE_SECRET }
+  const dl = { base: `${(env.DIRECT_LINE_ENDPOINT || 'https://directline.botframework.com').replace(/\/+$/, '').replace(/\/v3\/directline$/, '')}/v3/directline`, secret: env[DL_SECRET_NAME] }
   ask = (prompt, images) => askOnceDl(dl, prompt, images)
 } else {
   const settings = new ConnectionSettings({ environmentId: env.COPILOT_ENVIRONMENT_ID, agentIdentifier: env.COPILOT_AGENT_SCHEMA_NAME })

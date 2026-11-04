@@ -16,7 +16,7 @@ AWS 版の ZIP を受け取って、サーバーで CCP を立ち上げる・設
 5. 最初の管理者を作る(3.6)
 6. ⚙ →「データの取り込み」で BigQuery の表の場所を入れて取り込む(4 章)。⚙ →「AI の設定」でモデルを確かめる(5 章)
 7. ⚙ →「設定の状態」で、全部の行が「済み」になったのを見る(6 章)
-8. 新しい版が届いたら、`scripts/workbench.sh update`(8 章)
+8. 新しい版が届いたら、`vendor` に入れて `main` にマージし、`scripts/workbench.sh update`(8 章)
 
 ## 2. 用意するもの(CCP の外で、サーバーを立てる人の作業)
 
@@ -81,7 +81,7 @@ gcloud iam workload-identity-pools create-cred-config \
 
 ### 3.1 リポジトリを取得する
 
-ZIP を利用先の Git に入れ(`CCP AWS 版 <版>` でコミット)、サーバーで取得します。
+ZIP を利用先の Git に入れ(`CCP AWS 版 <版>` でコミット)、サーバーで取得します。CCP がリポジトリの中のフォルダ(`ccp/`)にあるときは、以下のコマンドをそのフォルダで実行します。
 
 ```bash
 git clone <利用先の Git の URL> ~/ccp
@@ -212,7 +212,7 @@ scripts/workbench.sh status
 | 使うモデル | Vertex AI の Gemini のモデル。一覧は、いまこの環境(`GOOGLE_CLOUD_PROJECT`・`GOOGLE_CLOUD_LOCATION`)で使えるもの(1 日覚える。「一覧を読み直す」で読み直す)。一覧にないものは「そのほか(名前を書く)」 |
 | 考える深さ | 最小 / 少し / ふつう / 深く(`minimal` / `low` / `medium` / `high`)。1 回の下書きで 6〜9 回呼ぶので、ふだんは「少し」 |
 | 同時に呼ぶ数 | AI を同時に呼ぶ数の上限(1〜32)。混み合い(429)が出るときは減らす。AI の出口を使うときも効く |
-| AI の出口(空なら Gemini) | URL を入れると、AI をすべて、その層(ほかの AI)に頼む。合言葉は環境変数 `AI_OUTLET_TOKEN`。待ち時間(秒)は 5〜600。層が失敗しても、自動で Gemini には戻さない([AI_OUTLET.md](AI_OUTLET.md)) |
+| AI の出口(空なら Gemini) | URL を入れると、AI をすべて、その層(ほかの AI)に頼む。合言葉は環境変数 `AI_OUTLET_TOKEN`。待ち時間(秒)は 5〜600。層が失敗しても、自動で Gemini には戻さない([AI_OUTLET.md](AI_OUTLET.md)。Microsoft の AI に替えるときは [MS_AI_SETUP.md](MS_AI_SETUP.md)) |
 
 - 「試す」で、保存の前の値で AI を短く 1 回呼びます(何も保存しない)。
 - モデル・考える深さ・出口を変えて「保存」すると、保存の前に 1 回試し、通らなければ保存しません(いまの設定のまま動き続ける)。理由を見たうえで、それでも保存するときは「それでも保存する」。
@@ -294,8 +294,8 @@ ID トークンに `email` を足す・ログインできる人を絞る、な�
 
 ## 8. 更新の手順(新しい版が届いたとき)
 
-1. 新しい版の ZIP を、利用先の Git に入れる(`CCP AWS 版 <版>` でコミット)。
-2. サーバーで:
+1. 新しい版の ZIP をブランチ `vendor` に入れ、`main` にマージして確認する。**総入れ替えはしません**(AWS 側の調整を残すため)。手順は [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の 5 章です。
+2. 人の指示があったら、サーバーで:
 
    ```bash
    cd ~/ccp
@@ -340,16 +340,19 @@ ID トークンに `email` を足す・ログインできる人を絞る、な�
 1. `scripts/workbench.sh check`(または ⚙ →「設定の状態」)の `[NG]` の行を見る。
 2. `scripts/workbench.sh log` で、サーバーのログの最後を見る。
 3. [WORKBENCH.md](WORKBENCH.md) の 5 章「よくあるつまずき」の表も見る。
-4. それでも直らなければ、`check` の出力とログの最後を、開発の担当に伝える(**サーバーの上でコードを直さない**。次の版で上書きされる)。
+4. それでも直らなければ、`check` の出力とログの最後を、開発の担当に伝える(**サーバーの上でコードを直さない**。`update` が止まる。AWS 側の調整は [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) の手順で行う)。
 
 ## 10. 関係する文書
 
 | 文書 | 中身 |
 |---|---|
+| [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md) | スキーマ・画面を AWS 側で変える決まりと、新しい版の取り込み(マージ)の手順 |
 | [WORKBENCH.md](WORKBENCH.md) | コマンドの意味・引っ越し用のパック・環境変数の全部の一覧(付録 A)など、この文書の補足 |
 | [BIGQUERY_EXPORT.md](BIGQUERY_EXPORT.md) | BigQuery から出してもらう出力と列の仕様(利用先のデータの担当に渡す) |
 | [BIGQUERY.md](BIGQUERY.md) | BigQuery からの取り込みの仕組み |
 | [AI_OUTLET.md](AI_OUTLET.md) | AI の出口(ほかの AI を使う層)の約束と見本 |
+| [MS_AI_SETUP.md](MS_AI_SETUP.md) | AI を Microsoft の Copilot Studio(Direct Line)・AI Builder に替えるとき: 検証で分かったこと・作るもの(層)・準備・確かめ直し・つなぎ方(0 章から読む) |
+| [MS_AI_VERIFY.md](MS_AI_VERIFY.md) | その検証の手順と、測った数字の記録 |
 | [FEATURES.md](FEATURES.md) | 機能の一覧 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 設計の約束事(0.5 章: 置き先の違いを設定で吸収する) |
 | [DATA_TABLES.md](DATA_TABLES.md) | CCP の DB の表と列の一覧 |

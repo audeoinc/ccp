@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.json"
+# AWS 側の列・表(docs/AWS_CUSTOMIZE.md の 4 章)。開発側には置かない。ないときは、schema.json だけで動く
+OVERLAY_PATH = Path(__file__).resolve().parent / "client" / "schema.json"
 
 SQL_TYPES = {
     "text": "text",
@@ -36,6 +38,14 @@ IGNORED_ON_WRITE = {"id", "created_on", "modified_on"}
 
 class BadRequest(ValueError):
     """依頼の内容が正しくない(400 で返す)"""
+
+
+class SchemaOverlayError(RuntimeError):
+    """重ねるファイルを読めない。黙って飛ばすと、足した列への保存や取り込みが、あとで分かりにくく失敗するので、起動を止める"""
+
+    def __init__(self, problems: list[str]) -> None:
+        self.problems = problems
+        super().__init__("server/ccp/client/schema.json を重ねられません。\n- " + "\n- ".join(problems) + "\n次にやること: 上の行を直してから、もう一度起動してください(決まりは docs/AWS_CUSTOMIZE.md の 4 章)")
 
 
 @dataclass
@@ -206,11 +216,191 @@ class Schema:
 
 _cache: Schema | None = None
 
+_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+_RESERVED = {"id", "state_code", "created_on", "modified_on"}
+_ON_DELETE = {"NO ACTION", "CASCADE", "SET NULL"}
+
+
+def _j(v: Any) -> str:
+    return json.dumps(v, ensure_ascii=False, separators=(",", ":"))
+
+
+def _entry_ok(e: Any) -> bool:
+    return isinstance(e, list) and 2 <= len(e) <= 3 and isinstance(e[0], str) and isinstance(e[1], str) and (len(e) == 2 or isinstance(e[2], dict))
+
+
+def _items(t: dict[str, Any], key: str) -> list[Any]:
+    v = t.get(key, [])
+    return v if isinstance(v, list) else []
+
+
+def merge_overlay(base: dict[str, Any], overlay: Any) -> tuple[dict[str, Any], list[str], list[str]]:
+    """schema.json の中身に、重ねるファイルの中身を重ねる。返すのは (重ねた形, 重ねられない理由, 消してよい行)。
+    足すだけ: 共通の列を変える・消す形は受けない(それは共通の変更で、CHANGES.md に書くもの)。
+    同じ決まりを scripts/schema-overlay.mjs(npm run verify)も持つ。食い違いは test_schema_overlay.py が見つける"""
+    merged = json.loads(json.dumps(base))
+    problems: list[str] = []
+    notes: list[str] = []
+    if not isinstance(overlay, dict):
+        return merged, ["いちばん外は { } にしてください"], notes
+    for key in overlay:
+        if key not in ("tables", "choices") and not key.startswith("_"):
+            problems.append(f"{key}: 使えない項目です(使えるのは tables と choices)")
+    tables = merged["tables"]
+    over_tables = overlay.get("tables", {})
+    over_choices = overlay.get("choices", {})
+    if not isinstance(over_tables, dict) or not isinstance(over_choices, dict):
+        return merged, ["tables と choices は { } にしてください"], notes
+    added_tables = {n for n in over_tables if n not in tables}
+    own_choice_columns: set[str] = set()
+
+    # 先に表をそろえる(足した表どうしの参照は、書いた順によらない)
+    for name, t in over_tables.items():
+        if not _NAME.match(name):
+            problems.append(f"{name}: 表の名前は、小文字の英字で始まる英数字と _ にしてください")
+            continue
+        if not isinstance(t, dict):
+            problems.append(f"{name}: 表の定義は {{ }} にしてください")
+            continue
+        for key in t:
+            if key not in ("columns", "lookups", "retired", "unique") and not key.startswith("_"):
+                problems.append(f"{name}.{key}: 使えない項目です(使えるのは columns・lookups・retired・unique)")
+            elif key in ("columns", "lookups", "retired", "unique") and not isinstance(t[key], list):
+                problems.append(f"{name}.{key}: [ ] で並べてください")
+        tables.setdefault(name, {"columns": [], "lookups": []})
+
+    for name, t in over_tables.items():
+        if name not in tables or not isinstance(t, dict):
+            continue
+        target = tables[name]
+        have_cols = {c[0]: c for c in target["columns"]}
+        have_lks = {lk[0]: lk for lk in target["lookups"]}
+        for c in _items(t, "columns"):
+            if not _entry_ok(c):
+                problems.append(f"{name}: 列は [名前, 型] か [名前, 型, {{ 指定 }}] にしてください({_j(c)})")
+                continue
+            col = f"{name}.{c[0]}"
+            opts = c[2] if len(c) == 3 else {}
+            if not _NAME.match(c[0]):
+                problems.append(f"{col}: 列の名前は、小文字の英字で始まる英数字と _ にしてください")
+            elif c[0] in _RESERVED:
+                problems.append(f"{col}: どの表にもある列なので、足せません。別の名前にしてください")
+            elif c[1] not in SQL_TYPES:
+                problems.append(f"{col}: 使えない型です: {c[1]}(使える型: {', '.join(SQL_TYPES)})")
+            elif any(k not in ("required", "index") for k in opts):
+                problems.append(f"{col}: 使えない指定です(使えるのは required と index)")
+            elif c[0] in have_lks:
+                problems.append(f"{col}: 同じ名前の参照が、すでにあります。別の名前にしてください")
+            elif c[0] in have_cols:
+                old = have_cols[c[0]]
+                if old[1] != c[1] or (old[2] if len(old) > 2 else {}) != opts:
+                    problems.append(f"{col}: すでにある列と定義が違います(いま: {_j(old)}、重ね: {_j(c)})。別の名前にするか、いまの定義に合わせてください")
+                else:
+                    notes.append(f"{col}: すでに同じ定義の列があります。重ねるファイルから消してかまいません")
+            else:
+                new = [c[0], c[1], opts] if opts else [c[0], c[1]]
+                target["columns"].append(new)
+                have_cols[c[0]] = new
+                if c[1] == "choice":
+                    own_choice_columns.add(col)
+        for lk in _items(t, "lookups"):
+            if not _entry_ok(lk):
+                problems.append(f"{name}: 参照は [名前, 参照先の表] か [名前, 参照先の表, {{ \"onDelete\": … }}] にしてください({_j(lk)})")
+                continue
+            col = f"{name}.{lk[0]}"
+            opts = lk[2] if len(lk) == 3 else {}
+            if not _NAME.match(lk[0]):
+                problems.append(f"{col}: 参照の名前は、小文字の英字で始まる英数字と _ にしてください")
+            elif lk[0] in _RESERVED or lk[0] in have_cols:
+                problems.append(f"{col}: 同じ名前の列が、すでにあります。別の名前にしてください")
+            elif lk[1] not in tables:
+                problems.append(f"{col}: 参照先の表 {lk[1]} がありません")
+            elif any(k != "onDelete" for k in opts) or opts.get("onDelete", "NO ACTION") not in _ON_DELETE:
+                problems.append(f"{col}: 使えない指定です(onDelete に使えるのは {', '.join(sorted(_ON_DELETE))})")
+            elif lk[0] in have_lks:
+                old = have_lks[lk[0]]
+                if old[1] != lk[1] or (old[2] if len(old) > 2 else {}) != opts:
+                    problems.append(f"{col}: すでにある参照と定義が違います。別の名前にするか、いまの定義に合わせてください")
+                else:
+                    notes.append(f"{col}: すでに同じ定義の参照があります。重ねるファイルから消してかまいません")
+            else:
+                new = [lk[0], lk[1], opts] if opts else [lk[0], lk[1]]
+                target["lookups"].append(new)
+                have_lks[lk[0]] = new
+
+    for name, t in over_tables.items():
+        if name not in tables or not isinstance(t, dict):
+            continue
+        target = tables[name]
+        names = {c[0] for c in target["columns"]} | {lk[0] for lk in target["lookups"]}
+        retired = _items(t, "retired")
+        for r in retired:
+            if not isinstance(r, str):
+                problems.append(f"{name}: retired には列の名前を並べてください({_j(r)})")
+            elif r in names:
+                problems.append(f"{name}.{r}: 使っている列を retired にはできません。共通の列を止めるなら、共通の変更として CHANGES.md に書いてください")
+        if retired and not problems:
+            have = target.get("retired", [])
+            target["retired"] = [*have, *[r for r in retired if r not in have]]
+        unique = _items(t, "unique")
+        if unique and name not in added_tables:
+            # 一意にする SQL は、重なった行を消す。共通の表の行を、重ねるファイルだけで消させない
+            problems.append(f"{name}: unique は、重ねるファイルで足した表にだけ書けます(一意にするときに、重なった行が消えるため)")
+        elif unique:
+            for u in unique:
+                if not isinstance(u, list) or not u or any(not isinstance(c, str) or c not in names for c in u):
+                    problems.append(f"{name}: unique の列がありません: {_j(u)}")
+            target["unique"] = unique
+
+    choices = merged.setdefault("choices", {})
+    for col, values in over_choices.items():
+        if col not in own_choice_columns:
+            problems.append(f"{col}: 重ねるファイルで足した choice の列にだけ、選択肢を書けます")
+        elif not isinstance(values, list) or not values or any(not isinstance(v, str) for v in values):
+            problems.append(f"{col}: 選択肢は、文字の値を 1 つ以上並べてください")
+        else:
+            choices[col] = values
+    for col in sorted(own_choice_columns - set(over_choices)):
+        problems.append(f"{col}: choice の列には、choices に選択肢を書いてください")
+    return merged, problems, notes
+
+
+def overlay_status() -> dict[str, Any] | None:
+    """重ねるファイルの様子(健康診断のため)。ファイルがなければ None"""
+    if not OVERLAY_PATH.exists():
+        return None
+    try:
+        overlay = json.loads(OVERLAY_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return {"problems": [f"読めません({type(e).__name__}: {e})"], "notes": [], "tables": 0, "columns": 0}
+    base = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    merged, problems, notes = merge_overlay(base, overlay)
+    return {
+        "problems": problems,
+        "notes": notes,
+        "tables": len(merged["tables"]) - len(base["tables"]),
+        "columns": sum(len(t["columns"]) + len(t["lookups"]) for t in merged["tables"].values()) - sum(len(t["columns"]) + len(t["lookups"]) for t in base["tables"].values()),
+    }
+
+
+def _read_raw() -> dict[str, Any]:
+    raw = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    if not OVERLAY_PATH.exists():
+        return raw
+    try:
+        overlay = json.loads(OVERLAY_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise SchemaOverlayError([f"読めません({type(e).__name__}: {e})"]) from e
+    merged, problems, _notes = merge_overlay(raw, overlay)
+    if problems:
+        raise SchemaOverlayError(problems)
+    return merged
+
 
 def _schema() -> Schema:
     global _cache
     if _cache is None:
-        raw = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        raw = _read_raw()
         choices = raw.get("choices", {})
         tables: dict[str, Table] = {}
         for name, t in raw["tables"].items():

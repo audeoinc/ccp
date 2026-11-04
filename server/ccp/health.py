@@ -33,7 +33,7 @@ SERVER = Path(__file__).resolve().parent.parent
 
 @dataclass
 class Item:
-    """1 行。area は組(db / google / ai / bq / sync / assets / guard / static)。goto は ⚙ で直す所(ai / dataimport)"""
+    """1 行。area は組(schema / db / google / ai / bq / sync / assets / guard / static)。goto は ⚙ で直す所(ai / dataimport)"""
 
     area: str
     status: str
@@ -375,8 +375,26 @@ async def _net(out: _Out) -> None:
         out.add("net", "failed", f"サーバーから外(インターネット)に出られません({why})", "ファイアウォール・NAT・プロキシ(環境変数 HTTPS_PROXY)を確認する。外に出られないと、BigQuery・AI・ログインも動きません")
 
 
+def _schema_overlay(out: _Out) -> bool:
+    """AWS 側の列・表を重ねるファイル。なければ何も出さない。重ねられなければ False(そのあとの確かめは表の定義を使えない)"""
+    from . import schema as sc
+
+    st = sc.overlay_status()
+    if st is None:
+        return True
+    if st["problems"]:
+        out.add("schema", "failed", "重ねるファイル(server/ccp/client/schema.json)を重ねられません: " + " / ".join(st["problems"][:5]), "この行を直して、サーバーを起動し直してください(docs/AWS_CUSTOMIZE.md の 4 章)")
+        return False
+    out.add("schema", "ok", f"重ねるファイルを読みました(足した表 {st['tables']}、足した列と参照 {st['columns']})")
+    for note in st["notes"][:5]:
+        out.add("schema", "warn", note, "新しい版で同じ定義が入りました。重ねるファイルのこの行を消してください")
+    return True
+
+
 async def diagnose(full: bool = True) -> list[Item]:
     out = _Out()
+    if not _schema_overlay(out):
+        return list(out)
     # 外への確かめは、画面と check のときだけ(起動を待たせない)
     if full:
         await _net(out)
