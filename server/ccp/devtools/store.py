@@ -264,12 +264,15 @@ def _history_path() -> Path:
 
 
 def record_run(source: str, sql: str, rows: int | None = None, processed: int | None = None, billed: int | None = None,
-               seconds: float | None = None, error: str = "") -> None:
+               seconds: float | None = None, error: str = "", target: str = "bigquery", actor: str | None = None) -> None:
+    """実行の履歴に 1 行。target = 流す先(bigquery / pg)、actor = 流した人(ログインしていれば。なければ空。X104)"""
+    from ..identity import request_email
+
     try:
         p = _history_path()
         p.parent.mkdir(parents=True, exist_ok=True)
-        entry = {"at": now_iso(), "source": source, "sql": sql, "ok": not error, "rows": rows, "processed": processed, "billed": billed,
-                 "cost_usd": cost_usd(billed), "seconds": seconds, "error": error[:2000]}
+        entry = {"at": now_iso(), "source": source, "target": target, "actor": actor if actor is not None else request_email.get(), "sql": sql, "ok": not error,
+                 "rows": rows, "processed": processed, "billed": billed, "cost_usd": cost_usd(billed), "seconds": seconds, "error": error[:2000]}
         with p.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
         if p.stat().st_size > 20 * 1024**2:

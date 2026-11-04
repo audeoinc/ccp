@@ -154,7 +154,8 @@ def _step(step: str) -> dict[str, Any]:
     if step == "assets":
         d = os.getenv("ASSET_DIR", "")
         return {"id": "assets", "done": (bool(d) and Path(d).is_dir()) or skipped, "skipped": skipped, "locked": envfile.from_env("ASSET_DIR"), "values": {"dir": d}}
-    guarded = bool(os.getenv("APP_PASSWORD") or os.getenv("CCP_IAP_AUDIENCE"))
+    # ログイン(OIDC)・手前の認証・「守らない」と決めた(CCP_AUTH)なら、画面のパスワードは要らない
+    guarded = bool(os.getenv("APP_PASSWORD") or os.getenv("CCP_IAP_AUDIENCE") or os.getenv("OIDC_ISSUER") or os.getenv("CCP_AUTH"))
     return {"id": "password", "done": guarded or skipped, "skipped": skipped, "locked": envfile.from_env("APP_PASSWORD"), "values": {}, "secretSet": bool(os.getenv("APP_PASSWORD"))}
 
 

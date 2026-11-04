@@ -1,6 +1,7 @@
 // 開発用の画面(/dev/)の窓口の身代わり(撮影・デモ用のビルド。vite.mock.config.ts で src/dev/api と差し替える)。
 // BigQuery がなくても画面を確かめられるように、練習用の元データ(docs/bq_example/ と同じ名前の表)を見本として返す。
-import type { ImageKind, ImageList, ImageRow, ChatContext, ChatEvent, ChatTurn, CheckResult, ColumnProfile, RunEntry, ConvertEvent, GcsFile, PolicyDraft, PolicyPreview, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo } from '../dev/api'
+import type { ImageKind, ImageList, ImageRow, ChatContext, ChatEvent, ChatTurn, CheckResult, ColumnProfile, RunEntry, ConvertEvent, GcsFile, PolicyDraft, PolicyPreview, VersionMeta, Column, DryRun, RunResult, Row, Settings, TableInfo, PgStatus, PgTable, PgRunResult } from '../dev/api'
+import { users as seedUsers } from './seed'
 
 export * from '../dev/api'
 
@@ -62,6 +63,46 @@ const ref = (id: string) => `${DS}.${id}`
 const idOf = (r: string) => r.split('.').pop() ?? r
 let settings: Settings = { datasets: [DS, 'demo-project.ccp_dummy'] }
 const wait = <T,>(v: T) => new Promise<T>((ok) => window.setTimeout(() => ok(v), 250))
+
+// CCP の DB(X104)の身代わり。表と列は本物の schema.json の一部、中身は見本のユーザー。
+// ?pg=off で、ログインがない置き先の見え方(切り替えを出さず、なぜかを 1 行)
+const PG_ON = new URLSearchParams(location.search).get('pg') !== 'off'
+const PG_TABLES: PgTable[] = [
+  {
+    name: 'users',
+    columns: [
+      { name: 'id', type: 'uuid' },
+      { name: 'name', type: 'text' },
+      { name: 'email', type: 'text' },
+      { name: 'role', type: 'choice', choices: ['member', 'admin'] },
+      { name: 'status', type: 'choice', choices: ['active', 'inactive'] },
+      { name: 'is_developer', type: 'int' },
+      { name: 'created_on', type: 'timestamptz' },
+      { name: 'modified_on', type: 'timestamptz' },
+    ],
+  },
+  {
+    name: 'delivery_cards',
+    columns: [
+      { name: 'id', type: 'uuid' },
+      { name: 'name', type: 'text' },
+      { name: 'scheduled_at', type: 'timestamptz' },
+      { name: 'country', type: 'choice', choices: ['US', 'JP'] },
+      { name: 'channel', type: 'choice', choices: ['email', 'app'] },
+      { name: 'status', type: 'choice', choices: ['not_started', 'reviewing', 'approved', 'confirmed'] },
+      { name: 'created_on', type: 'timestamptz' },
+    ],
+  },
+  {
+    name: 'campaigns',
+    columns: [
+      { name: 'id', type: 'uuid' },
+      { name: 'name', type: 'text' },
+      { name: 'country', type: 'choice', choices: ['US', 'JP'] },
+      { name: 'created_on', type: 'timestamptz' },
+    ],
+  },
+]
 
 const fail = (error: string) => wait({ ok: false as const, error })
 
@@ -185,6 +226,23 @@ ${ctx.sql}
     return wait(d)
   },
   cancel: () => wait({ ok: true as const, cancelled: true }),
+  pgStatus: () =>
+    wait<PgStatus>({
+      ok: true,
+      available: PG_ON,
+      reason: PG_ON ? '' : 'CCP の DB は、ログインした開発者だけが使えます(この置き先にはログインがありません。ログインの設定は docs/WORKBENCH.md の 7.2)',
+      readonly_role: false,
+      timeout_s: 15,
+      max_rows: 200,
+    }),
+  pgTables: () => (PG_ON ? wait({ ok: true as const, tables: PG_TABLES }) : fail('CCP の DB は、ログインした開発者だけが使えます')),
+  pgRun: (sql: string, maxRows: number) => {
+    if (!/^\s*(select|with|table|values|explain|show)\b/i.test(sql)) return fail('CCP の DB には、読む文(SELECT・WITH など)だけを流せます')
+    if (!/\busers\b/i.test(sql)) return fail('relation "xxx" does not exist(見本の画面では、users の表だけを読めます)')
+    const cols = ['id', 'name', 'email', 'role', 'status', 'is_developer']
+    const rows = seedUsers.slice(0, maxRows).map((u) => Object.fromEntries(cols.map((c) => [c, u[c] ?? null])) as Row)
+    return wait<PgRunResult>({ ok: true, columns: cols.map((name) => ({ name, type: '' })), rows, more: false, seconds: 0.03 })
+  },
   run: (sql: string, maxRows: number) => {
     const t = tableIn(sql)
     if (!t) return fail('BadRequest: 400 Not found: Table demo-project:ccp_dummy_src.xxx was not found in location asia-northeast1')

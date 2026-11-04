@@ -192,6 +192,8 @@ interface Props {
   onOutput: (output: string) => void
   /** 外から頼む(答え合わせの「AI に直してもらう」)。id が変わったら送る */
   ask?: { id: number; text: string } | null
+  /** SQL の欄の流す先(pg = CCP の DB。AI には表と列の形だけ。X104) */
+  target?: 'bigquery' | 'pg'
 }
 
 /**
@@ -199,7 +201,7 @@ interface Props {
  * Gemini は、BigQuery を調べる道具(表を探す・列を見る・ビューの参照先をたどる・確かめる・SELECT を流す)を使える。
  * 思考の要約・調べたこと・返事は、届いたそばから出す(止まっているのか考えているのかが分かるように)
  */
-export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNotes, onUseSql, onFold, output, onOutput, ask }: Props) {
+export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNotes, onUseSql, onFold, output, onOutput, ask, target = 'bigquery' }: Props) {
   const s = useStyles()
   const [messages, setMessages] = useState<Message[]>([])
   const [chatId, setChatId] = useState<string>(() => load<string>(CHAT_KEY, '') || newId())
@@ -266,6 +268,7 @@ export function ChatPanel({ dataset, selected, sql, last, hasError, notes, onNot
     notes: draftNotes,
     sql: withSql ? sql : '',
     last: withSql ? last : '',
+    target,
   })
 
   const refreshFiles = async () => {

@@ -80,6 +80,24 @@ class SetupTest(unittest.TestCase):
         with mock.patch.dict(setup._state, {"active": False}):
             self.assertIsNone(asyncio.run(setup.gate("/api/data/x")))
 
+    def test_setup_opens_behind_a_relay_without_auth(self) -> None:
+        # 認証の設定を入れるための画面なので、認証がまだなくても、中継の先から開ける(ほかの API は断る)
+        from fastapi.testclient import TestClient
+
+        from ccp import main
+
+        env = {"CCP_AUTH": "", "OIDC_ISSUER": "", "APP_PASSWORD": "", "CCP_IAP_AUDIENCE": ""}
+        relay = {"x-forwarded-for": "203.0.113.1"}
+        with mock.patch.dict(os.environ, env):
+            client = TestClient(main.app)
+            with mock.patch.dict(setup._state, {"active": True, "reason": "x", "key": "k"}):
+                self.assertEqual(client.get("/api/setup/state", headers=relay).status_code, 200)
+                self.assertEqual(client.get("/api/data/x", headers=relay).status_code, 503)
+                self.assertEqual(client.get("/api/data/x", headers=relay).json()["error"]["code"], "setup_required")
+            with mock.patch.dict(setup._state, {"active": False}):
+                self.assertEqual(client.get("/api/setup/state", headers=relay).status_code, 503)
+                self.assertEqual(client.get("/api/setup/state", headers=relay).json()["error"]["code"], "auth_setup")
+
     def test_checks_refuse_bad_values(self) -> None:
         self.assertFalse(asyncio.run(setup.check("assets", {"dir": "relative/path"}))[0])
         self.assertFalse(asyncio.run(setup.check("password", {"password": "short"}))[0])

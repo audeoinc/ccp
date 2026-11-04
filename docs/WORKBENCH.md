@@ -349,6 +349,7 @@ cd server
 | 写真の代わりに**イラスト**が出る | パックを取り込んでいない(初期データの `seed` のまま)/ `ASSET_DIR` を付けずに起動した | 3.7 の取り込み、3.8 で `workbench.env` を読み込んでから起動 |
 | 写真の場所が**灰色の枠**のまま | `ASSET_DIR` のパスが違う(相対パス・フォルダ違い) | `ls $ASSET_DIR/products | head` で写真があるか確かめる。絶対パスにする |
 | 画面が**真っ白**、または API が 404 | URL の末尾の `/` がない | `…/proxy/8082/` のように `/` を付ける |
+| 画面に「**入口の認証が設定されていないため、外と中継…からは開けません**」(503) | `workbench.env` に入口の認証の設定がない(2026-11-03 から、中継を通った依頼は、設定がないと止める) | `workbench.env` に `CCP_AUTH=none` を書き、`scripts/workbench.sh restart`(Jupyter の中継が Google のログインで守るので、CCP では守らない) |
 | 画面に「**データベースにつながりません**」(以前の版では「データベースを起動しています」のまま進まない) | **サーバーを起動したターミナル**に、DB の設定が読み込まれていない(`check` を実行したターミナルとは別のターミナルで起動した、`conda activate` していない など)。画面の赤い文字が、つながらない理由 | サーバーを止め、**同じターミナルで** `set -a; source workbench.env; set +a`(必要なら `conda activate`)→ `check` → 起動 の順に実行する。サーバーのターミナルにも「DB につながりません: …」と理由が出る |
 | `socket.gaierror: Name or service not known` | 接続先のホスト名が引けない。① `workbench.env` の見本の行(`<ホスト>`)が、設定済みの `DATABASE_URL` を上書きした ② パスワードの `@` を `%40` にしていない(`@` の後ろがホスト名と読まれる) | 設定済みなら、`workbench.env` の DB の行をコメントアウトし、**新しいターミナル**でやり直す。Workbench の中の PostgreSQL なら、ホストは `localhost`。CCP が読んでいるホストは、`.venv/bin/python -m ccp.cli check` で表示する(下の「動かす前の確認」) |
 | `workbench.env: No such file or directory` | ① リポジトリが古く、見本(`workbench.env.example`)がない ② 見本から `workbench.env` をコピーしていない ③ `~/ccp/server` 以外の場所で実行した ④ ファイル名の綴りの違い(work**bench**)、Jupyter で作って `workbench.env.txt` になった | `cd ~/ccp && git pull` → `cd server && cp workbench.env.example workbench.env`。`ls -la ~/ccp/server \| grep -i workbench` で、ファイルの名前と場所を確かめる |
@@ -528,6 +529,8 @@ PY
 
 ## 7. Workbench 以外の Linux のサーバー(AWS など)で動かすとき
 
+**AWS で動かすときの手順は [AWS.md](AWS.md) にまとめました(2026-11-03)。** この章は、Workbench との違いの一覧として残しています。
+
 この手順書の「Workbench」は、**CCP を動かしているそのサーバー**と読み替えれば、そのまま使えます。
 仕組みは同じです。サーバーが PostgreSQL につなぎ、BigQuery と Gemini(Vertex AI)を呼びます。
 違うのは、次の 4 点だけです。
@@ -537,7 +540,7 @@ PY
 | **Google Cloud への入り方** | ノートブックに付いたサービスアカウントが、自動で使われる(設定は要らない) | その機械には Google のサービスアカウントがない。**環境変数や秘密の置き場所(Secrets など)から、Google の認証情報を渡す**。方法は 2 つ: <br>① AWS から Google Cloud への鍵なしのつなぎ(Workload Identity 連携) <br>② サービスアカウントの鍵のファイル(`GOOGLE_APPLICATION_CREDENTIALS`) <br>CCP は、その機械の標準の認証(`google.auth.default`)で入るので、どちらでも動く |
 | **サービスアカウントの権限** | 同じ | BigQuery を読む権限と、Vertex AI を使う権限が要る |
 | **外への通信** | 外のサイトを読めないことがある(6 章) | 外に出られれば、**商品ページを読む・URL の画像から選ぶ機能が、そのまま動く**。6 章の試しは要らない |
-| **画面の開き方** | Jupyter の中継 `https://<ノートブックの URL>/proxy/<ポート>/` | ロードバランサーなどで直接開く。CCP は置かれた場所に合わせて動くので、パスの設定は要らない。**外から開けるなら、HTTPS と、画面のパスワード(`APP_PASSWORD`)か手前の認証を、必ず付ける**(Workbench は Jupyter の認証の内側にあった) |
+| **画面の開き方** | Jupyter の中継 `https://<ノートブックの URL>/proxy/<ポート>/` | ロードバランサーなどで直接開く。CCP は置かれた場所に合わせて動くので、パスの設定は要らない。**外から開けるなら、HTTPS と、ログイン(Entra ID などの SSO。7.2)か画面のパスワード(`APP_PASSWORD`)を、必ず付ける**(Workbench は Jupyter の認証の内側にあった)。何も付けないと、CCP はそのサーバーの中から直に(`http://127.0.0.1:…`)しか開けず、中継(nginx など)や外からの依頼には設定の案内を返す。**Workbench の Jupyter の中継も「中継」なので、Workbench では `CCP_AUTH=none` を書く**(`workbench.env.example` に入っている) |
 
 そのほかの点:
 
@@ -557,7 +560,7 @@ CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(
 2. PostgreSQL(同じ機械か、マネージドの DB)と、CCP 用の DB・ユーザー
 3. Google Cloud のサービスアカウントと、その認証情報の渡し方(7 章の表)。権限は、BigQuery を読む・Vertex AI を使う
 4. 秘密の置き場所(Secrets など)に、DB のパスワード・画面のパスワードなど
-5. 画面を開く入口(ロードバランサーなど)と、HTTPS・手前の認証
+5. 画面を開く入口(ロードバランサーなど)と、HTTPS。ログインを Entra ID にするなら、アプリの登録(7.2)
 
 **CCP で行うこと**(画面が案内する)
 
@@ -578,6 +581,33 @@ CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(
 
 (6 の初期設定の画面と 8 の「設定の状態」はできている。7 の設定の型は、`settings.setup` として作っている途中。できるまでは、ほかのリージョンの値も、初期設定の画面と ⚙ で入れる)
 
+### 7.2 ログインを Entra ID(SSO)にする
+
+CCP の中に、標準の OIDC のログインがある(`server/ccp/oidc.py`)。Google・Okta なども、発行元を替えるだけで同じ。
+設定が足りないと、画面は開かず、何が足りないかを返す。健康診断(`check`)の「画面の守り」の行にも出る。
+
+**Entra の管理画面で行うこと**(テナントの管理者)
+
+1. 「アプリの登録」で、新しいアプリを登録する。対象は「この組織のディレクトリのみ」。
+2. 「リダイレクト URI」に、種類「Web」で `https://<画面のアドレス>/auth/callback` を足す(健康診断の行に、そのまま出る)。
+3. 「証明書とシークレット」で、クライアントシークレットを作る(期限を控える。切れるとログインできなくなる)。
+4. 「トークンの構成」で、ID トークンに `email` を足す(足さなくても、`preferred_username` から取る)。
+5. ログインできる人を絞るなら、エンタープライズ アプリの「割り当てが必要」をはいにし、人・グループを割り当てる。
+6. 「概要」から、アプリ(クライアント)ID とディレクトリ(テナント)ID を控える。
+
+**CCP に入れる設定**(環境変数。シークレットは秘密の置き場所から)
+
+| 環境変数 | 中身 |
+|---|---|
+| `OIDC_ISSUER` | `https://login.microsoftonline.com/<テナント ID>/v2.0`(`common`・`organizations` は使えない) |
+| `OIDC_CLIENT_ID` | アプリ(クライアント)ID |
+| `OIDC_CLIENT_SECRET` | クライアントシークレットの値 |
+| `CCP_PUBLIC_URL` | 画面のアドレス(`https://…`)。手前の機械が `X-Forwarded-Proto`・`Host` を付けるなら、なくてもよい |
+
+- だれが何をできるかは、これまでどおり CCP の「ユーザー」(⚙ →「ユーザーと承認グループ」)で決める。ログインしたメールアドレスで、ユーザーに結ぶ。
+- 管理する人がまだ 1 人もいない DB では、ログインした人がユーザーを足せる(最初の管理者を作るため)。管理者ができたら、ほかの人は足せなくなる。
+- ログインは 12 時間続く(使っていれば延びる。`CCP_SESSION_HOURS`)。サーバーを 2 台以上にしても切れない(どのサーバーも同じシークレットで確かめる。別の鍵にしたければ `CCP_SESSION_SECRET` をすべてのサーバーにそろえて入れる)。
+
 ---
 
 ## 付録 A. 環境変数の一覧
@@ -590,6 +620,8 @@ CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(
 | `ASSET_DIR` | 写真を出すとき | 写真のフォルダ(パックの展開先) | `<server の絶対パス>/images` |
 | `APP_PASSWORD` | — | 画面のパスワード(Basic 認証)。空なら、かけない | 空でよい(中継が Google のログインで守られている) |
 | `CCP_ENV_FILE` | — | 初期設定の画面が値を書くファイル(既定 `server/ccp.env`)。起動のときに読み、環境変数にない名前だけ入れる(環境変数が勝つ) | 設定しない |
+| `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `CCP_PUBLIC_URL` / `CCP_SESSION_HOURS` / `CCP_SESSION_SECRET` | ログインを使うとき | ログイン(Entra ID などの SSO。7.2)。`OIDC_ISSUER` があれば、`APP_PASSWORD` より先に使う | 設定しない |
+| `CCP_AUTH` | — | 入口の認証を名指しする(`oidc` / `basic` / `iap` / `none`)。なければ、ある設定から選ぶ。**どれもないと、そのサーバーの中から直に(`http://127.0.0.1:…`)しか開けず、中継(Jupyter の /proxy/・nginx など)からも開けない**。中継の手前で守っている・守りなしにすると決めたときだけ `none` | **`none`**(Jupyter の中継が Google のログインで守る。`workbench.env.example` に入っている) |
 | `STATIC_DIR` | — | 画面のビルドの場所(既定 `<リポジトリ>/dist-gcp`) | 設定しない |
 | `CCP_PORT` | — | サーバーのポート(`scripts/workbench.sh`) | 既定 8082 |
 | `CCP_PYTHON` / `CCP_PGDATA` / `CCP_PG_BIN` | — | スクリプトが使う Python・Workbench の中の PostgreSQL のデータの場所・`pg_ctl` のあるフォルダ | `server/workbench.env.example` の説明のとおり |
@@ -597,6 +629,7 @@ CCP の外の作業(1〜5)が済めば、あとは CCP の画面が案内する(
 | `GOOGLE_APPLICATION_CREDENTIALS` | — | 鍵のファイルで Google に入るとき(Workbench のサービスアカウントで足りれば要らない) | 設定しない |
 | `CCP_DEV_USER_EMAIL` | — | その人がログインしたことにする([APPROVAL.md](APPROVAL.md)) | 使わないなら設定しない |
 | `AI_OUTLET_TOKEN` | ほかの AI を使うとき | AI の出口の層に送る合言葉(秘密なので環境変数のまま。出口の URL は ⚙ →「AI の設定」)。約束と見本の層は [AI_OUTLET.md](AI_OUTLET.md) | 使わないなら設定しない |
+| `CCP_DB_READONLY_URL` / `DEVTOOLS_PG_TIMEOUT_S` | 開発用の画面から CCP の DB を読むとき(ログインした開発者だけ) | 読むだけの DB のユーザーのつなぎ先(書き方は `DATABASE_URL` と同じ。なければアプリと同じ)・1 回の時間の上限(既定 15 秒) | なくてよい([DEVTOOLS.md](DEVTOOLS.md) の 11 章) |
 | `CCP_DEVTOOLS` / `DEVTOOLS_MAX_GB` / `DEVTOOLS_GEMINI_MODEL` / `DEVTOOLS_THINKING` / `DEVTOOLS_PRICE_PER_TIB` | 開発用の画面を使うとき | `1` で開発用の画面(`/proxy/<ポート>/dev/`。ポートは CCP の画面と同じ `CCP_PORT`)を出す。BigQuery の 1 回の問い合わせで読む量の上限(既定 10 GB)。AI のモデル(既定は一覧でいちばん賢い Gemini)・考える量(既定 high)・料金の概算の単価(既定 $6.25/TiB)。作業ファイルは `server/devwork/`(Git に入れない) | 使うときだけ `1`([DEVTOOLS.md](DEVTOOLS.md)) |
 
 **DB に移した設定**(2026-11-03 から。⚙ の画面で変える。管理する人だけ)。前の版で、下の環境変数を書いてあれば、サーバーが最初に設定を読むときに一度だけ DB に写します。写したあとは、環境変数が残っていても DB の値が効くので、`workbench.env` から消してかまいません。

@@ -1,12 +1,15 @@
-// 利用先に渡す「Workbench 版」のリリース ZIP を作る(手順・約束事は docs/RELEASE.md)。
-//   npm run release:workbench                 HEAD から作り、検査し、展開した先でビルドとテストを通す
-//   npm run release:workbench -- --ref main   作る元のコミットを指定する
-//   npm run release:workbench -- --no-test    検査だけ(npm ci・ビルド・サーバーのテストを省く。急ぐときの確認用。渡す ZIP は省かずに作る)
-//   npm run release:workbench -- --publish    すべての確かめを通ったら、GitHub の Releases に公開する(タグ workbench-<版>。利用先は、そこからダウンロードする)
+// 利用先に渡すリリース ZIP を作る(手順・約束事は docs/RELEASE.md)。開発元の GCP の本番の仕組みを消した形にする。
+//   npm run release:aws                 HEAD から AWS 版を作り、検査し、展開した先でビルドとテストを通す
+//   npm run release:aws -- --ref main   作る元のコミットを指定する
+//   npm run release:aws -- --no-test    検査だけ(npm ci・ビルド・サーバーのテストを省く。急ぐときの確認用。渡す ZIP は省かずに作る)
+//   npm run release:aws -- --publish    すべての確かめを通ったら、GitHub の Releases に公開する(タグ aws-<版>。利用先は、そこからダウンロードする)
+//   npm run release:aws -- --publish --note "…"   公開の説明に、その版だけの知らせを 1 段足す(段が複数なら --note を繰り返す)
+//   npm run release:workbench           Workbench 版(2026-11-03 に停止。作って確かめることはできるが、公開はしない)
+// 版の種類は --target(下の TARGETS)。npm のスクリプトが付ける。
 //
 // 書き換えの手作業をなくすため、次をすべてこのスクリプトが行う。
 //   ① コミット済みのファイル(git archive)から、入れるものだけを選ぶ(下の RULES。どれにも当たらないファイルがあれば止まる)
-//   ② release/workbench/ の置き換え用のファイル(README・CLAUDE.md・手順書)を重ねる
+//   ② release/<版の種類>/files の置き換え用のファイル(README・CLAUDE.md)を重ねる
 //   ③ package.json から本番用のスクリプトを消し、文書の <!-- hosted:begin --> 〜 <!-- hosted:end --> の範囲を消す
 //   ④ 版のファイル(VERSION.txt)を入れて ZIP にする
 //   ⑤ ZIP を検査する(残してはいけない言葉・ファイル名・文書のリンク切れ)。展開した先で npm ci・npm run verify・サーバーのテストを通す
@@ -18,8 +21,27 @@ import { fileURLToPath } from 'node:url'
 import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const OVERLAY = 'release/workbench/files'
 const OUT = join(ROOT, 'release-out')
+
+// ---- 版の種類。中身(RULES・BANNED)は共通で、違うのは置き換えの文書・名前・必ず入っているべきファイルだけ
+// (製品は 1 つ。置き先の違いは設定とアダプターで吸収する。ARCHITECTURE の 0.5 章)
+const TARGETS = {
+  aws: {
+    name: 'AWS 版',
+    about: 'AWS などの Linux のサーバーで動かす CCP',
+    guide: 'docs/AWS.md',
+    // 手順書・操作のスクリプト・設定の見本がないと、立ち上げられない(作り忘れ・規則の書き違いで落ちたら、ここで止める)
+    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'docs/AWS.md', 'docs/WORKBENCH.md', 'docs/DATA_TABLES.md', 'docs/API.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
+  },
+  workbench: {
+    name: 'Workbench 版',
+    about: 'Vertex AI Workbench で動かす CCP',
+    guide: 'docs/WORKBENCH.md',
+    required: ['README.md', 'CLAUDE.md', 'VERSION.txt', 'docs/WORKBENCH.md', 'scripts/workbench.sh', 'server/workbench.env.example', 'server/requirements.txt'],
+    // 2026-11-03 利用者: Workbench 版の ZIP と Releases の公開を止め、AWS 版に切り替えた
+    stopped: '2026-11-03 に停止しました(AWS 版に切り替え。npm run release:aws)',
+  },
+}
 
 // ---- 入れるもの・外すもの。上から順に見て、最初に当たった規則で決める。どれにも当たらなければ止まる
 // (新しく足したファイルが、黙って入ったり、黙って落ちたりしないようにするため。足したら、ここに書く)
@@ -30,7 +52,7 @@ const RULES = [
   ['exclude', /^(cloudbuild-preview\.yaml|preview\/)/],
   // 見本の画面の使い方(開発元の本番だけの仕組みなので、ZIP に入れない)
   ['exclude', /^docs\/PREVIEW\.md$/],
-  ['exclude', /^scripts\/(deploy-gcp|gcp-smoke|release-workbench)\.mjs$/],
+  ['exclude', /^scripts\/(deploy-gcp|gcp-smoke|release)\.mjs$/],
   ['exclude', /^server\/ccp\/hosted\//],
   ['exclude', /^server\/requirements-hosted\.txt$/],
   ['exclude', /^server\/tests\/test_hosted_/],
@@ -71,8 +93,8 @@ const RULES = [
   ['include', /^docs\//],
 ]
 
-// package.json から消すスクリプト(開発元の本番への反映・撮影・検証の道具の ZIP)
-const DROP_SCRIPTS = ['deploy:gcp', 'screenshots', 'pack:ms-verify']
+// package.json から消すスクリプト(開発元の本番への反映・撮影・検証の道具の ZIP・この ZIP を作るスクリプト)
+const DROP_SCRIPTS = ['deploy:gcp', 'screenshots', 'pack:ms-verify', 'release:aws', 'release:workbench']
 
 // ---- 残してはいけない言葉(大文字小文字は区別しない)。足すときは docs/RELEASE.md の表も直す
 const BANNED = [
@@ -80,11 +102,10 @@ const BANNED = [
   // Power Apps・Power Platform・Copilot などは、2026-10-30 から書いてよい(その検証の文書を入れるため。利用者)
   ['Cloud Run', /cloud\s*run|run\.app|\bkaniko\b/i],
   ['Cloud SQL', /cloud[\s_-]*sql|sqladmin/i],
-  ['本番の反映', /deploy[:-]gcp|gcp-smoke|cloudbuild|cloud\s*build|\bgcloud\b|dockerfile|gcloudignore/i],
-  ['DB の自動起動・停止', /dbctl|cloud\s*scheduler|idle[-_]check|CCP_DEV_GCLOUD/i],
-  ['DB の自動起動・停止の設定', /\bDB_CONTROL\b|\bIDLE_CHECK_/], // 大文字だけ(db_controller などに当てないため)
-  ['本番のサービス名', /contents-planner/i],
-  ['開発用の文書', /HANDOVER\.md|CLOUD\.md|ONBOARDING\.md|GCP\.md|RELEASE\.md/],
+  // 開発元の本番のサービス名(本番の URL の一部)
+  ['開発元の名前', /contents-planner/i],
+  // 2026-11-03 利用者: 消すのは「開発元が Cloud Run・Cloud SQL で動かしていること」だけ。
+  // gcloud・dbctl・本番の反映・開発用の文書の名前などの言葉の禁止はやめた(ファイルは RULES でこれまでどおり外す)
 ]
 // 中身を検査しないファイル(画像など。名前は検査する)
 const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|zip)$/i
@@ -98,6 +119,8 @@ const option = (name, fallback) => {
 const ref = option('--ref', 'HEAD')
 const runTests = !flag('--no-test')
 const publish = flag('--publish')
+const targetKey = option('--target', '')
+const target = TARGETS[targetKey]
 
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 })
 const gitBuf = (...a) => execFileSync('git', a, { cwd: ROOT, maxBuffer: 1 << 30 })
@@ -107,19 +130,23 @@ const fail = (msg) => {
 }
 const step = (msg) => console.log(`\n■ ${msg}`)
 
+if (!target) fail(`版の種類を --target で指定してください(${Object.keys(TARGETS).join(' / ')})。ふつうは npm run release:aws`)
+const OVERLAY = `release/${targetKey}/files`
 if (publish && !runTests) fail('--publish は --no-test と一緒には使えません(確かめを通った ZIP だけを公開する)')
+if (publish && target.stopped) fail(`${target.name}の公開は、${target.stopped}`)
 if (publish) {
   // 同じ版(同じコミット)を公開済みなら、何もしない(毎日の手順を、1 日に 2 回実行しても困らないように)
   git('fetch', '-q', '--tags', 'origin')
   const done = git('rev-parse', '--short=7', `${ref}^{commit}`).trim()
-  if (git('tag', '-l', `workbench-*-${done}`).trim()) {
+  if (git('tag', '-l', `${targetKey}-*-${done}`).trim()) {
     console.log(`この版(コミット ${done})は、もう Releases に公開してあります。何もしません`)
     process.exit(0)
   }
 }
 
 // ---- ① ファイルを選ぶ
-step(`元のコミット: ${ref}`)
+step(`${target.name}の元のコミット: ${ref}`)
+if (target.stopped) console.log(`  [注意] ${target.name}は、${target.stopped}`)
 const sha = git('rev-parse', '--short=7', `${ref}^{commit}`).trim()
 const commitDate = git('show', '-s', '--format=%cd', '--date=format:%Y-%m-%d', sha).trim()
 const version = `${commitDate.replaceAll('-', '')}-${sha}`
@@ -140,7 +167,7 @@ for (const entry of tree) {
   if (!rule) unknown.push(entry.path)
   else if (rule[0] === 'include') picked.push(entry)
 }
-if (unknown.length) fail(`入れるか外すかが決まっていないファイルがあります。scripts/release-workbench.mjs の RULES に足してください:\n  ${unknown.join('\n  ')}`)
+if (unknown.length) fail(`入れるか外すかが決まっていないファイルがあります。scripts/release.mjs の RULES に足してください:\n  ${unknown.join('\n  ')}`)
 console.log(`  入れる ${picked.length} 個 / 外す ${tree.length - picked.length} 個`)
 
 // ---- ② ③ 中身を作る(パス → { data, mode })。git cat-file --batch で、まとめて読む
@@ -180,13 +207,18 @@ for (const [path, f] of files) {
   }
 }
 
+// 表と列・API の一覧を、ZIP に入る中身から作る(手で書く文書にすると、列や API を足したときに古くなるため。
+// 利用先の Claude が、利用者に聞かれて答える・調べるのに使う)
+files.set('docs/DATA_TABLES.md', { data: Buffer.from(dataTablesDoc(JSON.parse(files.get('server/schema.json').data.toString('utf8')))), mode: 0o644 })
+files.set('docs/API.md', { data: Buffer.from(apiDoc([...files].filter(([p]) => /^server\/ccp\/.*\.py$/.test(p)).map(([p, f]) => [p, f.data.toString('utf8')]))), mode: 0o644 })
+
 files.set('VERSION.txt', {
-  data: Buffer.from(`CCP(Campaign Contents Planner)Workbench 版\n版: ${version}\n元のコミット: ${sha}\nコミットの日付: ${commitDate}\n`),
+  data: Buffer.from(`CCP(Campaign Contents Planner)${target.name}\n版: ${version}\n元のコミット: ${sha}\nコミットの日付: ${commitDate}\n`),
   mode: 0o644,
 })
 
-// ---- ④ ZIP にする(ZIP の中は、1 つのフォルダ ccp-workbench-<版>/ の下に置く)
-const top = `ccp-workbench-${version}`
+// ---- ④ ZIP にする(ZIP の中は、1 つのフォルダ ccp-<版の種類>-<版>/ の下に置く)
+const top = `ccp-${targetKey}-${version}`
 const zipPath = join(OUT, `${top}.zip`)
 mkdirSync(OUT, { recursive: true })
 writeFileSync(zipPath, makeZip([...files].sort(([a], [b]) => a.localeCompare(b)).map(([path, f]) => ({ name: `${top}/${path}`, ...f }))))
@@ -197,6 +229,7 @@ step('ZIP の検査(残してはいけない言葉・ファイル名・リンク
 const entries = readZip(readFileSync(zipPath))
 const problems = []
 const names = new Set(entries.map((e) => e.name.slice(top.length + 1)))
+for (const path of target.required) if (!names.has(path)) problems.push(`${path}: ${target.name}に必ず入っているべきファイルがありません(RULES か ${OVERLAY} を確かめる)`)
 for (const e of entries) {
   const path = e.name.slice(top.length + 1)
   if (!e.name.startsWith(`${top}/`)) problems.push(`${e.name}: フォルダ ${top}/ の外にあります`)
@@ -267,14 +300,17 @@ if (publish) {
   const full = git('rev-parse', `${sha}^{commit}`).trim()
   // タグを元のコミットに付けるので、そのコミットが GitHub にないと公開できない
   if (!git('branch', '-r', '--contains', full).trim()) fail(`元のコミット ${sha} が、まだ push されていません`)
-  const tag = `workbench-${version}`
+  const tag = `${targetKey}-${version}`
   const notes = [
-    `Vertex AI Workbench で動かす CCP の版 ${version}(元のコミット ${sha}、コミットの日付 ${commitDate})。`,
+    `${target.about}の版 ${version}(元のコミット ${sha}、コミットの日付 ${commitDate})。`,
     '',
-    `添付の ccp-workbench-${version}.zip をダウンロードし、利用先の Git に入れてください(入れ方の手順は、別にお渡しします)。`,
-    '検査(残してはいけない言葉・リンク切れ)と、展開した先での npm ci・npm run verify・サーバーのテストを通っています。',
+    `添付の ${top}.zip をダウンロードし、利用先の Git に入れてください。立ち上げ・更新の手順は、ZIP の中の ${target.guide} にあります。`,
+    '検査(残してはいけない言葉・リンク切れ・必ず入っているべきファイル)と、展開した先での npm ci・npm run verify・サーバーのテストを通っています。',
+    // その版だけの知らせ(--note "…")。利用先が更新するときに気を付けることなど。
+    // Windows の npm run は引数の改行から先を落とすので、段落ごとに --note を繰り返して渡す
+    ...args.flatMap((a, i) => (a === '--note' && args[i + 1] ? ['', args[i + 1]] : [])),
   ].join('\n')
-  const r = spawnSync('gh', ['release', 'create', tag, zipPath, '--target', full, '--title', `CCP Workbench 版 ${version}`, '--notes', notes], { cwd: ROOT, stdio: 'inherit' })
+  const r = spawnSync('gh', ['release', 'create', tag, zipPath, '--target', full, '--title', `CCP ${target.name} ${version}`, '--notes', notes], { cwd: ROOT, stdio: 'inherit' })
   if (r.status !== 0) fail('gh release create に失敗しました(同じ版がすでにあるか、gh auth status でサインインを確かめる)')
   console.log(`  公開しました: タグ ${tag}`)
 }
@@ -311,6 +347,82 @@ function stripHosted(path, text) {
   // 消したあとに、空行が 3 つ以上続かないようにする
   const lines = out.split(/\r?\n/)
   return lines.filter((line, i) => !(line.trim() === '' && lines[i - 1]?.trim() === '' && lines[i - 2]?.trim() === '')).join(nl)
+}
+
+// 関数の宣言は先に読まれるので、ファイルの上のほうから呼べる(定数だと、まだ決まっていないと言われる)
+function generated(src) {
+  return `(この文書は、ZIP を作るときに自動で作りました。手で直さないでください。元は \`${src}\` です)`
+}
+
+// server/schema.json(データ定義の唯一の正)から、表と列の一覧を作る
+function dataTablesDoc(schema) {
+  const out = [
+    '# データの表と列の一覧',
+    '',
+    generated('server/schema.json'),
+    '',
+    '- 表・列の名前は、画面・API・PostgreSQL で同じです。読み書きの API は `/api/data/<表>`([API.md](API.md))。',
+    '- 型: `text`・`int`・`numeric`・`float`・`date`・`timestamptz`・`choice`。`choice` は決まった文字の値だけ(下の「選べる値」)。JSON の中身は `text` に文字で持つ。',
+    '- どの表にも、主キー `id`(UUID)・`state_code`・作った日時 `created_on`・変えた日時 `modified_on` があります(下の列の一覧には出していません。`server/ccp/schema.py` の `SYSTEM_COLUMNS`)。',
+    '- ほかの表を指す列(`…_id`)は、各表の最後に書いています。',
+    `- 表の数: ${Object.keys(schema.tables).length}`,
+    '',
+    '## 表の一覧',
+    '',
+    ...Object.keys(schema.tables).map((n) => `- [\`${n}\`](#${n})`),
+    '',
+  ]
+  for (const [name, t] of Object.entries(schema.tables)) {
+    out.push(`## ${name}`, '')
+    if (t._comment) out.push(t._comment, '')
+    out.push('| 列 | 型 | 印 | 選べる値 |', '|---|---|---|---|')
+    for (const [col, type, opt = {}] of t.columns) {
+      const marks = [opt.required && '必須', opt.index && '索引'].filter(Boolean).join('・')
+      const choices = schema.choices?.[`${name}.${col}`]
+      out.push(`| \`${col}\` | ${type} | ${marks} | ${choices ? choices.map((c) => `\`${c}\``).join(' / ') : ''} |`)
+    }
+    for (const [col, ref, opt = {}] of t.lookups ?? []) out.push('', `- \`${col}\` は表 \`${ref}\` の \`id\` を指す${opt.onDelete ? `(相手を消したとき: ${opt.onDelete})` : ''}`)
+    if (t.unique?.length) out.push('', `- 重ならない組: ${t.unique.map((u) => `(${u.join(', ')})`).join('・')}`)
+    if (t.retired?.length) out.push('', `- 使わなくなった列(書き込みは無視する): ${t.retired.map((c) => `\`${c}\``).join('・')}`)
+    out.push('')
+  }
+  return out.join('\n')
+}
+
+// server/ccp/ の FastAPI の窓口(@router.get("…") など)を、ソースを読んで一覧にする(サーバーを動かさずに作れるように)
+function apiDoc(sources) {
+  const rows = []
+  for (const [path, text] of sources.sort(([a], [b]) => a.localeCompare(b))) {
+    const prefix = text.match(/^router\s*=\s*APIRouter\(([^\n]*)\)/m)?.[1].match(/prefix\s*=\s*"([^"]*)"/)?.[1] ?? ''
+    const lines = text.split('\n')
+    lines.forEach((line, i) => {
+      const m = line.match(/^@(router|app)\.(get|post|put|patch|delete)\(\s*"([^"]*)"/)
+      if (!m) return
+      // 関数の宣言の行のあと、最初の行が文字列(docstring)なら、その 1 行目を説明にする
+      let j = i + 1
+      while (j < lines.length && !/^\s*(async\s+)?def\s/.test(lines[j])) j++
+      const fn = lines[j]?.match(/def\s+(\w+)/)?.[1] ?? ''
+      while (j < lines.length && !/:\s*(#.*)?$/.test(lines[j])) j++
+      const doc = lines[j + 1]?.trim().match(/^[rbu]?("""|''')(.*?)(\1|$)/)?.[2].trim() ?? ''
+      rows.push({ file: path.replace(/^server\//, ''), method: m[2].toUpperCase(), url: (m[1] === 'app' ? '' : prefix) + m[3], fn, doc })
+    })
+  }
+  const out = [
+    '# サーバーの API の一覧',
+    '',
+    generated('server/ccp/ のソース'),
+    '',
+    '- 画面は、この API を呼んで動きます。ログイン(画面のパスワード・OIDC など)は、画面と同じものが要ります。',
+    '- `/api/data/<表>` は、表の読み書きの共通の窓口です(表と列は [DATA_TABLES.md](DATA_TABLES.md))。',
+    '- 設定の状態(健康診断)は `/api/settings/health`。コマンドなら `python -m ccp.cli check`。',
+    `- 窓口の数: ${rows.length}`,
+    '',
+    '| 方法 | URL | 説明(関数の docstring の 1 行目。なければ関数名) | ファイル |',
+    '|---|---|---|---|',
+    ...rows.map((r) => `| ${r.method} | \`${r.url || '/'}\` | ${(r.doc || r.fn).replaceAll('|', '\\|')} | \`${r.file}\` |`),
+    '',
+  ]
+  return out.join('\n')
 }
 
 function findPython() {

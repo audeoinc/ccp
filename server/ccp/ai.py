@@ -143,8 +143,12 @@ def _ask_outlet(purpose: str, parts: list[Part], effort: str | None) -> str:
     token = os.getenv("AI_OUTLET_TOKEN", "").strip()
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    wait = float(appsettings.get("ai", "outlet_timeout"))
     try:
-        r = requests.post(outlet_url(), json=body, headers=headers, timeout=float(appsettings.get("ai", "outlet_timeout")))
+        r = requests.post(outlet_url(), json=body, headers=headers, timeout=wait)
+    except requests.Timeout as e:
+        # 届かないのとは直し方が違う(待ち時間・層の混み具合)ので、Gemini の時間切れと同じ言い方にそろえる(契約テスト)
+        raise OutletError(f"AI の出口(⚙ →「AI の設定」の URL)から、時間内に返事がありませんでした(待ち時間 {wait:g} 秒)") from e
     except requests.RequestException as e:
         raise OutletError(f"AI の出口(⚙ →「AI の設定」の URL)に届きませんでした: {type(e).__name__}") from e
     try:
@@ -228,8 +232,10 @@ async def list_models(refresh: bool = False) -> dict:
 def explain(e: BaseException) -> str:
     """AI を呼べなかった理由を、人に分かる言葉で(元の文も短く添える)"""
     if isinstance(e, OutletError):
-        return e.message
-    if isinstance(e, (asyncio.TimeoutError, TimeoutError)):
+        # 混み合いは、Gemini と同じ言葉を添える(層の理由の文は、層ごとにちがうため)
+        return f"混み合っているか、使える量の上限に達しています。({e.message})" if e.status == 429 else e.message
+    # SDK の時間切れは httpx の ReadTimeout など(asyncio の TimeoutError ではない)
+    if isinstance(e, (asyncio.TimeoutError, TimeoutError)) or type(e).__name__.endswith("Timeout"):
         return "時間内に返事がありませんでした(待ち時間を延ばすか、混み具合・つながりを確かめてください)"
     if isinstance(e, KeyError) and "GOOGLE_CLOUD_PROJECT" in str(e):
         return "サーバーの設定に GOOGLE_CLOUD_PROJECT がありません"

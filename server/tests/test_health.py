@@ -46,7 +46,19 @@ class DiagnoseTest(Base):
         self.assertTrue(db[0].fix)
         self.assertEqual(by_area(items, "google")[0].status, "missing")
         self.assertEqual(by_area(items, "bq")[0].goto, "dataimport")
-        self.assertEqual(by_area(items, "guard")[0].status, "warn")
+        # 入口の認証がなければ、中継からは開けないので「足りない」(⚙ の赤い点で気づけるように)
+        self.assertEqual(by_area(items, "guard")[0].status, "missing")
+        self.assertIn("CCP_AUTH=none", by_area(items, "guard")[0].fix)
+
+    def test_devtools_without_login_is_flagged(self) -> None:
+        # 開発用の画面が有効で、ログインがなければ、入れる人を見分けられない(X103)
+        with mock.patch.dict(os.environ, {"CCP_DEVTOOLS": "1", "APP_PASSWORD": "pw"}):
+            items = self.run_light()
+        dev = [i for i in by_area(items, "guard") if "開発用の画面" in i.text]
+        self.assertEqual([i.status for i in dev], ["warn"])
+        with mock.patch.dict(os.environ, {"CCP_DEVTOOLS": "1", "CCP_DEV_USER_EMAIL": "a@example.com"}):
+            items = self.run_light()
+        self.assertEqual([i.status for i in by_area(items, "guard") if "開発用の画面" in i.text], ["ok"])
 
     def test_bad_url_shape(self) -> None:
         with mock.patch.dict(os.environ, {"DATABASE_URL": "postgresql://u:p@ss@host/db"}):

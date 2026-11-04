@@ -46,7 +46,7 @@ server/postgres.log
 # 写真版のスクリーンショット(利用先の画像が写るので、Git に入れない。手元だけに置く)
 docs/screenshots-photo/
 
-# Workbench 版のリリース ZIP と、その確かめの作業フォルダ(npm run release:workbench)
+# リリース ZIP と、その確かめの作業フォルダ(npm run release:aws)
 release-out/
 
 # 開発用の画面(/dev/)の作業ファイル(利用先の表の名前を含む。docs/DEVTOOLS.md)

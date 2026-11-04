@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Badge, Button, Dropdown, MessageBar, MessageBarBody, Option, SearchBox, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { Badge, Button, Dropdown, MessageBar, MessageBarBody, Option, SearchBox, Spinner, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { DatabaseRegular, PlayRegular, TableRegular, EyeRegular, CheckmarkCircleRegular, PanelLeftContractRegular, PanelLeftExpandRegular, PanelRightExpandRegular, SparkleRegular, HistoryRegular, StopRegular, SaveRegular } from '@fluentui/react-icons'
-import { DevApi, bytesLabel, isFailure, type Column, type DryRun, type RunResult, type Settings, type TableInfo } from './api'
+import { DevApi, bytesLabel, isFailure, type Column, type DryRun, type PgStatus, type PgTable, type RunResult, type Settings, type TableInfo } from './api'
 import { CopyButton } from './CopyButton'
 import { ResultGrid } from './ResultGrid'
 import { SqlEditor, type SqlCatalog } from './SqlEditor'
@@ -79,6 +79,8 @@ const useStyles = makeStyles({
   mono: { fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
   editor: { overflow: 'hidden' },
   muted: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  // CCP の DB の表の列(表を押すと開く)
+  pgCols: { display: 'flex', flexDirection: 'column', gap: '2px', padding: '2px 4px 6px 26px', fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground2 },
 })
 
 // SQL の書きかけは、この画面を開いている人のブラウザにだけ残す(作業の記録は、版の保存で残す。DEVTOOLS.md 3.1)
@@ -99,6 +101,8 @@ const writeDraft = (v: string) => {
 }
 
 const ROW_CHOICES = [20, 200, 1000]
+// CCP の DB は、1 回 200 行まで(サーバーでも上限)
+const PG_ROW_CHOICES = [20, 200]
 
 // ペインの幅と、開いているか(左: データセットと表 / 右: AI との会話。真ん中は残り。ただし 420px は残し、窓が狭ければ横にスクロール)。
 // この画面を開いている人のブラウザに覚える
@@ -167,6 +171,31 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
   const [result, setResult] = useState<RunResult | null>(null)
   const [sqlError, setSqlError] = useState('')
 
+  // SQL の流す先(X104): BigQuery か、CCP の DB(PostgreSQL。読むだけ・ログインした開発者だけ)
+  const [target, setTarget] = useState<'bigquery' | 'pg'>('bigquery')
+  const [pg, setPg] = useState<PgStatus | null>(null)
+  const [pgTables, setPgTables] = useState<PgTable[]>([])
+  const [pgOpen, setPgOpen] = useState('')
+  const [pgMore, setPgMore] = useState(false)
+  const isPg = target === 'pg'
+  useEffect(() => {
+    void (async () => {
+      const st = await DevApi.pgStatus()
+      if (isFailure(st)) return
+      setPg(st)
+      if (!st.available) return
+      const t = await DevApi.pgTables()
+      if (!isFailure(t)) setPgTables(t.tables)
+    })()
+  }, [])
+  const switchTarget = (t: 'bigquery' | 'pg') => {
+    setTarget(t)
+    setResult(null)
+    setDry(null)
+    setSqlError('')
+    if (t === 'pg' && maxRows > 200) setMaxRows(200)
+  }
+
   const changeSql = useCallback((v: string) => {
     setSql(v)
     writeDraft(v)
@@ -229,6 +258,20 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
     setBusy('run')
     setSqlError('')
     setStopped(false)
+    if (isPg) {
+      // CCP の DB: 読むだけの取引の中で流す(止めるボタンはない。時間の上限でサーバーが止める)
+      const r = await DevApi.pgRun(text, Math.min(maxRows, 200))
+      setBusy('')
+      if (isFailure(r)) {
+        setResult(null)
+        setSqlError(r.error)
+      } else {
+        setResult({ ok: true, columns: r.columns, rows: r.rows, total_rows: null, bytes: null, billed: null, seconds: r.seconds, cached: false })
+        setPgMore(r.more)
+        setDry(null)
+      }
+      return
+    }
     const id = `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
     runId.current = id
     const r = await DevApi.run(text, maxRows, id)
@@ -275,19 +318,26 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
   // エディタは打つたびに候補を聞くので、いまの一覧を ref で渡す(エディタを作り直さない)
   const catalogRef = useRef<SqlCatalog>({ tables: [], columns: [] })
   useEffect(() => {
-    catalogRef.current = {
-      tables: (tables ?? []).map((t) => ({ ref: t.ref, type: t.type })),
-      columns: Object.entries(columnsOf).flatMap(([table, cols]) => cols.map((c) => ({ name: c.name, type: c.type, table, description: c.description }))),
-    }
-  }, [tables, columnsOf])
+    catalogRef.current = isPg
+      ? {
+          tables: pgTables.map((t) => ({ ref: t.name, type: 'TABLE' })),
+          columns: pgTables.flatMap((t) => t.columns.map((c) => ({ name: c.name, type: c.type, table: t.name, description: c.choices?.join(' / ') }))),
+        }
+      : {
+          tables: (tables ?? []).map((t) => ({ ref: t.ref, type: t.type })),
+          columns: Object.entries(columnsOf).flatMap(([table, cols]) => cols.map((c) => ({ name: c.name, type: c.type, table, description: c.description }))),
+        }
+  }, [tables, columnsOf, isPg, pgTables])
   const catalog = useCallback(() => catalogRef.current, [])
 
   // AI に渡す「いまの SQL を流した結果」(エラー、または結果の先頭 20 行)
+  // CCP の DB の結果(行)は渡さない(ユーザーのメールアドレスなどが入っているため。見せたいときは、人が結果をコピーして会話に貼る。X104)
   const last = useMemo(() => {
     if (sqlError) return `エラー:\n${sqlError}`
+    if (result && isPg) return `${result.rows.length} 行が返りました(CCP の DB の結果の中身は、AI に渡していません)`
     if (result) return `${result.total_rows ?? '?'} 行(先頭 ${Math.min(20, result.rows.length)} 行):\n\n${toMarkdown(result.columns, result.rows.slice(0, 20))}`
     return ''
-  }, [sqlError, result])
+  }, [sqlError, result, isPg])
 
   const shown = useMemo(() => {
     const f = filter.trim().toLowerCase()
@@ -312,15 +362,43 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
             <span className={s.grow}>データセット</span>
             <Button size="small" appearance="subtle" icon={<PanelLeftContractRegular />} onClick={() => setWidths((w) => ({ ...w, leftOpen: false }))} title="畳む" />
           </div>
+          {isPg ? (
+            <>
+              <span className={s.muted}>CCP の DB の表(server/schema.json)。押すと列が開きます</span>
+              <div className={s.list}>
+                {pgTables.map((t) => (
+                  <div key={t.name}>
+                    <button type="button" className={mergeClasses(s.item, pgOpen === t.name && s.itemOn)} onClick={() => setPgOpen(pgOpen === t.name ? '' : t.name)} title={t.name}>
+                      <TableRegular />
+                      <span className={s.itemName}>{t.name}</span>
+                    </button>
+                    {pgOpen === t.name && (
+                      <div className={s.pgCols}>
+                        {t.columns.map((c) => (
+                          <span key={c.name} title={c.choices?.join(' / ')}>
+                            {c.name} <span className={s.muted}>{c.type}</span>
+                          </span>
+                        ))}
+                        <Button size="small" appearance="subtle" onClick={() => changeSql(`SELECT *\nFROM ${t.name}\nORDER BY created_on DESC\nLIMIT 20`)}>
+                          この表を見る SQL を入れる
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
           <DatasetPicker value={dataset} recent={settings.datasets ?? []} onOpen={(d) => void openDataset(d)} busy={loadingTables} />
-          {dataset && tables && <span className={s.mono}>{dataset}</span>}
+          )}
+          {!isPg && dataset && tables && <span className={s.mono}>{dataset}</span>}
           {tablesError && (
             <MessageBar intent="error" layout="multiline">
               <MessageBarBody>{tablesError}</MessageBarBody>
             </MessageBar>
           )}
           {loadingTables && <Spinner size="tiny" label="表の一覧を読んでいます" />}
-          {tables && (
+          {!isPg && tables && (
             <>
               <SearchBox size="small" placeholder={`表を絞り込む(${tables.length} 件)`} value={filter} onChange={(_, d) => setFilter(d.value)} />
               <div className={s.list}>
@@ -342,7 +420,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
         <Splitter label="ドラッグで幅を変える(ダブルクリックで元に戻す)" onDrag={widths.leftOpen ? dragLeft : () => undefined} onReset={() => setWidths(WIDTHS)} />
       </div>
       <div className={s.main}>
-        {selected && <TableDetail refName={selected} info={info} error={infoError} loading={busy === 'info'} onOpenTable={(r) => void openTable(r)} onUseSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />}
+        {!isPg && selected && <TableDetail refName={selected} info={info} error={infoError} loading={busy === 'info'} onOpenTable={(r) => void openTable(r)} onUseSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />}
 
         <div className={s.card}>
           <div className={s.row}>
@@ -355,18 +433,33 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
               保存
             </Button>
           </div>
-          <WorkPanel output={output} onOutput={setOutput} sql={sql} onLoadSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />
-          <span className={s.muted}>流せるのは SELECT だけです(表を作る SQL は、BigQuery のコンソールで実行します)。Ctrl + Enter で流します(一部を選ぶと、その部分だけ)。表・列の名前は、打つと候補が出ます。</span>
+          {/* 流す先(X104)。CCP の DB は、ログインした開発者だけ。使えないときは切り替えを出さず、なぜかを 1 行で */}
+          {pg?.available ? (
+            <TabList size="small" selectedValue={target} onTabSelect={(_, d) => switchTarget(d.value as 'bigquery' | 'pg')}>
+              <Tab value="bigquery">BigQuery</Tab>
+              <Tab value="pg">CCP の DB</Tab>
+            </TabList>
+          ) : (
+            pg && <span className={s.muted}>{pg.reason}</span>
+          )}
+          {!isPg && <WorkPanel output={output} onOutput={setOutput} sql={sql} onLoadSql={changeSql} onAsk={(text) => setAsk({ id: Date.now(), text })} />}
+          <span className={s.muted}>
+            {isPg
+              ? `CCP のアプリの DB(PostgreSQL)を読みます。読むだけの取引の中で流すので、書き込みはできません。1 回 ${pg?.timeout_s ?? 15} 秒・${pg?.max_rows ?? 200} 行まで。AI には表と列の形だけを渡し、結果の中身は渡しません。Ctrl + Enter で流します。`
+              : '流せるのは SELECT だけです(表を作る SQL は、BigQuery のコンソールで実行します)。Ctrl + Enter で流します(一部を選ぶと、その部分だけ)。表・列の名前は、打つと候補が出ます。'}
+          </span>
           {saveNote && <span className={s.muted}>{saveNote}</span>}
           <div className={s.editor} style={{ height: `${editorH}px` }}>
             <SqlEditor value={sql} onChange={changeSql} onRun={() => void runSql(selection.trim() ? selection : sql)} onSelection={setSelection} catalog={catalog} />
           </div>
           <ResizeBar height={editorH} onHeight={setEditorH} min={120} reset={260} />
           <div className={s.row}>
-            <Button size="small" icon={<CheckmarkCircleRegular />} onClick={() => void dryRun()} disabled={!sql.trim() || !!busy} title="BigQuery の dry-run。料金はかかりません">
-              料金なしで確認する
-            </Button>
-            {busy === 'run' ? (
+            {!isPg && (
+              <Button size="small" icon={<CheckmarkCircleRegular />} onClick={() => void dryRun()} disabled={!sql.trim() || !!busy} title="BigQuery の dry-run。料金はかかりません">
+                料金なしで確認する
+              </Button>
+            )}
+            {busy === 'run' && !isPg ? (
               <Button size="small" icon={<StopRegular />} onClick={() => void stop()} disabled={stopped} title="BigQuery の問い合わせを止める(止まるまでに読んだ分は、課金されることがある)">
                 {stopped ? '止めています…' : '止める'}
               </Button>
@@ -377,6 +470,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
                 icon={<PlayRegular />}
                 onClick={() => void runSql(selection.trim() ? selection : sql)}
                 disabled={!sql.trim() || !!busy}
+                aria-label={isPg ? 'CCP の DB に流す' : undefined}
                 title={selection.trim() ? 'エディタで選んでいる部分だけを流す' : 'SQL の欄の全部を流す(一部を選ぶと、その部分だけ)'}
               >
                 {selection.trim() ? '選んだ部分を流す' : '流す'}
@@ -403,7 +497,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
               </Dropdown>
             )}
             <Dropdown size="small" style={{ minWidth: '120px' }} value={`先頭 ${maxRows} 行`} selectedOptions={[String(maxRows)]} onOptionSelect={(_, d) => setMaxRows(Number(d.optionValue))}>
-              {ROW_CHOICES.map((n) => (
+              {(isPg ? PG_ROW_CHOICES : ROW_CHOICES).map((n) => (
                 <Option key={n} value={String(n)}>{`先頭 ${n} 行`}</Option>
               ))}
             </Dropdown>
@@ -434,7 +528,11 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
             <ResultGrid
               columns={result.columns}
               rows={result.rows}
-              note={`${result.total_rows?.toLocaleString() ?? '?'} 行のうち先頭 ${result.rows.length} 行 / 読んだ量 ${bytesLabel(result.bytes)}${result.cached ? '(キャッシュ)' : ''} / ${result.seconds} 秒`}
+              note={
+                isPg
+                  ? `CCP の DB: ${result.rows.length} 行${pgMore ? '(まだあります。条件で絞ってください)' : ''} / ${result.seconds} 秒`
+                  : `${result.total_rows?.toLocaleString() ?? '?'} 行のうち先頭 ${result.rows.length} 行 / 読んだ量 ${bytesLabel(result.bytes)}${result.cached ? '(キャッシュ)' : ''} / ${result.seconds} 秒`
+              }
             />
           )}
           {result?.job && <JobInfo job={result.job} />}
@@ -470,6 +568,7 @@ export function BqTab({ settings, onSettings }: { settings: Settings; onSettings
         selected={selected}
         sql={sql}
         last={last}
+        target={target}
         hasError={!!sqlError}
         notes={settings.notes ?? ''}
         onNotes={(notes) => onSettings({ ...settings, notes })}

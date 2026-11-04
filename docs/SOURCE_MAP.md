@@ -2,7 +2,7 @@
 
 CCP のソースファイルが、どこに・何のためにあるかの一覧。はじめてコードを読む人と、「この変更はどこを触ればよいか」を探す人向け。
 
-- 最終更新: 2026-10-30(`main` の時点のファイル。行数は目安)
+- 最終更新: 2026-11-03(`main` の時点のファイル。行数は目安)
 - 設計の約束事・AI の仕組みの詳しい話は [ARCHITECTURE.md](ARCHITECTURE.md)<!-- hosted:begin -->、サーバー・DB・AI は [GCP.md](GCP.md)、いまどこにいるかは [HANDOVER.md](HANDOVER.md)<!-- hosted:end -->
 - ファイルを足したり、役割を変えたりしたら、この表も直す
 
@@ -174,10 +174,12 @@ flowchart TD
 | `server/` | サーバー(Python / FastAPI)。画面・データ API・AI・画像を配る |
 | `scripts/` | 反映・検証・撮影・Workbench の運用などの補助スクリプト |
 | `docs/` | 文書、ワイヤーフレーム、スクリーンショット、サンプルデータ(CSV) |
+| `tools/` | 開発側の道具(ZIP に入れない。ただし AI の出口の見本の層 `tools/ai-outlet/sample_layer.py` は入れる)。`tools/ms-verify/` は Copilot Studio を CCP から呼ぶ検証の道具(`npm run pack:ms-verify` で ZIP に固める。結果は `docs/MS_AI_VERIFY.md`) |
+| `release/` | 利用先に渡す ZIP の置き換えの文書(`release/aws/files` の README・CLAUDE.md。`scripts/release.mjs` が重ねる) |
 | `.github/workflows/ci.yml` | GitHub の CI(スキーマの照合・型チェック・lint・ビルド・サーバーのテスト) | <!-- hosted -->
 | `index.html` | 画面の入口の HTML |
 | `vite.config.ts` / `vite.mock.config.ts` | ビルドの設定(本番 / 撮影用。1 章) |
-| `package.json` | npm のスクリプト(`dev`・`build`・`verify`<!-- hosted:begin -->・`deploy:gcp`<!-- hosted:end -->・`dev:gcp` と `build:gcp`(`dev`・`build` と同じ。Workbench の手順のため)<!-- hosted:begin -->・`screenshots`<!-- hosted:end -->・`seed:export`・`release:workbench`) |
+| `package.json` | npm のスクリプト(`dev`・`build`・`verify`<!-- hosted:begin -->・`deploy:gcp`<!-- hosted:end -->・`dev:gcp` と `build:gcp`(`dev`・`build` と同じ。Workbench の手順のため)<!-- hosted:begin -->・`screenshots`<!-- hosted:end -->・`seed:export`<!-- hosted:begin -->・`release:aws`・`release:workbench`<!-- hosted:end -->) |
 | `Dockerfile` / `.dockerignore` / `.gcloudignore` / `cloudbuild.yaml` | Cloud Run のコンテナと、そのビルド | <!-- hosted -->
 | `tsconfig*.json` / `eslint.config.js` | 型チェック・lint の設定 |
 | `CLAUDE.md` / `README.md` | AI アシスタント向けの約束事 / 全体の紹介 |
@@ -358,6 +360,7 @@ flowchart TD
 | `parts.ts` | 188 | 「部品」の型(プレビューの上で押して選ぶ単位)と、プレビューの目印(`data-part`・`data-anchor`)との読み替え |
 | `PartPane.tsx` | 1,259 | 選んだ部品のペイン(文言・メイン画像・商品・空いた枠・リンク先など、部品ごとの欄。商品の箱の真下に「商品を入れ替える」と「画像を替える」) |
 | `ProductDetailFields.tsx` | 121 | 商品の枠の「素材・機能を詳しく見せる」(X80)のスイッチ(部品のペインのいちばん上)と、オンのときの見出し・説明文の欄(その枠だけ横いっぱいの、写真 + 見出し + 長い説明の行) |
+| `pageOverlap.ts` | 43 | 「詳しく」の説明文のうち、商品ページの本文と重なる所を探す(X80 段 ③。書く人の画面にだけ薄い印。表示のたびに計算し、保存しない) |
 | `PartAiChat.tsx` / `partAi.ts` | 202 / 328 | 選んだ部品を AI に頼む(指示の例の札・案 3 つ・乗せると仮に写る・押すと採用。何も選んでいないときは配信の全体) |
 | `editor.ts` | 211 | シンプルな画面で直せる、配信カードの入力欄(CardDetail の Form の一部) |
 | `CommPane.tsx` | 608 | やり取りのペイン(状態の道のりと次に動く人・書き込み / タスク / 承認の 1 本の流れ・書く欄。承認・差し戻しも) |
@@ -366,6 +369,7 @@ flowchart TD
 | `NotesAiDraft.tsx` | 119 | 渡す文章(制作指示)の AI(「AI で書く」→ 欄の真下に案 → 押した案がそのまま入る。プレビューに出ない長い文なので、試す → 確定にしない) |
 | `AbSettings.tsx` | 86 | AB テストの設定(SU2。案のタブの横の ⚙) |
 | `StageFrame.tsx` / `stageLayout.ts` | 373 / 90 | 面の枠(X90 の塊 A)。計画・制作・結果のシンプルな画面が載る共通の枠: 上の帯(`StageFrame`: キャンペーンの帯・案の段・題・タブ・状態の札・保存の様子・保存の問題・↶・主のボタン・⋯・×)・帯の下のお知らせ・列の並び(`StagePanes`: 左のバーと開いたパネル・境目・右のペイン・右端の列)・プレビュー(`PreviewFrame`: 道具の行・スマホ / PC・ピン・ピンを打つ間の帯・倍率・つかんで動かす)・右のペイン(`StagePane`)。列の幅と狭いときの割り振り(`useStageLayout`)、倍率の鍵 `STAGE_ZOOM_KEY` は面で 1 つ |
+| `PaneCrumbs.tsx` | 90 | 右のペインの見出し(パンくずと ×・何も選んでいないときの題と ⓘ)と、その場の一言の案内 `PaneHint`(塊 B。計画・制作・結果で共通) |
 | `useSidePanel.ts` / `useStageNoteCounts.ts` / `useAssetDrop.tsx` / `StageTalkPanel.tsx` | 22 / 31 / 52 / 65 | 計画・制作・結果の面で同じ形のもの(2026-11-02 にまとめた): 左のバーの欄の開け閉め(しまう動きの間の中身・moving)/ やり取りの欄の数(その段の未解決の書き込み・タスク)/ 左のバーに落とした画像・資料・URL を素材に入れる(SideRail の drop と知らせの印)/ やり取りの欄(書き込み + タスク。制作・結果) |
 | `StageChip.tsx` / `chipBase.ts` / `VariantTabs.tsx` / `StagePins.tsx` / `useDebouncedSave.ts` | 35 / 17 / 40 / 59 / 24 | 計画・制作・結果の面で同じ形のもの(2026-11-03 にまとめた): 上の帯の状態の札(色の点と短い言葉。承認の札 `ApprovalChip` も形 `chipBase` は同じ)/ AB テストの案のタブ(キャンペーンの帯の案の段か、題の帯の 2 段目)/ プレビューのピンとピンのフロート(計画と、制作の企画の見本の上)/ 入力が止まって 1.5 秒で自動で保存し、閉じる前に打ちかけを保存する(flush)。キャンペーンの帯と × は `StageFrame` の `campaign` が置く |
 | `StageHeader.tsx` / `NextAction.tsx` / `nextStep.ts` | 46 / 78 / 24 | 上の帯(チャネル・配信名・日時を自分で描き、「題 → 段階のタブ PLAN \| PRODUCTION \| RESULTS → その面の状態の札 → 右の操作」の並び。計画と制作で同じ形で、上の部分が動かないように)/ 次にやることのボタン |
@@ -389,6 +393,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
+| `aiAdoption.ts` | 232 | AI の案の扱い(そのまま / 直した / 使わず)の記録(X56 (b))。案に比べるための指紋(文のハッシュと MinHash。案そのものではない)を付け、承認がそろったとき・制作に渡したときに、いまの中身と比べて `ai_runs.adoption` を決める |
 | `aiSelect.ts` | 784 | **AI の呼び出しの入口**(`askAgent`)と、商品・メイン画像・見出し・コピーの選定 |
 | `aiDraft.ts` | 323 | テーマ・コピー・制作指示・件名の「案」 |
 | `autoDraft.ts` | 237 | 「すべてAIで下書き」(1 回で 6〜9 回呼ぶ) |
@@ -421,6 +426,8 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ProductRankings.tsx` | 178 | 詳しい結果の「販売チャネルごとの順位」(R17。全社 / EC / 配信経由。配信前 4 週で Top N に入った週の数と、配信の週・翌週の順位)。「上位」とみなす線 Top N は、国の「アラートの基準」(`countrySettings.ts`) |
 | `ResultSummary.tsx` | 101 | 主な数字の札と、採用した AI の提案 |
 | `results/SimpleResultsPage.tsx` / `results/CampaignResultsTable.tsx` / `results/resultSums.ts` | 606 / 149 / 53 | 結果のシンプルな画面(X89。配信カード・制作と同じ窓で RESULTS に切り替え、ヒートマップの部品を押して数字)/ 結果の一覧のキャンペーンのまとめ方(木の形の表)/ キャンペーンの合計・商品の週の売れ方の計算 |
+| `results/ResultsAiPanel.tsx` / `results/resultsAi.ts` | 121 / 107 | 結果の画面の「AI の読み」(押したときだけ AI を呼ぶ。どう読めるか・次に試すこと・「メモに入れる」。`results.ai`)/ その依頼文と読み方 |
+| `data/weekRetros.ts` | 21 | 週の振り返り(表 `week_retros`。国だけ選べば書ける。読む順は 組 → 国だけ → 以前の `weeks.retro`) |
 | `ResultCompare.tsx` | 324 | 過去の配信と比べる・AI の振り返り |
 | `HeatPreview.tsx` | 193 | プレビューの上に、リンクごとのクリックを重ねる |
 | `results.ts` | 425 | 結果の計算(前週比・前年比・まとめ)と、CSV の読み書き |
@@ -466,6 +473,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ResizableSurface.tsx` / `floatMove.ts` | 71 / 59 | 大きさを変えられ、種類ごとに大きさを覚えるフロートの枠(決まり 2)/ 題の行をつかんで動かす(位置は覚えない。2 回押すと戻る) |
 | `PaneRail.tsx` / `PaneSpinner.tsx` | 43 / 13 | たたんだペインの細い帯 / ペインの中の読み込み中の印 |
 | `LabeledValue.tsx` / `typo.ts` | 59 / 25 | ラベルと値の組(ラベルは小さく薄く、値は 14px・semibold)/ 文字の階層(`makeStyles` の中で広げて使う) |
+| `CopyButton.tsx` / `emptyValue.ts` | 45 / 7 | コピーのボタン(1 つにまとめた。`LabeledValue` の `copy` も使う)/ 空の値の出し方(未設定 / —) |
 | `Hint.tsx` / `hints.ts` | 40 / 26 | 慣れたら閉じられる案内(X72。閉じたかを人ごとに覚える)/ その覚えと「ヒントをもう一度出す」 |
 | `SearchField.tsx` | 96 | 検索の欄(`SearchBox`)と件数、絞り込みのチップ(X71) |
 | `fuzzySearch.ts` | 189 | あいまいな検索(かな・全角半角・記号をそろえ、言い換え・1 文字の打ち間違い・順に含むでも当て、近い順に。当たった所を返す。X87 の「使える機能」から) |
@@ -492,6 +500,10 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `production/SimpleProductionPage.tsx` | 1,546 | 制作の面のシンプルな画面(X86。配信カードと同じ窓で PLAN ↔ PRODUCTION を切り替える。上は計画と同じ題の行・キャンペーンの帯・AB の案の段、左のバー(渡されたもの・やり取り・タスク・素材・工程)、企画の見本のプレビュー(部品を押せる。上に配信の情報の帯)、右に部品のペイン。題の行に、自分の番のときだけ工程の青いボタンと「仕上がりを見る」。写しとコピーの値は `productionSnapshot.ts` と同じ) |
 | `production/useProductionFlow.ts` / `production/StepAction.tsx` / `production/StepsPane.tsx` | 114 / 99 / 58 | 制作の工程(X86 の ①。`prod.steps`・`prod.result`): 段の決め方と進める操作(① 渡す → ② 受け取る → ③ 制作する → ④ 仕上がりの確認 → ⑤ 送る。⑤ は `prod.export` が公開のときだけ)/ 段を進めるボタン(題の行と左のバーで共通)/ 左のバーの「工程」(道のり・済んだ段のだれがいつ・だれの番でも押せるボタン・やり直す / 取り下げる) |
 | `production/AbHandoffSection.tsx` | 108 | 渡されたものの「AB テスト」の欄(P40。AB の配信のときだけ): まとめ・案ごとのメイン画像・見出し・商品・utm_campaign(コピー)・この案のリンクをコピー・計測の注意。見るだけ。判定は `card.abtest`(案から選ぶは `card.variants`)。差し込むのはシンプルな制作の画面の「渡された」 |
+| `production/MaterialRows.tsx` | 215 | 制作の材料の行(塊 C): 商品(画像・コード・価格・URL・「詳しく」の全文を行ごとにコピー)・リンク先と計測の対応表(utm_content ごと)・部品の画像 |
+| `production/ProductionChanges.tsx` / `production/changeRows.ts` | 131 / 99 | 企画から変えた所の一覧(左のバーの「変更」。企画の値に線・行ごとに戻す・すべて戻す・直した人と日時)/ 写しと直したあとの比べ方 `snapshotChanges`(プレビューの印にも使う) |
+| `production/ProductionPartEdit.tsx` | 277 | 部品のペインの「直す」(文言・メイン画像・商品・リンク先。企画から変更の印・戻す) |
+| `MaterialPickers.tsx` | 165 | 制作で使うメイン画像・商品を選び直す部品(`ProductPicker`・`HeroPicker`。K4 で ProductionInfoPane から移した) |
 | `HtmlEditor.tsx` / `HtmlPreviewFrame.tsx` | 78 / 114 | HTML のエディタ(開いたときに読み込む)/ HTML をそのまま描くプレビュー(縮小・拡大・全体) |
 | `productionSnapshot.ts` | 527 | 配信カードの写し(制作に要る中身を固める)、コピー用の行、プレビューの HTML の書き出し |
 | `useProductionRequests.ts` / `notesStage.ts` | 67 / 11 | 制作の依頼の読み込み(制作の面・札)/ やり取りの段階(企画 / 制作) |
@@ -511,6 +523,12 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `CountryTemplatesPanel.tsx` / `CountryLearningsPanel.tsx` / `CountryPoliciesPanel.tsx` | 27 / 58 / 79 | 国で使うテンプレート(ST1)/ 学び(ST5。国のデッキ)/ 決まり(ST8) |
 | `PatternPanel.tsx` / `samplePatterns.ts` | 182 / 33 | 国ごとの配信の型(ST9。「まとめて作る」が、この型どおりに枠を作る。表は `data/deliveryPatterns.ts`)/ その見本 |
 | `BrandPanel.tsx` / `SenderName.tsx` | 162 / 9 | 差出人の名前・店の URL・utm_source と utm_medium(ST10。全社の既定と国の上書き)/ 差出人の名前の表示 |
+| `UrlPatternFields.tsx` | 262 | 店の URL の形(`settings.shopurl`。X92): 実際の URL を 1 つ貼ると、商品コード・カテゴリの値・配信の ID を見つけて形を作り、別の見本の URL で見せる(`{ }` で書く欄は畳む) |
+| `DataImportPanel.tsx` / `dataImportState.ts` / `data/dataImport.ts` | 471 / 52 / 109 | ⚙ → 全社 →「データの取り込み」(`settings.dataimport`。管理する人だけ。出力ごとに 1 行の表・⋯ の操作・行を開いた所に流れ・時刻・記録)/ ⚙ の赤い点のための状態(10 分ごとに読む)/ `/api/bq/*` の窓口 |
+| `BqLocations.tsx` / `useBqLocations.ts` | 136 / 75 | データの取り込みの「表の場所」(ジョブのプロジェクト・出力ごとの読む場所・更新の合図に見る表。「接続を確認」は保存の前の値で読むだけ) |
+| `AiSettingsPanel.tsx` | 240 | ⚙ → 全社 →「AI の設定」(`settings.ai`。モデルをいま使える一覧から選ぶ・考える深さ・同時に呼ぶ数・AI の出口。「試す」・保存の前の自動の試し) |
+| `SettingsHealthPanel.tsx` / `healthState.ts` / `data/health.ts` | 133 / 39 / 37 | ⚙ → 全社 →「設定の状態」(`settings.setup`。健康診断の行ごとの札・理由・直し方・「直す」)/ ⚙ の赤い点 / `GET /api/settings/health` |
+| `SettingsChanges.tsx` / `data/appSettings.ts` / `models/appSettings.ts` | 58 / 70 / 13 | DB に持つ仕事の設定(表 `app_settings`)を変えた記録の一覧 / `GET・PUT /api/settings/{bq,ai}` の窓口と型 |
 | `SampleShopPanel.tsx` | 191 | 「開発・管理」→「見本の商品ページ」(X76。表 `product_images` を読むだけ。表は `data/productImages.ts`) |
 | `productImageImport.ts` | 76 | ⚙ の「商品・メイン画像の写真の ZIP を取り込む」(まず件数だけ見せ、OK のときだけ取り込む) |
 
@@ -554,11 +572,13 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `gcp/readShare.ts` | 同じ表・同じ条件の読み込みが重なったら、1 回の通信を分け合う |
 | `gcp/samples.ts` | ⚙ の「開発・管理」の見本のデータを作る(`/api/ads/sample`・`/api/impact/sample`) |
 | `data/stockCover.ts` | 在庫の持ちの材料(直近 4 週の販売数と最新の在庫)を、商品コードの一覧から 1 回で読む(表ではなく API。`server/ccp/stock_cover.py`) |
+| `productPageText.ts` / `data/productPageTexts.ts` / `models/productPageTexts.ts` | 31 / 6 / — | 商品ページの本文(表 `product_page_texts`。X80 段 ②)。`productPageText(product)` は、残した本文 → なければページを読む |
 | `mock/db.ts` ・ `mock/agent.ts` ・ `mock/seed.ts` | 撮影・デモ用の、DB と AI の身代わりと、サンプルデータ(本番のビルドには入らない) |
 | `mock/approvals.ts` ・ `mock/production.ts` ・ `mock/me.ts` ・ `mock/metricsImport.ts` ・ `mock/ads.ts` ・ `mock/csv.ts` | 撮影・デモ用の、サーバーの窓口(`/api/approvals`・`/api/production`・`/api/me`・指標の取り込み)の身代わりと、外部広告の出稿の見本(`server/ccp/ads.py` と同じ作り方) |
 | `mock/stockCover.ts` ・ `mock/devApi.ts` | 撮影・デモ用の、在庫の持ちの窓口と、開発用の画面(`/dev/`)の窓口の身代わり |
+| `mock/dataImport.ts` ・ `mock/appSettings.ts` ・ `mock/health.ts` | 撮影・デモ用の、データの取り込みの状態・仕事の設定・設定の健康診断の窓口の身代わり(見本の状態を返す) |
 
-### 3.10 開発用の画面(`src/dev/`。B10。Workbench だけ)
+### 3.10 開発用の画面(`src/dev/`。B10)
 
 `/dev/` で開く、CCP の画面とは別のページ(`CCP_DEVTOOLS=1` のときだけ)。BigQuery を見る・SELECT を試す・Gemini と会話して SQL を作る・出力ごとの版と答え合わせ・ポリシーの文書の取り込み。設計は [DEVTOOLS.md](DEVTOOLS.md)、サーバーは `server/ccp/devtools/`。
 
@@ -591,13 +611,15 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/ai.py` | 91 | `/api/ask`。依頼文を Gemini(Vertex AI)に渡し、返答をそのまま返す |
 | `ccp/approvals.py` | 307 | 承認の依頼・承認・差し戻し・やり直し(`/api/approvals`) |
 | `ccp/production.py` | 346 | 制作の依頼(`/api/production`。依頼・受け取る・終わった・仕上がりの確認(OK / 直してほしい)・送る・やり直す・HTML・要素の直し) |
-| `ccp/identity.py` | 116 | ログインしている人(`/api/me`) |
+| `ccp/identity.py` | 268 | 入口の認証の差し込み口(入ってよいか・ログインしている人。`/api/me`) |
+| `ccp/oidc.py` | 331 | 入口の認証の OIDC のアダプター(Entra ID などの SSO。`/auth/login`・`/auth/callback`・`/auth/logout`) |
 | `ccp/policies.py` | 504 | 方針と決まりの取り込みと、AI への渡し方 |
 | `ccp/metrics.py` | 171 | 商品・カテゴリの週の指標の取り込み(`/api/metrics/import` と `ccp.cli import-metrics`。CSV の週 × 市場の行を置き換える) |
 | `ccp/heroes.py` | 119 | メイン画像を上げる・AI で画像を読んで下書き(`/api/heroes/upload`・`/api/heroes/describe`。X59) |
 | `ccp/help.py` | 344 | 「？ 聞く」の質問の保存と、よく聞かれる質問のまとめ直しの札・保存・数え上げ(`/api/help`。X82 段 ④。生の記録はまとめてから 90 日で消す) |
 | `ccp/linkpreview.py` | 153 | 素材の URL の見本カード(ページの題名・説明・代表の画像を 1 回だけ取る。公開のアドレスだけ。`/api/creative/preview`) |
 | `ccp/product_pages.py` | 623 | 商品ページから配信で使う画像を選ぶ(X64。`/api/product-pages/images`・`suggest`(Gemini でアングルとおすすめ)・`adopt`(素材の置き場所に写す))。見本の EC サイト(`/sample-shop/p/<コード>`・`/sample-shop/img/<コード>/<アングル>.svg`。絵の型は `ccp/sample_shop/*.svg`) |
+| `ccp/page_text.py` | 152 | 商品ページの本文の取り出し(X80 段 ②。`<main>` / `<article>` だけ・ナビなどを除く・JSON-LD の Product の description を先頭に・8,000 字)。表 `product_page_texts` |
 | `ccp/creative.py` | 105 | 素材のファイルの置き場所(`/api/creative/files`。本番はバケットの `creative/`、Workbench は `ASSET_DIR/creative`) |
 | `ccp/ads.py` | 93 | 外部広告の出稿の記録(表 `ad_spends`。X49)。`/api/ads/sample` で見本を作り直す(消すのは `campaign` が `sample:` で始まる行だけ) |
 | `ccp/bq.py` / `ccp/bq_import.py` / `ccp/bq_validate.py` | 141 / 367 / 267 | BigQuery の出力の定義 / 取り込み(SPU・SKU・在庫・週ごとの実績・天気予報・販売チャネルごとの順位。商品の性別の読み替え)/ 取り込む前の確かめ |
@@ -608,6 +630,9 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/pack.py` | 263 | 引っ越し用のパック(すべてのデータと画像の ZIP)の書き出し・取り込み(古い版 1 のパックは「対応していません」で止める) |
 | `ccp/cli.py` | — | 運用のコマンド(`migrate` / `seed` / `counts` / `check` / `import-pack` / `import-metrics` / `import-images` / `bq-check` / `bq-dummy` / `ranking-dummy` / `sample-model-expiry`) |
 | `ccp/check.py` | 172 | 動かす前の確認(設定・DB・写真・画面のビルド) |
+| `ccp/health.py` | 416 | 設定の健康診断 `diagnose()`(行ごとに 済み・足りない・確認に失敗・注意と直し方・画面で直す所)。`ccp.cli check`・`GET /api/settings/health`(管理する人だけ)・起動のとき(軽く確かめてログに)の 3 か所で使う |
+| `ccp/appsettings.py` | 435 | 仕事の設定を DB に持つ(表 `app_settings`。BigQuery の表の場所・AI の設定・定期の取り込み)。読むのは `appsettings.get` だけ。最初に 1 回だけ環境変数から写し、そのあとは DB が正。5 分覚えて保存で捨てる。変えるたびに 1 行の記録。`/api/settings/{bq,ai}` |
+| `ccp/seeddata.py` | 28 | 見本のデータ(`seed.json`)の行の見分け(`cli seed` を BigQuery のある環境で止める・`cli remove-seed`・取り込みが止まった理由の「見本の商品です」) |
 | `ccp/importer.py` | — | 画像から、デモ用の商品・メイン画像のデータを作って取り込む運用ツール |
 | `seed.json` | — | 初期データ(`scripts/export-seed.mjs` が `src/mock/seed.ts` から作る) |
 | `ccp/impact.py` | — | 配信の効果の見本(⚙ の「効果の見本を作る」。`POST /api/impact/sample`。見本の行だけを置き換える) |
@@ -617,7 +642,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `ccp/stock_cover.py` | 61 | 在庫の持ちの材料を、商品コードの一覧から 1 回でまとめて返す(読むだけ) |
 | `ccp/product_images.py` | 300 | 商品の画像の ZIP を取り込み、商品につなぐ(表 `product_images`。`/api/product-images/import` と `ccp.cli import-images`) |
 | `ccp/model_expiry.py` | 61 | 見本の画像に、写っているモデル(人物)の使用期限を入れる(X77 の確かめ用。`ccp.cli sample-model-expiry`) |
-| `ccp/devtools/` | — | 開発用の画面(`/dev/`)の API(B10。`CCP_DEVTOOLS=1` のときだけ)。`ai_sql.py`(Gemini と会話して SQL を組む)・`bq_tools.py`(BigQuery を見る・流す)・`work.py`(出力ごとの版と答え合わせ)・`store.py`(作業フォルダ `server/devwork/`)・`gcs_policy.py`(ポリシーの文書の取り込み)・`tasks.py`(時間のかかる処理を裏で)・`common.py` |
+| `ccp/devtools/` | — | 開発用の画面(`/dev/`)の API(B10。`CCP_DEVTOOLS=1` のときだけ)。`ai_sql.py`(Gemini と会話して SQL を組む)・`bq_tools.py`(BigQuery を見る・流す)・`work.py`(出力ごとの版と答え合わせ)・`store.py`(作業フォルダ `server/devwork/`)・`gcs_policy.py`(ポリシーの文書の取り込み)・`pg_tools.py`(CCP の DB を読むだけ。開発者だけ。X104)・`tasks.py`(時間のかかる処理を裏で)・`common.py` |
 | `ccp/devimages.py` | 175 | 開発用の画面の「画像の一覧」(読むだけ) |
 | `tests/` | — | サーバーのテスト(`python -m unittest discover server/tests`。CI でも実行) |
 | `requirements.txt` / `requirements-tools.txt` | — | Python のパッケージ(サーバー / 運用ツール) |
@@ -628,15 +653,17 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 
 | ファイル | 役割 |
 |---|---|
-| `workbench.sh` | Workbench の操作(`setup` / `update` / `start` / `stop` / `restart` / `status` / `pg-start` / `check` / `import` / `log`) |
+| `workbench.sh` | Linux のサーバー(AWS など・Workbench)での操作(`setup` / `update` / `start` / `stop` / `restart` / `status` / `pg-start` / `check` / `import` / `log`)。足りない道具は `setup`・`update` の初めに教える。受け付けるアドレスは `CCP_HOST` |
 | `verify.mjs` | `npm run verify` の中身(表・承認・決まりの確かめのあと、型チェックと lint を同時に、ビルド。変えたのが文書だけなら重い所を飛ばす。`--full` で全部) |
 | `deploy-gcp.mjs` | 本番(Cloud Run)への反映(`npm run deploy:gcp`。main・最新・変更なしのときだけ) | <!-- hosted -->
-| `release-workbench.mjs` | 利用先に渡す Workbench 版の ZIP を作り、検査する(`npm run release:workbench`。[RELEASE.md](RELEASE.md)) | <!-- hosted -->
+| `release.mjs` | 利用先に渡す ZIP(AWS 版。停止した Workbench 版も)を作り、検査する(`npm run release:aws`。[RELEASE.md](RELEASE.md)) | <!-- hosted -->
+| `pack-ms-verify.mjs` | 検証の道具 `tools/ms-verify/` を ZIP に固める(`npm run pack:ms-verify`。利用先の ZIP には入れない) |
 | `check-schema.mjs` | `server/schema.json` と画面の型(`src/models`・`src/data`)の食い違いの検出(`npm run verify`) |
 | `check-approvals.mjs` | 承認の判定(`src/approvals.ts`)が、サーバーと同じ例(`server/tests/approval_cases.json`)で同じ結果になるかの確かめ(`npm run verify`) |
 | `check-policy.mjs` | must の決まりの確かめ(`src/policyCheck.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
 | `check-parts.mjs` / `check-slots.mjs` / `check-save.mjs` | 部品の配信ごとの中身(`src/partContent.ts`)/ 商品の並びとセクションの枠(`src/slots.ts`)/ 配信カードの保存の流れ(`src/saveFlow.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
 | `check-readiness.mjs` / `check-utm.mjs` / `check-template-ai.mjs` | 送る前の確認(`src/simple/readiness.ts`)/ 計測用の utm_content(`src/links.ts`)/ AI で作る・直すテンプレートの返答の読み方(`src/templateDraft.ts`・`src/templateEdit.ts`)が、例どおりに動くかの確かめ(`npm run verify`) |
+| `check-scale.mjs` | 開いたときの画面の大きさの自動(`src/uiScale.ts` の `autoScaleFor`。`settings.me.autoscale`)の境目を、例で確かめる(`npm run verify`) |
 | `export-seed.mjs` | 初期データを `server/seed.json` に書き出す(`npm run seed:export`) |
 | `gcp-smoke.mjs` | 本番・手元のサーバーの動作確認(画面を開いて、カードが出るか) | <!-- hosted -->
 | `screenshots.mjs` | スクリーンショットの撮影(撮影用のビルド + 模擬の AI) | <!-- hosted -->
@@ -651,7 +678,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 |---|---|
 | データの列・テーブルを足す | `server/schema.json`(サーバーが起動後に自動で足す)。型は `src/models/`、新しいテーブルは `src/data/` にサービスを足す |
 | AI の指示文・選定のしかたを変える | `src/aiSelect.ts`(選定)・`src/aiDraft.ts`(案)・`src/autoDraft.ts`(すべて下書き)。呼び出しは `askAgent` だけを通す |
-| AI のモデル・考える量を変える | 環境変数 `GEMINI_MODEL` / `GEMINI_THINKING`(`server/ccp/ai.py`) |
+| AI のモデル・考える量を変える | ⚙ → 全社 →「AI の設定」(DB の `app_settings`。読むのは `server/ccp/appsettings.py`。最初の 1 回だけ環境変数 `GEMINI_MODEL` / `GEMINI_THINKING` から写す。呼ぶのは `server/ccp/ai.py`) |
 | AI をほかの AI(外の層)に頼む | 環境変数 `AI_OUTLET_URL` ほか(`server/ccp/ai.py` の `generate`。約束は `docs/AI_OUTLET.md`、見本の層は `tools/ai-outlet/sample_layer.py`) |
 | 配信カードに部品・機能を足す | `src/simple/PartPane.tsx`(選んだ部品のペイン)・`src/simple/SimpleCardLayout.tsx`(中身の状態と保存は `src/useCardEditor.ts`) |
 | 配信カードの保存の流れを変える | `src/saveFlow.ts`(例は `scripts/check-save.mjs`)・`src/useCardEditor.ts` |
@@ -667,4 +694,4 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | 週の確認の項目を足す | `src/reviewChecks.ts` と `src/weekLabels.ts` |
 | ヘッダー・ツールバー・面の切り替え | `src/App.tsx`・`src/AppToolbar.tsx` |
 | 画面の文言を日英で足す | その場で `t('日本語', 'English')`(`src/i18n.ts`) |
-| Workbench の運用を変える | `scripts/workbench.sh`・`server/ccp/check.py`・[WORKBENCH.md](WORKBENCH.md) |
+| サーバー(AWS など・Workbench)の運用を変える | `scripts/workbench.sh`・`server/ccp/check.py`・[AWS.md](AWS.md)・[WORKBENCH.md](WORKBENCH.md) |

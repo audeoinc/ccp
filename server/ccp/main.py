@@ -1,13 +1,11 @@
 """CCP(Campaign Contents Planner)の GCP 版サーバー。
 
 1 つのプロセスで、画面(ビルド済みの dist-gcp)・データ API・AI(次の段階)を配信する。
-アクセスは HTTP Basic 認証(環境変数 APP_PASSWORD。営業支援システムと同じ仕組み)。
+入口の認証は、差し込み口 ccp/identity.py が設定で選ぶ(ログイン(OIDC)・画面のパスワード(Basic)・手前の IAP・なし)。
 """
 from __future__ import annotations
 
-import base64
 import os
-import secrets
 from pathlib import Path
 
 import asyncio
@@ -32,7 +30,9 @@ from .assets import router as assets_router
 from .bq_import import router as bq_router
 from . import devimages, devtools
 from .help import router as help_router
+from . import identity
 from .identity import router as me_router
+from .oidc import router as oidc_router
 from .prefs import router as prefs_router
 from .production import router as production_router
 from .ads import router as ads_router
@@ -90,28 +90,27 @@ async def stop_bq_scheduler() -> None:
 
 
 @app.middleware("http")
-async def basic_auth(request: Request, call_next):
-    # 死活確認(中身は何も返さない)と、内部の呼び出し(/internal/。呼ばれる側で、署名つきトークンを確認する)は、Basic 認証の対象外
-    path = request.url.path
+async def entry_auth(request: Request, call_next):
     # 開発用の画面(/dev/)と API は、CCP_DEVTOOLS=1 のときだけ見せる(ccp/devtools/)
-    if devtools.blocks(path):
+    if devtools.blocks(request.url.path):
         return PlainTextResponse("Not Found", status_code=404)
-    # 画面のパスワードは、初期設定の画面で入れることがあるので、そのつど読む(起動し直さずに効かせる)
-    app_password = os.getenv("APP_PASSWORD")
-    if app_password and path != "/ping" and not path.startswith("/internal/"):
-        header = request.headers.get("authorization", "")
-        ok = False
-        if header.startswith("Basic "):
-            try:
-                _, _, pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
-                ok = secrets.compare_digest(pw.encode(), app_password.encode())
-            except Exception:  # noqa: BLE001 — 壊れた認証ヘッダーは、不一致として扱う
-                ok = False
-        if not ok:
-            return PlainTextResponse("Unauthorized", status_code=401, headers={"WWW-Authenticate": 'Basic realm="ccp"'})
+    path = request.url.path
+    # 初期設定の間で、入口の認証がまだ何もないときは、通す(認証の設定そのものを、これから初期設定の画面で入れるため。
+    # 値を変えられるのは、サーバーのログの合言葉を知っている人だけ。ほかの API は下の gate が断る)
+    if not (setup.active() and identity.auth_mode() == "none"):
+        # 入口の認証(死活確認・内部の呼び出しは対象外。どの道を通すかは identity.admit が決める)
+        if (denied := identity.admit(request)) is not None:
+            return denied
     if (closed := await setup.gate(path)) is not None:
         return JSONResponse(closed, status_code=503)
-    return await call_next(request)
+    # 開発用の画面は、ログインしていれば開発者だけ(X103)
+    if devtools.is_dev_path(path) and (why := await identity.developer_denied(request)):
+        if path.startswith("/api/"):
+            return JSONResponse({"ok": False, "error": why}, status_code=403)
+        return PlainTextResponse(why, status_code=403)
+    response = await call_next(request)
+    identity.after(request, response)
+    return response
 
 
 @app.get("/ping")
@@ -163,6 +162,7 @@ app.include_router(metrics_router)
 app.include_router(stock_cover_router)
 app.include_router(approvals_router)
 app.include_router(me_router)
+app.include_router(oidc_router)
 app.include_router(help_router)
 app.include_router(prefs_router)
 app.include_router(production_router)
