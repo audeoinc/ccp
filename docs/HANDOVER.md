@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-04 連絡係: Copilot Studio の検証(docs/MS_AI_VERIFY.md・道具 tools/ms-verify/)。方式 1 Direct Line は文・画像とも使える(1 回 4MB まで)。方式 3 AI Builder は Power Automate の流れを窓口にすると文・画像とも通った(画像は 1 回 1 枚まで。流れの Image の欄を base64ToBinary にする)。方式 2 Agents SDK は利用者ごとのサインインが要る。残り: AI Builder で何枚も送る(T9)・道具をサーバーでも使える手直し
 - 2026-11-03 1 日の終わりの文書の更新(10-30〜11-03 の分): FEATURES・SOURCE_MAP・FEATURE_REASONS(F189〜F196・S15〜S18)・USER_STORIES・BACKLOG(X101 を DONE、X98 を ▶)・FLOWS 1.1・2.9。`source-map.drawio` は直していない
 - 2026-11-03 UI 1: W2 の SSO のサーバー側・入口の認証がないときの扱い(中継の印は 503。**Workbench・AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。SSO の画面(右上のメニューのログアウト・切れたときの案内 `src/gcp/loginExpired.ts`)も main に入れた(2026-11-04。**見た目は利用者が未確認**。Entra のある別の環境で利用者が確認する。ログインなしの置き先の見た目は変わらない)。残りは X104 を本物の DB で確認
 - 2026-11-04 UI 2: W1 データの入口の切れ目を main に(`ccp/datasource.py` の約束 3 つ・`bq.BigQuerySource`・契約テスト `test_contract_datasource.py`。取り込みの動きは変わらない)。W3 も main に(定期の取り込みは読む前に番を取る `TICK_LOCK_KEY`・健康診断の行「外へのつなぎ」)。詳しくはアーカイブ 2026-10-28_ の末尾
