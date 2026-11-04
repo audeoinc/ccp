@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import appsettings, bq, bq_validate as bv, dbready, schema as sc, seeddata
+from . import appsettings, bq, bq_validate as bv, datasource, dbready, schema as sc, seeddata
 from .data_api import db, require_db
 from .identity import admin_denied
 
@@ -132,13 +132,9 @@ def due(names: list[str], settings: dict[str, Any], prev: dict[str, dict[str, An
     return out
 
 
-def _modified(o: bq.Output, client: Any) -> datetime | None:
-    """出力の最終更新の日時。ビューは、更新を見る元の表の日時(なければ None = 分からない)"""
-    t = client.get_table(bq.location(o))
-    if (getattr(t, "table_type", "") or "") == "TABLE":
-        return getattr(t, "modified", None)
-    w = bq.watch_location(o)
-    return getattr(client.get_table(w), "modified", None) if w else None
+def _modified(o: bq.Output, source: datasource.DataSource) -> datetime | None:
+    """出力の最終更新の日時。分からなければ None = 間隔ごとに読む"""
+    return source.last_updated(bq.location(o) or "", bq.watch_location(o))
 
 
 def changed(prev: dict[str, Any] | None, modified: datetime | None, now: datetime) -> bool:
@@ -406,7 +402,7 @@ async def sync(force: bool = False, only: list[str] | None = None, trigger: str 
             _last_check = time.monotonic()
         now = _now()
         outputs = _pick(only)
-        client = await asyncio.to_thread(bq.client)
+        source = await asyncio.to_thread(datasource.open)
         prev = await latest()
 
         # ① ② 変わった出力だけ読む
@@ -415,10 +411,10 @@ async def sync(force: bool = False, only: list[str] | None = None, trigger: str 
         failed: list[dict[str, str]] = []
         for o in outputs:
             try:
-                modified[o.name] = await asyncio.to_thread(_modified, o, client)
+                modified[o.name] = await asyncio.to_thread(_modified, o, source)
                 _checked[o.name] = now
                 if force or changed(prev.get(o.name), modified[o.name], now):
-                    rows[o.name] = await asyncio.to_thread(bv.fetch, o, client)
+                    rows[o.name] = await asyncio.to_thread(bv.fetch, o, source)
             except Exception as e:  # noqa: BLE001 — 見つからない・権限がない など。ほかの出力は続ける
                 log.warning("BigQuery の %s を読めません: %s", o.name, e)
                 failed.append({"name": o.name, "message": f"BigQuery を読めません({type(e).__name__}: {e})"})
@@ -503,7 +499,7 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
         return {"configured": False, "outputs": []}
     now = _now()
     outputs = _pick(only)
-    client = await asyncio.to_thread(bq.client)
+    source = await asyncio.to_thread(datasource.open)
     prev = await latest()
     rows: dict[str, list[dict[str, Any]]] = {}
     result: dict[str, dict[str, Any]] = {}
@@ -511,11 +507,12 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
     for o in outputs:
         # 表かビューか(ビューのときだけ、更新の合図に見る元の表が要る。画面で「要りません」と言えるように)
         try:
-            kinds[o.name] = getattr(await asyncio.to_thread(client.get_table, bq.location(o)), "table_type", "") or ""
+            if kind := getattr(source, "kind", None):
+                kinds[o.name] = await asyncio.to_thread(kind, bq.location(o))
         except Exception:  # noqa: BLE001 — 読めないなら、下の読み込みが理由を出す
             pass
         try:
-            rows[o.name] = await asyncio.to_thread(bv.fetch, o, client)
+            rows[o.name] = await asyncio.to_thread(bv.fetch, o, source)
         except Exception as e:  # noqa: BLE001
             result[o.name] = {"name": o.name, "label": o.label, "ok": False, "rows": None, "dataAsOf": None,
                               "issues": [{"level": bv.NG, "text": f"BigQuery を読めません({type(e).__name__}: {e})"}]}
