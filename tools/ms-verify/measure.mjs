@@ -275,6 +275,9 @@ async function askOnceFlow(url, prompt, images) {
   if (images.length) {
     const [, mime, b64] = images[0].contentUrl.match(/^data:([^;]+);base64,(.*)$/)
     payload.image = { '$content-type': mime, '$content': b64 }
+    // 流れの Image の欄には base64ToBinary(triggerBody()?['imageBase64']) を式で入れる。
+    // 欄は受けた中身を自分で base64 にするので、base64 の文をそのまま入れると 2 重に包まれて読めない(MS_AI_VERIFY.md 15.8)
+    payload.imageBase64 = b64
   }
   const t0 = performance.now()
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
