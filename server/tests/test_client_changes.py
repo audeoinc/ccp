@@ -1,4 +1,4 @@
-"""共通の定義を変えたのに CHANGES.md に書いていなければ止める確認(scripts/check-client-changes.mjs)を、コマンドのまま流す。"""
+"""共通の定義を変えたのに CHANGES.md に書いていなければ注意を出す確認(scripts/check-client-changes.mjs)を、コマンドのまま流す。止めない(2026-11-04 利用者)。"""
 from __future__ import annotations
 
 import json
@@ -48,37 +48,40 @@ class ClientChangesTest(unittest.TestCase):
         cur = self._changed(products={"columns": [*BASE["tables"]["products"]["columns"], ["maker", "text"]], "lookups": []})
         self.assertEqual(self._run(cur).returncode, 0)
 
-    def test_removed_column_stops_with_name_and_next_step(self) -> None:
+    def test_removed_column_warns_with_name_and_next_step_but_does_not_stop(self) -> None:
         cur = self._changed(products={"columns": [["name", "text"]], "lookups": []})
         out = self._run(cur)
-        self.assertEqual(out.returncode, 1)
-        self.assertIn("products.season", out.stderr)
-        self.assertIn("次にやること", out.stderr)
+        self.assertEqual(out.returncode, 0)
+        self.assertIn("注意", out.stdout)
+        self.assertIn("products.season", out.stdout)
+        self.assertIn("次にやること", out.stdout)
 
     def test_recorded_change_passes(self) -> None:
         cur = self._changed(products={"columns": [["name", "text"]], "lookups": []})
-        self.assertEqual(self._run(cur, "- `products.season` を消した。理由: 相手のデータにないため\n").returncode, 0)
+        out = self._run(cur, "- `products.season` を消した。理由: 相手のデータにないため\n")
+        self.assertEqual(out.returncode, 0)
+        self.assertNotIn("注意", out.stdout)
 
     def test_longer_name_does_not_count_as_recorded(self) -> None:
         cur = self._changed(products={"columns": [["name", "text"]], "lookups": []})
-        self.assertEqual(self._run(cur, "products.season_code / my_products.season\n").returncode, 1)
+        self.assertIn("注意", self._run(cur, "products.season_code / my_products.season\n").stdout)
 
-    def test_type_change_stops(self) -> None:
+    def test_type_change_warns(self) -> None:
         cur = self._changed(products={"columns": [["name", "int"], ["season", "choice"]], "lookups": []})
         out = self._run(cur)
-        self.assertEqual(out.returncode, 1)
-        self.assertIn("text → int", out.stderr)
+        self.assertEqual(out.returncode, 0)
+        self.assertIn("text → int", out.stdout)
 
-    def test_removed_table_stops(self) -> None:
+    def test_removed_table_warns(self) -> None:
         cur = json.loads(json.dumps(BASE))
         del cur["tables"]["cards"]
         out = self._run(cur, "")
-        self.assertEqual(out.returncode, 1)
-        self.assertIn("- cards:", out.stderr)
+        self.assertEqual(out.returncode, 0)
+        self.assertIn("- cards:", out.stdout)
 
-    def test_lookup_changes_stop(self) -> None:
-        self.assertEqual(self._run(self._changed(cards={"columns": [["title", "text"]], "lookups": []})).returncode, 1)
-        self.assertEqual(self._run(self._changed(cards={"columns": [["title", "text"]], "lookups": [["product_id", "cards"]]})).returncode, 1)
+    def test_lookup_changes_warn(self) -> None:
+        self.assertIn("参照がなくなった", self._run(self._changed(cards={"columns": [["title", "text"]], "lookups": []})).stdout)
+        self.assertIn("参照先が変わった", self._run(self._changed(cards={"columns": [["title", "text"]], "lookups": [["product_id", "cards"]]})).stdout)
 
 
 if __name__ == "__main__":

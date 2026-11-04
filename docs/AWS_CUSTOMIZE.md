@@ -72,7 +72,7 @@ AWS の環境で作業する人と Claude のための決まりと手順です(2
 - 書けないもの(`npm run verify`・起動・`check` が、理由と直し方を出して止める): 共通の列と定義が違う列、共通の列の `retired`、共通の表の `unique`(一意にするときに、重なった行が消えるため)、共通の列の `choices`。
 - 開発側の新しい版に、同じ定義の列が入ったら、そのまま動く。⚙ の「設定の状態」と `check` が、消してよい行を教える。**定義が違えば止まる**ので、別の名前にするか、合わせる。
 - 型は、共通のファイルを直さず、`src/client/models/<表の名前>.ts`(例: `makerNotes.ts`)に `export interface` で書く。足した `choice` の列は、共通の型と同じ形の `export const …SizeBand = { s: '…' } as const` も書く。`npm run verify` が、重ねたあとの定義と型を突き合わせる。
-- 共通の列の消す・名前を変える・型を変えるは、2 章の順番で考えたうえで、`server/schema.json` を直して `docs/client/CHANGES.md` に名前(例: `products.season`)と理由を書く。**書いていなければ `npm run verify` が止める**(届いたままの定義 `server/schema.base.json` と比べる。このファイルは版と一緒に届くので、手で直さない)。
+- 共通の列の消す・名前を変える・型を変えるは、2 章の順番で考えたうえで、`server/schema.json` を直して `docs/client/CHANGES.md` に名前(例: `products.season`)と理由を書く。**書いていなければ `npm run verify` が注意を出す**(止めない。届いたままの定義 `server/schema.base.json` と比べる。このファイルは版と一緒に届くので、手で直さない)。
 
 ## 5. 新しい版を取り込む
 
