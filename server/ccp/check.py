@@ -13,6 +13,7 @@ from . import health
 OK, NG, WARN = "OK  ", "NG  ", "注意"
 MARK = {"ok": OK, "missing": NG, "failed": NG, "warn": WARN}
 AREAS = {
+    "net": "外へのつなぎ",
     "db": "DB",
     "google": "Google の認証",
     "ai": "AI(Vertex AI の Gemini。出口があれば、その層)",

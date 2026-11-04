@@ -27,10 +27,25 @@ class Base(unittest.TestCase):
             mock.patch.object(appsettings, "_rows", {}),
             mock.patch.object(appsettings, "_rows_ok", True),
             mock.patch.object(appsettings, "ensure", mock.AsyncMock()),
+            mock.patch.object(health, "_can_reach", return_value=None),
             mock.patch.dict(os.environ, {"DATABASE_URL": "", "GOOGLE_CLOUD_PROJECT": "", "AI_OUTLET_URL": "", "APP_PASSWORD": "", "ASSET_DIR": "", "BQ_AUTO_SYNC": ""}),
         ):
             p.__enter__()
             self.addCleanup(p.__exit__, None, None, None)
+
+
+class NetTest(Base):
+    def test_reports_why_it_cannot_get_out(self) -> None:
+        with mock.patch.object(health, "_can_reach", return_value="URLError: blocked"):
+            items = asyncio.run(health.diagnose(full=True))
+        net = by_area(items, "net")[0]
+        self.assertEqual((items[0].area, net.status), ("net", "failed"))
+        self.assertIn("blocked", net.text)
+        self.assertTrue(net.fix)
+
+    def test_light_check_does_not_go_out(self) -> None:
+        with mock.patch.object(health, "_can_reach", side_effect=AssertionError("起動のときに外へ出た")):
+            self.assertEqual(by_area(asyncio.run(health.diagnose(full=False)), "net"), [])
 
 
 class DiagnoseTest(Base):

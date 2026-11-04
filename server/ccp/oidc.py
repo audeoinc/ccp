@@ -6,6 +6,7 @@
   GET /auth/login?next=/…   発行元のログインの画面へ送る(戻ったら next へ)
   GET /auth/callback        発行元から戻る所(発行元に登録する「戻り先の URL」)
   GET /auth/logout          ログアウト(発行元にも、ログアウトの窓口があればそこへ)
+  GET /auth/done            別のタブでログインし直したあとに着く所(画面の「ログインが切れました」の案内から。src/gcp/loginExpired.ts)
 
 ログインしたあとは、署名つきのクッキー(だれが・いつまで)だけで人を見分ける。サーバーに状態を持たないので、サーバーが 2 台以上でも切れない
 (どのサーバーも同じ鍵で確かめられる)。鍵は CCP_SESSION_SECRET、なければクライアントシークレットから作る(設定を 1 つ減らすため。
@@ -312,6 +313,16 @@ async def callback(request: Request):
     resp.delete_cookie(FLOW_COOKIE, path="/")
     log.info("ログイン: %s", email)
     return resp
+
+
+@router.get("/done")
+async def done():
+    """ログインし直したタブ。元のタブは、ログインできたのを自分で確かめて続ける(書きかけを消さないため)ので、ここは閉じてもらうだけ"""
+    return _page(
+        "ログインしました / Signed in",
+        "<p>このタブを閉じて、元のタブに戻ってください。<br>Close this tab and return to the original one.</p><script>setTimeout(function(){window.close()},800)</script>",
+        200,
+    )
 
 
 @router.get("/logout")

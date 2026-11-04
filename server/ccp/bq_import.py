@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from . import appsettings, bq, bq_validate as bv, dbready, schema as sc, seeddata
+from . import appsettings, bq, bq_validate as bv, datasource, dbready, schema as sc, seeddata
 from .data_api import db, require_db
 from .identity import admin_denied
 
@@ -49,6 +49,8 @@ MIN_INTERVAL_S = 60
 VIEW_REFRESH = timedelta(minutes=10)
 # 取り込みを、複数のプロセス(サーバーの複数の台)で同時に行わない(PostgreSQL の勧告ロックの番号。CCP の中で一意なら何でもよい)
 LOCK_KEY = 4210017
+# 定期の取り込みの順番(サーバーが 2 台以上でも、BigQuery を読むのは 1 台だけにする。書き込みの LOCK_KEY とは別の番号)
+TICK_LOCK_KEY = 4210018
 # 出力 → 書き込む表(取り込む順。SKU の確かめに SPU が、在庫の確かめに SKU が要る)
 ORDER = ("spu", "sku", "sku_stock", "weekly", "forecast", "ranking")
 
@@ -132,13 +134,9 @@ def due(names: list[str], settings: dict[str, Any], prev: dict[str, dict[str, An
     return out
 
 
-def _modified(o: bq.Output, client: Any) -> datetime | None:
-    """出力の最終更新の日時。ビューは、更新を見る元の表の日時(なければ None = 分からない)"""
-    t = client.get_table(bq.location(o))
-    if (getattr(t, "table_type", "") or "") == "TABLE":
-        return getattr(t, "modified", None)
-    w = bq.watch_location(o)
-    return getattr(client.get_table(w), "modified", None) if w else None
+def _modified(o: bq.Output, source: datasource.DataSource) -> datetime | None:
+    """出力の最終更新の日時。分からなければ None = 間隔ごとに読む"""
+    return source.last_updated(bq.location(o) or "", bq.watch_location(o))
 
 
 def changed(prev: dict[str, Any] | None, modified: datetime | None, now: datetime) -> bool:
@@ -406,7 +404,7 @@ async def sync(force: bool = False, only: list[str] | None = None, trigger: str 
             _last_check = time.monotonic()
         now = _now()
         outputs = _pick(only)
-        client = await asyncio.to_thread(bq.client)
+        source = await asyncio.to_thread(datasource.open)
         prev = await latest()
 
         # ① ② 変わった出力だけ読む
@@ -415,10 +413,10 @@ async def sync(force: bool = False, only: list[str] | None = None, trigger: str 
         failed: list[dict[str, str]] = []
         for o in outputs:
             try:
-                modified[o.name] = await asyncio.to_thread(_modified, o, client)
+                modified[o.name] = await asyncio.to_thread(_modified, o, source)
                 _checked[o.name] = now
                 if force or changed(prev.get(o.name), modified[o.name], now):
-                    rows[o.name] = await asyncio.to_thread(bv.fetch, o, client)
+                    rows[o.name] = await asyncio.to_thread(bv.fetch, o, source)
             except Exception as e:  # noqa: BLE001 — 見つからない・権限がない など。ほかの出力は続ける
                 log.warning("BigQuery の %s を読めません: %s", o.name, e)
                 failed.append({"name": o.name, "message": f"BigQuery を読めません({type(e).__name__}: {e})"})
@@ -503,7 +501,7 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
         return {"configured": False, "outputs": []}
     now = _now()
     outputs = _pick(only)
-    client = await asyncio.to_thread(bq.client)
+    source = await asyncio.to_thread(datasource.open)
     prev = await latest()
     rows: dict[str, list[dict[str, Any]]] = {}
     result: dict[str, dict[str, Any]] = {}
@@ -511,11 +509,12 @@ async def check(only: list[str] | None = None) -> dict[str, Any]:
     for o in outputs:
         # 表かビューか(ビューのときだけ、更新の合図に見る元の表が要る。画面で「要りません」と言えるように)
         try:
-            kinds[o.name] = getattr(await asyncio.to_thread(client.get_table, bq.location(o)), "table_type", "") or ""
+            if kind := getattr(source, "kind", None):
+                kinds[o.name] = await asyncio.to_thread(kind, bq.location(o))
         except Exception:  # noqa: BLE001 — 読めないなら、下の読み込みが理由を出す
             pass
         try:
-            rows[o.name] = await asyncio.to_thread(bv.fetch, o, client)
+            rows[o.name] = await asyncio.to_thread(bv.fetch, o, source)
         except Exception as e:  # noqa: BLE001
             result[o.name] = {"name": o.name, "label": o.label, "ok": False, "rows": None, "dataAsOf": None,
                               "issues": [{"level": bv.NG, "text": f"BigQuery を読めません({type(e).__name__}: {e})"}]}
@@ -573,7 +572,7 @@ async def tick(trigger: str = "auto") -> list[str] | None:
     if env_disabled():
         return []
     if not appsettings.loaded():
-        # DB の起動を受け持つ仕組みがない環境(Workbench など。DB は止まらない)は、自分で読む。
+        # DB の起動を受け持つ仕組みがない環境(DB は止まらない)は、自分で読む。
         # 止まる DB の環境は、画面・窓口が読むのを待つ(人が使い始めれば、DB は起きている)
         if dbready.controller() is not None:
             return None
@@ -591,7 +590,13 @@ async def tick(trigger: str = "auto") -> list[str] | None:
         return []  # 取り込み中(ボタン・開いたとき)なら、この回は飛ばす
     names = [o.name for o in _pick(None)]
     targets = names if trigger == "startup" else due(names, settings, await latest(), _now())
-    if targets:
+    if not targets:
+        return targets
+    # 書き込みは LOCK_KEY で 1 台に絞れるが、読むのは絞れない。同じ時刻に見回った別のサーバーが同じ出力を読まないように、
+    # 取り込みが終わるまで番を持つ(トランザクションの錠なので、サーバーが落ちても残らない)。取れなければ、この回は飛ばす
+    async with db() as conn:
+        if not (await conn.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": TICK_LOCK_KEY})).scalar_one():
+            return []
         await sync(False, targets, trigger)
     return targets
 

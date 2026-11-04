@@ -146,5 +146,27 @@ class SyncTest(unittest.TestCase):
         self.write.assert_not_awaited()
 
 
+class TickTurnTest(unittest.TestCase):
+    """サーバーが 2 台以上でも、定期の取り込みで BigQuery を読むのは 1 台だけ"""
+
+    def _tick(self, got: bool) -> tuple[object, mock.AsyncMock]:
+        store = FakeStore()
+        store.statements += [(r"^SELECT pg_try_advisory_xact_lock", lambda s, m, p: Result([Row({"got": got})]))]
+        sync = mock.AsyncMock()
+        settings = {**bq_import.parse_settings(None), "enabled": True}
+        with store.patch("ccp.bq_import"), mock.patch.object(bq_import, "env_disabled", return_value=False), mock.patch.object(bq_import.appsettings, "loaded", return_value=True), mock.patch.object(bq_import.appsettings, "ensure", mock.AsyncMock()), mock.patch.object(bq_import.appsettings, "raw", return_value=settings), mock.patch.object(bq, "configured", return_value=[SPU]), mock.patch.object(bq_import, "_pick", return_value=[SPU]), mock.patch.object(bq_import, "due", return_value=["spu"]), mock.patch.object(bq_import, "latest", mock.AsyncMock(return_value={})), mock.patch.object(bq_import, "sync", sync):
+            return asyncio.run(bq_import.tick()), sync
+
+    def test_reads_when_it_has_the_turn(self) -> None:
+        got, sync = self._tick(True)
+        self.assertEqual(got, ["spu"])
+        sync.assert_awaited_once()
+
+    def test_skips_when_another_server_has_the_turn(self) -> None:
+        got, sync = self._tick(False)
+        self.assertEqual(got, [])
+        sync.assert_not_awaited()
+
+
 if __name__ == "__main__":
     unittest.main()

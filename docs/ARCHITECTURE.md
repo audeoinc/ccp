@@ -43,7 +43,7 @@
 | 差し込み口 | いまのアダプター | 足す予定 | 入口のコード |
 |---|---|---|---|
 | 設定 | 環境変数(起動に要るもの・秘密・アダプターの選択)/ DB(仕事の設定。8.5 章) | — | `appsettings.py` |
-| データの入口 | BigQuery | Databricks など(移ると決まってから) | `bq.py`・`bq_import.py`(切れ目を作る。受け持つのは「出力 1 つ分の行を読む・いつ更新されたか・列の一覧」だけ。確かめ・書き込み・定期の処理は外) |
+| データの入口 | BigQuery | Databricks など(移ると決まってから) | `datasource.py`(約束)・`bq.py` の `BigQuerySource`(切れ目。受け持つのは「出力 1 つ分の行を読む・いつ更新されたか・列の一覧」だけ。確かめ・書き込み・定期の処理は外) |
 | AI の出口 | Gemini / 外の層(`AI_OUTLET_URL`) | — | `ai.py` の `generate()`(開発用の画面は対象外) |
 | ファイルの置き場所 | フォルダ / GCS | S3(サーバーを 2 台以上にするとき) | `assets.py` の `put`・`get`・`delete` |
 | 入口の認証 | OIDC(Entra などの SSO。`oidc.py`。2026-11-03)/ Basic(`APP_PASSWORD`)/ IAP / なし(そのサーバーの中からだけ) | — | `identity.py`(受け持つのは「入ってよいか(`admit`)」と「ログインした人のメールアドレス(`current_identity`)」だけ。選ぶのは `CCP_AUTH`、なければある設定から。契約テストは `server/tests/test_auth_port.py`) |
