@@ -19,7 +19,7 @@
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
 - 2026-11-03 1 日の終わりの文書の更新(10-30〜11-03 の分): FEATURES・SOURCE_MAP・FEATURE_REASONS(F189〜F196・S15〜S18)・USER_STORIES・BACKLOG(X101 を DONE、X98 を ▶)・FLOWS 1.1・2.9。`source-map.drawio` は直していない
-- 2026-11-03 UI 1: W2 の SSO のサーバー側・入口の認証がないときの扱い(中継の印は 503。**Workbench・AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。残りは見本 `ui1-sso`(画面。返事待ち)と、X104 を本物の DB で確認
+- 2026-11-03 UI 1: W2 の SSO のサーバー側・入口の認証がないときの扱い(中継の印は 503。**Workbench・AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。SSO の画面(右上のメニューのログアウト・切れたときの案内 `src/gcp/loginExpired.ts`)も main に入れた(2026-11-04。**見た目は利用者が未確認**。Entra のある別の環境で利用者が確認する。ログインなしの置き先の見た目は変わらない)。残りは X104 を本物の DB で確認
 - 2026-11-03 UI 2: settings.dataimport ①〜③・settings.ai・settings.setup の健康診断(サーバーと画面)・仕事の設定を DB に(`app_settings`)は main。次は初期設定の画面 → 設定の型。本番の `BQ_AUTO_SYNC=0` を消すかは利用者
 - 2026-11-03 UI 3: X56 (b)〜(d)・W5 契約テスト・見本のデータは人が明示したときだけ(`cli remove-seed`)は main。割り当てなし。残り物は AB の案 B の「詳しく」をプレビューに(`vs.details`)と、パックの商品の消し方の相談
 - 2026-11-03 W6 AWS 版の ZIP(`npm run release:aws`・`docs/AWS.md`)は main・公開済み(5 章)。最適化(optimize-survey の 1〜6)・X95 も済み
@@ -28,7 +28,7 @@
 ## 3. 次にやること
 
 BACKLOG の ☐ / ❓ / ▶ の行が正。
-1. **X98** SSO の画面(見本 ui1-sso の返事待ち)。そのあと X97・X99・X100(置き先の差し込み口)と X96(引っ越し用のパックを消す)
+1. **X98** SSO の画面は main(利用者が別の環境で見た目を確認する)。そのあと X97・X99・X100(置き先の差し込み口)と X96(引っ越し用のパックを消す)
 2. **X102** AWS 版: 利用者が試した結果を待つ。公開は人の指示で
 3. **X79** の残りは Workbench での移し替え(B13 と一緒)だけ
 4. **App.tsx の残り**(CalendarViews・memo)は UI 1 の C1 と重なるので、連絡係と合わせてから
