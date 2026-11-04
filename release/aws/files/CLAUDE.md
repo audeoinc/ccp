@@ -46,8 +46,10 @@ scripts/workbench.sh log        # サーバーのログの最後
 ## このリポジトリについて
 
 - コードは、版ごとに ZIP で届く。ZIP の中身はブランチ `vendor` に入れ、`main` にマージして動かす(総入れ替えはしない)。
-- **BigQuery のデータに合わせて、スキーマ・表の構成・画面を変えてよい。** その前と版の取り込みの前に、[docs/AWS_CUSTOMIZE.md](docs/AWS_CUSTOMIZE.md) を読む(調整の順番・置き場所・取り込みの手順・確認)。
-- AWS 側のファイルは `src/client/`・`server/ccp/client/`・`docs/client/` に置く。共通のコードを直したら、`docs/client/CHANGES.md` に書く。
+- **データとそれに伴う設定項目は、BigQuery の内容に合わせて、ここで独自に開発する。** PostgreSQL の内容は、共通の表も含めて変えてよい。UI・UX・機能は、開発側の版から取り込む。
+- **ZIP を渡されたら、[docs/AWS_CUSTOMIZE.md](docs/AWS_CUSTOMIZE.md) の 5 章のとおりに取り込む。** ぶつかりの解消と、新機能をここのデータの形に合わせる所まで行う。スキーマ・画面を変える前にも、この文書を読む。
+- AWS 側のファイルは `src/client/`・`server/ccp/client/`・`docs/client/` に置く。共通のファイルを直したら、`docs/client/CHANGES.md` に書く。
+- 同じ所が版のたびにぶつかるなら、利用者に伝える(開発側がその所を減らす)。
 - **サーバーの置き方の違い**(認証・AI の出口・ファイルの置き場所など)でコードを直したくなったら、ここで直さず、内容(`check` の出力・ログの最後・やったこと)を人に伝える(置き先の違いは、設定とアダプターで吸収する作り。[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) の 0.5 章)。
 - 開発側のリポジトリは公開されている。開発側へ伝える内容からは、相手の名前・表や列の名前・実際の値を除く。
 
