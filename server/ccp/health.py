@@ -284,7 +284,7 @@ async def _guard(out: _Out) -> None:
     if mode == "oidc":
         cfg = oidc.config()
         if cfg is None:
-            out.add("guard", "missing", f"入口の認証: ログイン(OIDC)の設定が足りません({', '.join(oidc.missing())})。いまは、だれも画面を開けません", "アプリの登録の発行元・クライアント ID・クライアントシークレットを環境変数に入れて、起動し直す(docs/WORKBENCH.md の 7.1)")
+            out.add("guard", "missing", f"入口の認証: ログイン(OIDC)の設定が足りません({', '.join(oidc.missing())})。いまは、だれも画面を開けません", "アプリの登録の発行元・クライアント ID・クライアントシークレットを環境変数に入れて、起動し直す(docs/WORKBENCH.md の 7.1)", goto="secrets")
             return
         try:
             await oidc.discover(cfg, fresh=True)
@@ -301,7 +301,7 @@ async def _guard(out: _Out) -> None:
         if os.getenv("APP_PASSWORD"):
             out.add("guard", "ok", "入口の認証: 画面のパスワード(APP_PASSWORD)があります(人は分かりません)")
         else:
-            out.add("guard", "missing", "入口の認証: CCP_AUTH=basic なのに、画面のパスワード(APP_PASSWORD)がありません。いまは、だれも画面を開けません", "APP_PASSWORD を設定する")
+            out.add("guard", "missing", "入口の認証: CCP_AUTH=basic なのに、画面のパスワード(APP_PASSWORD)がありません。いまは、だれも画面を開けません", "APP_PASSWORD を設定する", goto="secrets")
     elif mode == "iap":
         out.add("guard", "ok", "入口の認証: 手前のログイン(IAP)で守られています")
     elif mode == "none":
@@ -314,6 +314,7 @@ async def _guard(out: _Out) -> None:
                 "missing",
                 "入口の認証がありません。このサーバーの中から直に(http://127.0.0.1:…)しか開けず、中継(Jupyter の /proxy/・nginx など)や外からは開けません",
                 "ログイン(OIDC_ISSUER・OIDC_CLIENT_ID・OIDC_CLIENT_SECRET)か APP_PASSWORD を設定する。中継の手前でログインしている(Workbench の Jupyter など)ので CCP では守らないなら、CCP_AUTH=none",
+                goto="secrets",
             )
     else:
         out.add("guard", "missing", f"入口の認証: CCP_AUTH の値({mode})が分かりません。いまは、だれも画面を開けません", "oidc / basic / iap / none のどれかにする")
@@ -387,7 +388,7 @@ async def at_startup() -> None:
         log.warning("⚙ →「設定の状態」か python -m ccp.cli check で、くわしく見られます")
 
 
-async def _denied(request: Request) -> dict[str, Any] | None:
+async def denied(request: Request) -> dict[str, Any] | None:
     from .data_api import db
     from .identity import admin_denied
 
@@ -396,10 +397,15 @@ async def _denied(request: Request) -> dict[str, Any] | None:
     return {"success": False, "error": {"message": why, "code": "forbidden"}} if why else None
 
 
+def forget_summary() -> None:
+    """設定を変えたあと、⚙ の赤い点を古い結果のままにしない(次に聞かれたときに確かめ直す)"""
+    _last["items"] = None
+
+
 @router.get("")
 async def get_health(request: Request) -> dict[str, Any]:
     """⚙ →「設定の状態」。AI を 1 回呼び、BigQuery の表を読む(数秒〜十数秒)"""
-    if bad := await _denied(request):
+    if bad := await denied(request):
         return bad
     items = await diagnose(full=True)
     _remember(items, True)
@@ -409,7 +415,7 @@ async def get_health(request: Request) -> dict[str, Any]:
 @router.get("/summary")
 async def get_summary(request: Request) -> dict[str, Any]:
     """⚙ の赤い点。起動のとき・画面で確かめた結果を使い回し、古ければ軽く確かめ直す(AI は呼ばない)"""
-    if bad := await _denied(request):
+    if bad := await denied(request):
         return bad
     if _last["items"] is None or time.time() - _last["at"] > SUMMARY_TTL_S:
         _remember(await diagnose(full=False), False)

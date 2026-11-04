@@ -65,7 +65,7 @@ export function SettingsHealthPanel({ go }: { go: (id: string) => void }) {
   }, [check])
 
   // 画面で直せる所の、⚙ の項目
-  const target = (goto: string) => ({ ai: 'aiSettings', dataimport: 'bq' })[goto]
+  const target = (goto: string) => ({ ai: 'aiSettings', dataimport: 'bq', secrets: 'secrets' })[goto]
   const c = report?.counts
   const bad = c ? c.missing + c.failed : 0
   const areas = report ? [...new Set(report.items.map((i) => i.area))] : []

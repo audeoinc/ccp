@@ -12,7 +12,7 @@ export interface HealthItem {
   text: string
   /** 直し方 */
   fix: string
-  /** ⚙ で直す所(ai / dataimport)。空なら、サーバーの設定で直す */
+  /** ⚙ で直す所(ai / dataimport / secrets)。空なら、サーバーの設定で直す */
   goto: string
 }
 

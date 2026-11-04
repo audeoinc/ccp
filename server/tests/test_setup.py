@@ -112,5 +112,49 @@ class SetupTest(unittest.TestCase):
         self.assertIn("パスワード", setup._db_reason(RuntimeError("password authentication failed for user")))
 
 
+
+class SecretsTest(unittest.TestCase):
+    """⚙ の「秘密の設定」: 値は返さない・環境から渡された値は変えられない・書くと起動し直さずに効く"""
+
+    def setUp(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from ccp import health, main
+
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.file = Path(self.dir.name) / "ccp.env"
+        env = mock.patch.dict(os.environ, {"CCP_ENV_FILE": str(self.file), "AI_OUTLET_TOKEN": "", "CCP_AUTH": "none"})
+        env.start()
+        self.addCleanup(env.stop)
+        allow = mock.patch.object(health, "denied", mock.AsyncMock(return_value=None))
+        allow.start()
+        self.addCleanup(allow.stop)
+        self.client = TestClient(main.app)
+        self.url = "/api/settings/secrets"
+
+    def _item(self, data: dict, name: str) -> dict:
+        return next(i for i in data["items"] if i["name"] == name)
+
+    def test_write_never_returns_the_value_and_takes_effect(self) -> None:
+        r = self.client.put(f"{self.url}/AI_OUTLET_TOKEN", json={"value": "tok-for-test"})
+        self.assertNotIn("tok-for-test", r.text)
+        self.assertTrue(self._item(r.json()["data"], "AI_OUTLET_TOKEN")["set"])
+        self.assertEqual(os.environ["AI_OUTLET_TOKEN"], "tok-for-test")
+        self.assertIn("tok-for-test", self.file.read_text(encoding="utf-8"))
+        self.assertNotIn("tok-for-test", self.client.get(self.url).text)
+        r = self.client.delete(f"{self.url}/AI_OUTLET_TOKEN")
+        self.assertFalse(self._item(r.json()["data"], "AI_OUTLET_TOKEN")["set"])
+        self.assertNotIn("tok-for-test", self.file.read_text(encoding="utf-8"))
+
+    def test_refuses_unknown_short_and_locked(self) -> None:
+        self.assertEqual(self.client.put(f"{self.url}/DATABASE_URL", json={"value": "x"}).json()["error"]["code"], "refused")
+        self.assertEqual(self.client.put(f"{self.url}/APP_PASSWORD", json={"value": "short"}).json()["error"]["code"], "too_short")
+        with mock.patch.object(setup.envfile, "from_env", return_value=True):
+            self.assertEqual(self.client.put(f"{self.url}/AI_OUTLET_TOKEN", json={"value": "x"}).json()["error"]["code"], "refused")
+            self.assertEqual(self.client.delete(f"{self.url}/AI_OUTLET_TOKEN").json()["error"]["code"], "refused")
+            self.assertTrue(self._item(self.client.get(self.url).json()["data"], "AI_OUTLET_TOKEN")["locked"])
+
+
 if __name__ == "__main__":
     unittest.main()

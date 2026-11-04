@@ -11,6 +11,7 @@ import {
   DeleteRegular,
   DocumentBulletListRegular,
   HeartPulseRegular,
+  KeyRegular,
   ImageMultipleRegular,
   LayoutColumnTwoRegular,
   LightbulbFilamentRegular,
@@ -30,6 +31,7 @@ import {
   CountryTemplatesPanel,
   AiSettingsPanel,
   SettingsHealthPanel,
+  SettingsSecretsPanel,
   DataImportPanel,
   DevRequestsDialog,
   FeaturesManager,
@@ -278,6 +280,20 @@ export function useSettingsActions(ctx: {
       render: (_co, _name, go) => (
         <Later spin>
           <SettingsHealthPanel go={go} />
+        </Later>
+      ),
+    },
+    // 秘密の設定(settings.setup)。パスワード・鍵を書くだけの欄。管理する人だけ
+    {
+      id: 'secrets',
+      section: 'company',
+      label: t('秘密の設定', 'Secrets'),
+      description: t('画面のパスワード・ログインのシークレット・AI の出口の合言葉を書きます。値は読み返せません。', 'Enter the app password, SSO client secret and AI outlet token. Values cannot be read back.'),
+      icon: <KeyRegular />,
+      hidden: !(setupOn && canManage),
+      render: () => (
+        <Later spin>
+          <SettingsSecretsPanel />
         </Later>
       ),
     },
