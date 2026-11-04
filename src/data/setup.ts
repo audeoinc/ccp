@@ -24,6 +24,8 @@ export interface SetupState {
   steps?: SetupStep[]
   /** 値を書くファイル */
   file?: string
+  /** default = 既定の場所(コンテナなどでは消える)/ chosen = CCP_ENV_FILE で場所を指定 / off = 画面では書かない */
+  fileMode?: 'default' | 'chosen' | 'off'
 }
 
 export interface SetupResult {

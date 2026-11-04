@@ -57,6 +57,74 @@ class EnvFileTest(unittest.TestCase):
             os.environ.pop(k, None)
 
 
+class FileModeTest(unittest.TestCase):
+    """CCP_ENV_FILE の 3 つの置き方。環境の名前では分けない。値は健康診断にも出さない"""
+
+    def setUp(self) -> None:
+        for p in (mock.patch.object(envfile, "_from_env", set()), mock.patch.object(envfile, "_from_file", set())):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_modes(self) -> None:
+        for value, want in (("", "default"), ("/mnt/efs/ccp.env", "chosen"), ("off", "off"), ("OFF", "off")):
+            with mock.patch.dict(os.environ, {"CCP_ENV_FILE": value}):
+                self.assertEqual(envfile.mode(), want)
+
+    def test_off_reads_nothing_and_refuses_to_write(self) -> None:
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"CCP_ENV_FILE": "off"}), mock.patch.object(envfile, "DEFAULT", Path(d) / "ccp.env"):
+            (Path(d) / "ccp.env").write_text("OLD_VALUE=x\n", encoding="utf-8")
+            envfile.load()
+            self.assertNotIn("OLD_VALUE", os.environ)
+            with self.assertRaises(envfile.FileOff):
+                envfile.write({"A": "1"})
+            self.assertTrue(envfile.locked("NOT_SET_ANYWHERE"))
+
+    def _health(self, mode_value: str) -> list:
+        from ccp import health
+
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "ccp.env"
+            env = {"CCP_ENV_FILE": str(f) if mode_value == "chosen" else mode_value}
+            with mock.patch.dict(os.environ, env), mock.patch.object(envfile, "DEFAULT", f):
+                f.write_text("APP_PASSWORD=do-not-show\nCCP_SETUP_SKIPPED=google\n", encoding="utf-8")
+                with mock.patch.dict(os.environ, {"APP_PASSWORD": "", "CCP_SETUP_SKIPPED": ""}):
+                    envfile.load()
+                    out = health._Out()
+                    health._settings_file(out)
+                return list(out)
+
+    def test_health_warns_when_the_file_is_in_the_default_place(self) -> None:
+        items = self._health("")
+        self.assertEqual([i.status for i in items], ["warn"])
+        self.assertIn("APP_PASSWORD", items[0].text)
+        self.assertNotIn("CCP_SETUP_SKIPPED", items[0].text)
+        self.assertNotIn("do-not-show", items[0].text + items[0].fix)
+        self.assertIn("環境変数", items[0].fix)
+
+    def test_health_is_quiet_when_the_place_was_chosen(self) -> None:
+        self.assertEqual([i.status for i in self._health("chosen")], ["ok"])
+
+    def test_health_says_nothing_without_file_values(self) -> None:
+        from ccp import health
+
+        with mock.patch.dict(os.environ, {"CCP_ENV_FILE": ""}):
+            out = health._Out()
+            health._settings_file(out)
+        self.assertEqual(list(out), [])
+
+    def test_setup_off_tells_to_pass_by_environment(self) -> None:
+        env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+        with mock.patch.dict(os.environ, {**env, "CCP_ENV_FILE": "off"}, clear=True):
+            ok, why, values = asyncio.run(setup.check("db", {"host": "h", "name": "n", "user": "u"}))
+            self.assertFalse(ok)
+            self.assertIn("環境変数", why)
+            self.assertEqual(values, {})
+            ok, why, _ = asyncio.run(setup.check("password", {"password": "long-enough"}))
+            self.assertFalse(ok)
+            self.assertTrue(setup._step("db")["locked"])
+            self.assertEqual(setup._view()["fileMode"], "off")
+
+
 class SetupTest(unittest.TestCase):
     def test_url_escapes_password(self) -> None:
         url = setup.build_url({"host": "db", "port": "5432", "name": "ccp", "user": "app", "password": "p@ss:w/rd"})
@@ -154,6 +222,15 @@ class SecretsTest(unittest.TestCase):
             self.assertEqual(self.client.put(f"{self.url}/AI_OUTLET_TOKEN", json={"value": "x"}).json()["error"]["code"], "refused")
             self.assertEqual(self.client.delete(f"{self.url}/AI_OUTLET_TOKEN").json()["error"]["code"], "refused")
             self.assertTrue(self._item(self.client.get(self.url).json()["data"], "AI_OUTLET_TOKEN")["locked"])
+
+    def test_off_closes_the_fields(self) -> None:
+        with mock.patch.dict(os.environ, {"CCP_ENV_FILE": "off"}):
+            data = self.client.get(self.url).json()["data"]
+            self.assertEqual(data["fileMode"], "off")
+            self.assertTrue(self._item(data, "AI_OUTLET_TOKEN")["locked"])
+            r = self.client.put(f"{self.url}/AI_OUTLET_TOKEN", json={"value": "x"}).json()
+            self.assertEqual(r["error"]["code"], "refused")
+            self.assertIn("環境変数", r["error"]["message"])
 
 
 if __name__ == "__main__":

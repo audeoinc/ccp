@@ -12,7 +12,7 @@ const steps: Record<SetupStepId, SetupStep> = {
   assets: { id: 'assets', done: false, locked: false, values: { dir: '' } },
   password: { id: 'password', done: false, locked: false, values: {}, secretSet: false },
 }
-const view = (): SetupState => ({ needed: true, reason: 'DB のつなぎ先(DATABASE_URL)がありません', steps: Object.values(steps).map((s) => ({ ...s, values: { ...s.values } })), file: '/srv/ccp/server/ccp.env' })
+const view = (): SetupState => ({ needed: true, fileMode: 'default', reason: 'DB のつなぎ先(DATABASE_URL)がありません', steps: Object.values(steps).map((s) => ({ ...s, values: { ...s.values } })), file: '/srv/ccp/server/ccp.env' })
 const wait = () => new Promise((r) => setTimeout(r, 700))
 
 function check(step: SetupStepId, v: Record<string, string>): { ok: boolean; message: string } {

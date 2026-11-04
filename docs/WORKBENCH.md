@@ -619,7 +619,7 @@ CCP の中に、標準の OIDC のログインがある(`server/ccp/oidc.py`)。
 | `GOOGLE_CLOUD_LOCATION` | — | Vertex AI の場所(既定 `global`) | `global` |
 | `ASSET_DIR` | 写真を出すとき | 写真のフォルダ(パックの展開先) | `<server の絶対パス>/images` |
 | `APP_PASSWORD` | — | 画面のパスワード(Basic 認証)。空なら、かけない | 空でよい(中継が Google のログインで守られている) |
-| `CCP_ENV_FILE` | — | 初期設定の画面が値を書くファイル(既定 `server/ccp.env`)。起動のときに読み、環境変数にない名前だけ入れる(環境変数が勝つ) | 設定しない |
+| `CCP_ENV_FILE` | — | 初期設定の画面が値を書くファイル(既定 `server/ccp.env`)。起動のときに読み、環境変数にない名前だけ入れる(環境変数が勝つ) | 設定しない。`off` なら、ファイルを読まず、画面の欄を閉じる(すべて環境変数で渡す運用) |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `CCP_PUBLIC_URL` / `CCP_SESSION_HOURS` / `CCP_SESSION_SECRET` | ログインを使うとき | ログイン(Entra ID などの SSO。7.2)。`OIDC_ISSUER` があれば、`APP_PASSWORD` より先に使う | 設定しない |
 | `CCP_AUTH` | — | 入口の認証を名指しする(`oidc` / `basic` / `iap` / `none`)。なければ、ある設定から選ぶ。**どれもないと、そのサーバーの中から直に(`http://127.0.0.1:…`)しか開けず、中継(Jupyter の /proxy/・nginx など)からも開けない**。中継の手前で守っている・守りなしにすると決めたときだけ `none` | **`none`**(Jupyter の中継が Google のログインで守る。`workbench.env.example` に入っている) |
 | `STATIC_DIR` | — | 画面のビルドの場所(既定 `<リポジトリ>/dist-gcp`) | 設定しない |

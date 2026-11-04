@@ -15,6 +15,8 @@ export interface SecretsView {
   items: SecretItem[]
   /** 値を書くファイル */
   file: string
+  /** default = 既定の場所(コンテナなどでは消える)/ chosen = CCP_ENV_FILE で場所を指定 / off = 画面では書かない */
+  fileMode: 'default' | 'chosen' | 'off'
 }
 
 type Res = { data?: SecretsView; error?: string }

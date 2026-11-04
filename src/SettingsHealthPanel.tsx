@@ -26,6 +26,7 @@ const useStyles = makeStyles({
 const areaName = (area: string, t: ReturnType<typeof useT>) =>
   ({
     schema: t('データの定義', 'Data definitions'),
+    file: t('サーバーの設定のファイル', 'Server settings file'),
     db: t('DB', 'Database'),
     google: t('Google の認証', 'Google credentials'),
     ai: t('AI', 'AI'),

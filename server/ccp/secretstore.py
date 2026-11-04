@@ -3,8 +3,8 @@
 - **値は返さない。** 入っているか・どこから来ているかだけを返す(画面にも API にも、ログにも出さない)。
 - 書く先は、初期設定の画面と同じ server/ccp.env(envfile)。起動し直さずに効く。
 - 環境から渡された値(Secrets など)は、そちらが勝つので、画面では変えられない。
-- サーバーが 2 台以上・起動のたびにファイルが消える置き方では、ここで書いた値はそのサーバーにしか残らないので、
-  Secrets で渡す(画面にも書いてある)。
+- サーバーが 2 台以上・入れ替えや起動でファイルが消える置き方では、ここで書いた値はそのサーバーにしか残らないので、
+  Secrets で渡す(画面と健康診断が知らせる)。CCP_ENV_FILE=off なら、欄を閉じる。
 """
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ MIN_LENGTH = {"APP_PASSWORD": 8, "OIDC_CLIENT_SECRET": 1, "AI_OUTLET_TOKEN": 1}
 
 
 def _view() -> dict[str, Any]:
-    items = [{"name": k, "set": bool(os.getenv(k, "").strip()), "locked": envfile.from_env(k)} for k in MIN_LENGTH]
-    return {"items": items, "file": str(envfile.path())}
+    items = [{"name": k, "set": bool(os.getenv(k, "").strip()), "locked": envfile.locked(k)} for k in MIN_LENGTH]
+    return {"items": items, "file": str(envfile.path()), "fileMode": envfile.mode()}
 
 
 def _refused(name: str) -> str | None:
@@ -33,6 +33,8 @@ def _refused(name: str) -> str | None:
         return "この名前は、ここでは変えられません"
     if envfile.from_env(name):
         return "環境から渡された値(Secrets など)なので、画面では変えられません。渡している所で変えてください"
+    if envfile.mode() == "off":
+        return "CCP_ENV_FILE=off なので、画面では書けません。環境変数で渡してください"
     return None
 
 

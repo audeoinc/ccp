@@ -143,26 +143,30 @@ def _skipped() -> set[str]:
 def _step(step: str) -> dict[str, Any]:
     skipped = step in _skipped()
     if step == "db":
-        return {"id": "db", "done": bool(_state["db_ok"]), "locked": envfile.from_env("DATABASE_URL"), "values": _db_values(), "secretSet": bool(os.getenv("DATABASE_URL"))}
+        return {"id": "db", "done": bool(_state["db_ok"]), "locked": envfile.locked("DATABASE_URL"), "values": _db_values(), "secretSet": bool(os.getenv("DATABASE_URL"))}
     if step == "google":
         project = os.getenv("GOOGLE_CLOUD_PROJECT", "")
         return {
             "id": "google", "done": bool(project) or skipped, "skipped": skipped,
-            "locked": envfile.from_env("GOOGLE_CLOUD_PROJECT"),
+            "locked": envfile.locked("GOOGLE_CLOUD_PROJECT"),
             "values": {"project": project, "location": os.getenv("GOOGLE_CLOUD_LOCATION", "global")},
         }
     if step == "assets":
         d = os.getenv("ASSET_DIR", "")
-        return {"id": "assets", "done": (bool(d) and Path(d).is_dir()) or skipped, "skipped": skipped, "locked": envfile.from_env("ASSET_DIR"), "values": {"dir": d}}
+        return {"id": "assets", "done": (bool(d) and Path(d).is_dir()) or skipped, "skipped": skipped, "locked": envfile.locked("ASSET_DIR"), "values": {"dir": d}}
     # ログイン(OIDC)・手前の認証・「守らない」と決めた(CCP_AUTH)なら、画面のパスワードは要らない
     guarded = bool(os.getenv("APP_PASSWORD") or os.getenv("CCP_IAP_AUDIENCE") or os.getenv("OIDC_ISSUER") or os.getenv("CCP_AUTH"))
-    return {"id": "password", "done": guarded or skipped, "skipped": skipped, "locked": envfile.from_env("APP_PASSWORD"), "values": {}, "secretSet": bool(os.getenv("APP_PASSWORD"))}
+    return {"id": "password", "done": guarded or skipped, "skipped": skipped, "locked": envfile.locked("APP_PASSWORD"), "values": {}, "secretSet": bool(os.getenv("APP_PASSWORD"))}
 
 
 async def check(step: str, v: dict[str, Any]) -> tuple[bool, str, dict[str, str | None]]:
     """入れた値を確かめる。(通ったか, 人に見せる文, 保存するときに書く値)"""
+    if envfile.mode() == "off" and step != "db":
+        return False, "CCP_ENV_FILE=off なので、画面では書けません。環境変数で渡して、サーバーを起動し直してください", {}
     if step == "db":
-        if envfile.from_env("DATABASE_URL"):
+        if envfile.locked("DATABASE_URL"):
+            if not os.getenv("DATABASE_URL"):
+                return False, "CCP_ENV_FILE=off なので、画面では書けません。DATABASE_URL を環境変数で渡して、サーバーを起動し直してください", {}
             ok, why = await try_db(os.environ["DATABASE_URL"])
             return ok, (f"つながりました({why})" if ok else why), {}
         # パスワードを空のまま確かめたら、いまのパスワードを使う(書くだけの欄なので、画面には戻さない)
@@ -220,7 +224,7 @@ def _need_key() -> dict[str, Any]:
 
 
 def _view() -> dict[str, Any]:
-    return {"needed": True, "reason": _state["reason"], "steps": [_step(s) for s in STEPS], "file": str(envfile.path())}
+    return {"needed": True, "reason": _state["reason"], "steps": [_step(s) for s in STEPS], "file": str(envfile.path()), "fileMode": envfile.mode()}
 
 
 @router.get("/state")
@@ -229,7 +233,7 @@ async def state(request: Request) -> dict[str, Any]:
     if not active():
         return {"success": True, "data": {"needed": False}}
     if not _key_ok(request):
-        return {"success": True, "data": {"needed": True, "reason": _state["reason"], "keyRequired": True}}
+        return {"success": True, "data": {"needed": True, "reason": _state["reason"], "keyRequired": True, "fileMode": envfile.mode()}}
     return {"success": True, "data": _view()}
 
 
@@ -261,7 +265,9 @@ async def save(step: str, request: Request) -> dict[str, Any]:
     if step == "assets" and values.get("ASSET_DIR"):
         Path(str(values["ASSET_DIR"])).mkdir(parents=True, exist_ok=True)
     skipped = _skipped() - {step}
-    envfile.write({**values, SKIP_KEY: ",".join(sorted(skipped)) or None})
+    # off でここに来るのは、環境から渡された DB を確かめたときだけ(書くものがない)
+    if envfile.mode() != "off":
+        envfile.write({**values, SKIP_KEY: ",".join(sorted(skipped)) or None})
     if step == "db":
         _state["db_ok"] = True
         # 前のつなぎ先で作った接続を捨てる(次に DB を使うときに、新しいつなぎ先で作り直す)
@@ -280,7 +286,11 @@ async def skip(step: str, request: Request) -> dict[str, Any]:
         return _need_key()
     if step not in SKIPPABLE:
         return {"success": False, "error": {"message": "この段は飛ばせません"}}
-    envfile.write({SKIP_KEY: ",".join(sorted(_skipped() | {step}))})
+    skipped = ",".join(sorted(_skipped() | {step}))
+    if envfile.mode() == "off":
+        os.environ[SKIP_KEY] = skipped  # 書く所がないので、この起動の間だけ覚える
+    else:
+        envfile.write({SKIP_KEY: skipped})
     return {"success": True, "data": _view()}
 
 

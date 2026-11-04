@@ -5,6 +5,9 @@
   どちらが効いているか分からなくならないように、画面にも「環境から設定」と出して、変えられないようにする)。
 - 書くときは、本人だけが読める権限(600)・改行は LF。ほかの行(コメントなど)はそのまま残す。
 - 秘密(パスワード・鍵)もここに入るので、Git に入れない(.gitignore)。
+- コンテナなどでは、入れ替えや再起動でファイルが消える。置き方を環境の名前で見分けず、CCP_ENV_FILE の値で決める(mode):
+  指定なし = 既定の場所(消えるかもしれないので、画面と健康診断が注意を出す)/ パスを指定 = 人が残る場所を選んだ /
+  off = ファイルを使わない(すべて環境変数で渡す運用。画面の欄は閉じる)。
 """
 from __future__ import annotations
 
@@ -20,8 +23,20 @@ _from_env: set[str] = set()
 _from_file: set[str] = set()
 
 
+class FileOff(OSError):
+    """CCP_ENV_FILE=off なので、書けない"""
+
+
+def mode() -> str:
+    """default(既定の場所)/ chosen(人が場所を指定した)/ off(ファイルを使わない)"""
+    v = os.getenv("CCP_ENV_FILE", "").strip()
+    if not v:
+        return "default"
+    return "off" if v.lower() == "off" else "chosen"
+
+
 def path() -> Path:
-    return Path(os.getenv("CCP_ENV_FILE") or DEFAULT)
+    return DEFAULT if mode() != "chosen" else Path(os.environ["CCP_ENV_FILE"].strip())
 
 
 def _unquote(v: str) -> str:
@@ -31,6 +46,8 @@ def _unquote(v: str) -> str:
 
 
 def read(p: Path | None = None) -> dict[str, str]:
+    if p is None and mode() == "off":
+        return {}
     p = p or path()
     if not p.is_file():
         return {}
@@ -59,8 +76,20 @@ def from_env(key: str) -> bool:
     return key in _from_env and key not in _from_file and bool(os.environ.get(key))
 
 
+def locked(key: str) -> bool:
+    """画面で変えられないか(環境から渡された値か、ファイルを使わない運用)"""
+    return from_env(key) or mode() == "off"
+
+
+def from_file() -> list[str]:
+    """いまファイルから効いている名前(値は出さない)"""
+    return sorted(_from_file)
+
+
 def write(values: dict[str, str | None]) -> None:
     """名前ごとに書き換える(None は消す)。プロセスの環境変数にも入れて、起動し直さずに効かせる。環境から渡された名前は書かない"""
+    if mode() == "off":
+        raise FileOff("CCP_ENV_FILE=off")
     p = path()
     lines = p.read_text(encoding="utf-8").splitlines() if p.is_file() else ["# CCP のサーバーの設定(初期設定の画面が書く。秘密を含むので、Git に入れない・人に渡さない)"]
     todo = {k: v for k, v in values.items() if not from_env(k)}

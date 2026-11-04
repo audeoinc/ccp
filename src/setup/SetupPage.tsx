@@ -119,7 +119,7 @@ function StepBody({ step, onSaved }: { step: SetupStep; onSaved: (s: SetupState)
     <>
       {step.locked && (
         <MessageBar intent="info" layout="multiline">
-          <MessageBarBody>{t('この段の値は、環境から渡されています(Secrets・環境変数など)。画面では変えられません。確かめるだけです。', 'These values come from the environment (Secrets, environment variables). They cannot be changed here; you can only check them.')}</MessageBarBody>
+          <MessageBarBody>{t('この段の値は、環境から渡します(Secrets・環境変数など)。画面では変えられません。確かめるだけです。', 'These values come from the environment (Secrets, environment variables). They cannot be changed here; you can only check them.')}</MessageBarBody>
         </MessageBar>
       )}
       {step.id === 'db' && (
@@ -233,6 +233,26 @@ export function SetupPage() {
             <MessageBarBody>{state.reason}</MessageBarBody>
           </MessageBar>
         )}
+        {state?.fileMode === 'default' && (
+          <MessageBar intent="warning" layout="multiline">
+            <MessageBarBody>
+              {t(
+                'ここで入れた値は、サーバーの中のファイルに書きます。コンテナでは、入れ替えや再起動で消えて、この画面がまた出ます(前に入れたのにこの画面が出たときは、そのためです。DB のデータは消えていません)。Secrets Manager などから環境変数で渡してください。消えない置き場所(EFS など)に置くなら、環境変数 CCP_ENV_FILE でファイルを指します。',
+                'Values entered here are written to a file inside the server. In a container, they are lost when it is replaced or restarted, and this screen comes back (if you see it again after filling it in, that is why; the data in the database is not lost). Pass them as environment variables from a secrets manager. To keep the file on durable storage (EFS, etc.), point the CCP_ENV_FILE environment variable at it.',
+              )}
+            </MessageBarBody>
+          </MessageBar>
+        )}
+        {state?.fileMode === 'off' && (
+          <MessageBar intent="info" layout="multiline">
+            <MessageBarBody>
+              {t(
+                'この環境では、画面から値を書きません(CCP_ENV_FILE=off)。足りない値を環境変数で渡して、サーバーを起動し直してください。',
+                'This environment does not accept values from the screen (CCP_ENV_FILE=off). Pass the missing values as environment variables and restart the server.',
+              )}
+            </MessageBarBody>
+          </MessageBar>
+        )}
         {error && (
           <MessageBar intent="error" layout="multiline">
             <MessageBarBody>{error}</MessageBarBody>
@@ -266,7 +286,7 @@ export function SetupPage() {
                 'You can start once the database step is done. BigQuery locations and the AI model are set afterwards in Settings → Company → "Settings health", which shows what is missing and how to fix it.',
               )}
             </span>
-            {state?.file && <span className={s.note}>{t(`値は ${state.file} に書きました(秘密を含むので、人に渡さない・Git に入れない)。`, `Values were written to ${state.file} (contains secrets; do not share or commit).`)}</span>}
+            {state?.file && state.fileMode !== 'off' && <span className={s.note}>{t(`値は ${state.file} に書きました(秘密を含むので、人に渡さない・Git に入れない)。`, `Values were written to ${state.file} (contains secrets; do not share or commit).`)}</span>}
             <span className={s.note}>{t('ほかのサーバーと同じ設定にするなら、そのサーバーの ⚙ →「設定の状態」で書き出した設定の型を読み込めます(AI の設定と BigQuery の表の場所。秘密と DB のつなぎ先は入っていません)。', 'To match another server, import the template exported from its Settings → Settings health (AI settings and BigQuery locations; secrets and the database connection are not included).')}</span>
             {imported && <MessageBar intent="success" layout="multiline"><MessageBarBody>{t('設定の型を読み込みました。BigQuery の表の場所は、始めたあとに ⚙ →「データの取り込み」で確認するまで、取り込みません。', 'Template imported. BigQuery locations are not imported from until you confirm them in Settings → Data import after starting.')}</MessageBarBody></MessageBar>}
             <div className={s.actions}>

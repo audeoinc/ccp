@@ -6,7 +6,7 @@ const items: SecretItem[] = [
   { name: 'OIDC_CLIENT_SECRET', set: true, locked: true },
   { name: 'AI_OUTLET_TOKEN', set: false, locked: false },
 ]
-const view = (): SecretsView => ({ items: items.map((i) => ({ ...i })), file: '/srv/ccp/server/ccp.env' })
+const view = (): SecretsView => ({ items: items.map((i) => ({ ...i })), file: '/srv/ccp/server/ccp.env', fileMode: 'default' })
 const wait = () => new Promise((r) => setTimeout(r, 400))
 
 export const SecretsService: typeof Real = {

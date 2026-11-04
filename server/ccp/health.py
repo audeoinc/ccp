@@ -23,7 +23,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-from . import appsettings, dbready
+from . import appsettings, dbready, envfile
 
 log = logging.getLogger("ccp.health")
 router = APIRouter(prefix="/api/settings/health")
@@ -33,7 +33,7 @@ SERVER = Path(__file__).resolve().parent.parent
 
 @dataclass
 class Item:
-    """1 行。area は組(schema / db / google / ai / bq / sync / assets / guard / static)。goto は ⚙ で直す所(ai / dataimport)"""
+    """1 行。area は組(schema / file / db / google / ai / bq / sync / assets / guard / static)。goto は ⚙ で直す所(ai / dataimport)"""
 
     area: str
     status: str
@@ -375,6 +375,24 @@ async def _net(out: _Out) -> None:
         out.add("net", "failed", f"サーバーから外(インターネット)に出られません({why})", "ファイアウォール・NAT・プロキシ(環境変数 HTTPS_PROXY)を確認する。外に出られないと、BigQuery・AI・ログインも動きません")
 
 
+def _settings_file(out: _Out) -> None:
+    """値が、サーバーのファイルから来ているか。コンテナなどでは入れ替えで消えるので、消える前に知らせる。
+    消えるかは環境の名前で決めず、CCP_ENV_FILE で場所を指定したか(人が残る場所を選んだか)で分ける"""
+    names = [n for n in envfile.from_file() if n != "CCP_SETUP_SKIPPED"]
+    if not names:
+        return
+    joined = ", ".join(names)
+    if envfile.mode() == "default":
+        out.add(
+            "file", "warn",
+            f"{joined} を、サーバーのファイル {envfile.path()} から読んでいます。コンテナなどでは、入れ替えや再起動でファイルが消え、次の起動で初期設定の画面に戻ります",
+            "Secrets Manager などから環境変数で渡してください。ファイルが残る置き方なら、CCP_ENV_FILE でこのファイルを指すと、この注意は消えます",
+            goto="secrets",
+        )
+    else:
+        out.add("file", "ok", f"{joined} を、指定されたファイル {envfile.path()} から読んでいます")
+
+
 def _schema_overlay(out: _Out) -> bool:
     """AWS 側の列・表を重ねるファイル。なければ何も出さない。重ねられなければ False(そのあとの確かめは表の定義を使えない)"""
     from . import schema as sc
@@ -395,6 +413,7 @@ async def diagnose(full: bool = True) -> list[Item]:
     out = _Out()
     if not _schema_overlay(out):
         return list(out)
+    _settings_file(out)
     # 外への確かめは、画面と check のときだけ(起動を待たせない)
     if full:
         await _net(out)

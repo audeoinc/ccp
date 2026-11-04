@@ -46,7 +46,7 @@ function Row({ item, labels, onChange }: { item: SecretItem; labels: Labels; onC
     <div className={s.row}>
       <div className={s.head}>
         <span className={s.name}>{labels.name}</span>
-        {item.locked ? (
+        {item.locked && item.set ? (
           <Badge appearance="tint" color="informative">{t('環境から', 'From environment')}</Badge>
         ) : item.set ? (
           <Badge appearance="tint" color="success">{t('入っています', 'Set')}</Badge>
@@ -56,7 +56,11 @@ function Row({ item, labels, onChange }: { item: SecretItem; labels: Labels; onC
         <span className={s.env}>{item.name}</span>
       </div>
       {item.locked ? (
-        <span className={s.note}>{t('環境から渡された値(Secrets など)です。画面では変えられません。渡している所で変えてください。', 'Provided by the environment (Secrets, etc.). It cannot be changed here; change it where it is provided.')}</span>
+        <span className={s.note}>
+          {item.set
+            ? t('環境から渡された値(Secrets など)です。画面では変えられません。渡している所で変えてください。', 'Provided by the environment (Secrets, etc.). It cannot be changed here; change it where it is provided.')
+            : t('この環境では、画面から書きません(CCP_ENV_FILE=off)。要るときは、環境変数で渡して、サーバーを起動し直してください。', 'This environment does not accept values from the screen (CCP_ENV_FILE=off). If needed, pass it as an environment variable and restart the server.')}
+        </span>
       ) : (
         <div className={s.input}>
           <Field className={s.grow} validationState={error ? 'error' : 'none'} validationMessage={error || undefined} label={<InfoLabel info={labels.info}>{item.set ? t('新しい値', 'New value') : t('値', 'Value')}</InfoLabel>}>
@@ -142,12 +146,22 @@ export function SettingsSecretsPanel() {
       )}
       {!view && !error && <Spinner size="small" />}
       {view?.items.map((item) => <Row key={item.name} item={item} labels={labels[item.name]} onChange={setView} />)}
-      {view && (
+      {view?.fileMode === 'default' && (
+        <MessageBar intent="warning" layout="multiline">
+          <MessageBarBody>
+            {t(
+              `値は、このサーバーの ${view.file} に書きます。コンテナでは、入れ替えや再起動で消えます。Secrets Manager などから環境変数で渡してください。消えない置き場所(EFS など)に置くなら、環境変数 CCP_ENV_FILE でファイルを指します。すべて環境変数で渡すなら、CCP_ENV_FILE=off でこの欄を閉じられます。`,
+              `Values are written to ${view.file} on this server. In a container, they are lost when it is replaced or restarted. Pass them as environment variables from a secrets manager. To keep the file on durable storage (EFS, etc.), point the CCP_ENV_FILE environment variable at it. If everything comes from environment variables, CCP_ENV_FILE=off closes these fields.`,
+            )}
+          </MessageBarBody>
+        </MessageBar>
+      )}
+      {view?.fileMode === 'chosen' && (
         <MessageBar intent="info" layout="multiline">
           <MessageBarBody>
             {t(
-              `値は、このサーバーの ${view.file} に書きます。サーバーが 2 台以上のときや、起動のたびにファイルが消える置き方では、ほかのサーバーに届かない・消えるので、Secrets などから環境変数で渡してください。`,
-              `Values are written to ${view.file} on this server. With two or more servers, or where files do not survive a restart, they will not reach the others or will be lost; pass them as environment variables from Secrets instead.`,
+              `値は、指定されたファイル ${view.file} に書きます。サーバーが 2 台以上なら、どのサーバーからも同じファイルが見える置き場所にしてください。`,
+              `Values are written to the specified file ${view.file}. With two or more servers, every server must see the same file.`,
             )}
           </MessageBarBody>
         </MessageBar>
