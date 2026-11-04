@@ -29,6 +29,7 @@ const areaName = (area: string, t: ReturnType<typeof useT>) =>
     google: t('Google の認証', 'Google credentials'),
     ai: t('AI', 'AI'),
     bq: t('BigQuery', 'BigQuery'),
+    net: t('外へのつなぎ', 'Internet access'),
     sync: t('定期の取り込み', 'Scheduled import'),
     assets: t('写真', 'Photos'),
     guard: t('画面の守り', 'Access protection'),

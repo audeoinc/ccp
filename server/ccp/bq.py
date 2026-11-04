@@ -3,7 +3,7 @@
 いまは「つながるか・出力の場所と列が仕様どおりか」を確かめるところまで(python -m ccp.cli check の「■ BigQuery」)。
 取り込み(B2 以降)は、これを土台に足す。
 
-接続は、Workbench のサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
+接続は、サーバーのサービスアカウント(creds.py の get_credentials。Gemini と同じ)で行う。PostgreSQL のアカウントは使わない。
 出力の場所(<プロジェクト>.<データセット>.<テーブルかビュー>)は、利用先の名前を含むので、コードにもリポジトリにも書かず、
 ⚙ →「データの取り込み」で DB に持つ(appsettings.py のまとめ bq。2026-11-03 までは環境変数。DB にまだなければ、一度だけ写す):
   BQ_SPU / BQ_SKU / BQ_SKU_STOCK / BQ_WEEKLY / BQ_FORECAST   5 つの出力(BIGQUERY_EXPORT.md の 2〜6 章)
@@ -75,6 +75,31 @@ def client() -> Any:
     from google.cloud import bigquery
 
     return bigquery.Client(project=job_project(), credentials=get_credentials())
+
+
+class BigQuerySource:
+    """データの入口(datasource.DataSource)の BigQuery のアダプター"""
+
+    def __init__(self, bq_client: Any):
+        self._client = bq_client
+
+    def columns(self, where: str) -> list[str]:
+        return [f.name for f in (getattr(self._client.get_table(where), "schema", None) or [])]
+
+    def last_updated(self, where: str, watch: str | None = None) -> datetime | None:
+        # ビューの最終更新は、元のデータの更新を表さないので、更新を見る元の表の日時を使う(なければ分からない)
+        t = self._client.get_table(where)
+        if (getattr(t, "table_type", "") or "") == "TABLE":
+            return getattr(t, "modified", None)
+        return getattr(self._client.get_table(watch), "modified", None) if watch else None
+
+    def read_rows(self, where: str, columns: list[str]) -> list[dict[str, Any]]:
+        sql = f"SELECT {', '.join(f'`{c}`' for c in columns)} FROM `{where}`"
+        return [{k.lower(): v for k, v in dict(r).items()} for r in self._client.query(sql).result()]
+
+    def kind(self, where: str) -> str:
+        """表かビューか(画面で「更新の合図に見る表は要りません」と言うため。入口の約束の外。ほかのアダプターにはなくてよい)"""
+        return getattr(self._client.get_table(where), "table_type", "") or ""
 
 
 def account() -> str:

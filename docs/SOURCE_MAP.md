@@ -569,6 +569,7 @@ AI の呼び出しは **`askAgent`(`aiSelect.ts`)だけ**を通す。指示文�
 | `gcp/ai.ts` | AI の依頼のサービス(サーバーの `/api/ask` を呼ぶ) |
 | `gcp/bq.ts` | BigQuery からの取り込みの呼び出し(サーバーの `/api/bq`。画面を開いたときと ⚙ の「BigQuery から取り込む」) |
 | `gcp/dbWake.ts` | 「データベースを準備中」の表示 |
+| `gcp/loginExpired.ts` | ログイン(OIDC)が切れたときの案内(別のタブでログインし直す) |
 | `gcp/readShare.ts` | 同じ表・同じ条件の読み込みが重なったら、1 回の通信を分け合う |
 | `gcp/samples.ts` | ⚙ の「開発・管理」の見本のデータを作る(`/api/ads/sample`・`/api/impact/sample`) |
 | `data/stockCover.ts` | 在庫の持ちの材料(直近 4 週の販売数と最新の在庫)を、商品コードの一覧から 1 回で読む(表ではなく API。`server/ccp/stock_cover.py`) |

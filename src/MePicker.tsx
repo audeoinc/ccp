@@ -27,6 +27,7 @@ import {
 import { ChevronDownRegular, PersonRegular, SignOutRegular } from '@fluentui/react-icons'
 import { isDeveloper, isOn, setViewingAsUser, useFeatureVersion, viewingAsUser } from './featureFlags'
 import { useT } from './i18n'
+import { appPath } from './appRoot'
 import { meLock, myName, myUserId, onMeChange, setMe, setMyName } from './history'
 import { activeUsers, groupsOf, usePeople, type People } from './people'
 import { UI_SCALES, setUiScale, setUiScaleAuto, useUiScale, useUiScaleAuto, type UiScale } from './uiScale'
@@ -36,8 +37,7 @@ const useStyles = makeStyles({
   account: { minWidth: 0, maxWidth: '100%', justifyContent: 'flex-start', columnGap: '6px', fontWeight: tokens.fontWeightRegular },
   name: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   placeholder: { color: tokens.colorNeutralForeground3 },
-  // ログインしている人は選び直せないので、名前だけ出す
-  fixed: { display: 'inline-flex', alignItems: 'center', columnGap: '6px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  // ログインしているメールアドレスが、ユーザーに登録されていないとき
   unregistered: { color: tokens.colorPaletteDarkOrangeForeground1 },
   menuNote: { padding: '4px 10px 6px', maxWidth: '260px', fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
   // 初回のダイアログ
@@ -92,18 +92,12 @@ export function MePicker({ className, ariaLabel }: Props) {
   }, [picked, name])
 
   const label = ariaLabel ?? t('ログインしている人', 'Signed-in user')
-  if (lock) {
-    // ログインしている(U7): 選ばせない。登録のない人は、メールアドレスを出して知らせる
-    const text = lock.registered ? (picked?.name ?? name) : lock.email
-    const title = lock.registered ? t('ログインしている人(変えられません)', 'Signed in (cannot be changed)') : t('このメールアドレスは、ユーザーに登録されていません(⚙ →「ユーザーと承認グループ」)', 'This email is not a registered user (⚙ → Users and approval groups)')
-    return (
-      <span className={mergeClasses(styles.fixed, !lock.registered && styles.unregistered, className)} title={title} aria-label={label}>
-        <Avatar size={24} name={text} color="colorful" />
-        {text}
-      </span>
-    )
-  }
-  if (!people.loaded || users.length === 0) {
+  // ログインしている(U7): 選ばせない。登録のない人は、メールアドレスを出して知らせる。
+  // メニューは、ログインしていないときと同じ(表示の大きさなどはそのまま使える)。人を選ぶ所の代わりにメールアドレスを出し、
+  // CCP の中のログイン(OIDC。Entra ID などの SSO)なら、本物のログアウト(手前の IAP・手元の人は、CCP からは抜けられない)
+  const lockText = lock ? (lock.registered ? (picked?.name ?? name) : lock.email) : ''
+  const lockTitle = lock && (lock.registered ? t('ログインしている人(変えられません)', 'Signed in (cannot be changed)') : t('このメールアドレスは、ユーザーに登録されていません(⚙ →「ユーザーと承認グループ」)', 'This email is not a registered user (⚙ → Users and approval groups)'))
+  if (!lock && (!people.loaded || users.length === 0)) {
     const input = (
       <Input
         size="small"
@@ -156,23 +150,34 @@ export function MePicker({ className, ariaLabel }: Props) {
           size="small"
           className={mergeClasses(styles.account, className)}
           aria-label={label}
-          icon={<Avatar size={24} name={picked?.name} color={picked ? 'colorful' : 'neutral'} />}
+          title={lockTitle || undefined}
+          icon={lock ? <Avatar size={24} name={lockText} color="colorful" /> : <Avatar size={24} name={picked?.name} color={picked ? 'colorful' : 'neutral'} />}
           iconPosition="before"
         >
-          <span className={mergeClasses(styles.name, !picked && styles.placeholder)}>{picked?.name ?? t('ログインする人を選ぶ', 'Choose who signs in')}</span>
+          {lock ? (
+            <span className={mergeClasses(styles.name, !lock.registered && styles.unregistered)}>{lockText}</span>
+          ) : (
+            <span className={mergeClasses(styles.name, !picked && styles.placeholder)}>{picked?.name ?? t('ログインする人を選ぶ', 'Choose who signs in')}</span>
+          )}
           <ChevronDownRegular />
         </Button>
       </MenuTrigger>
       <MenuPopover>
         <MenuList>
-          <MenuGroup>
-            <MenuGroupHeader>{t('ユーザーを切り替える(デモ)', 'Switch user (demo)')}</MenuGroupHeader>
-            {users.map((u) => (
-              <MenuItemRadio key={u.id} name="me" value={u.id} secondaryContent={groupNames(people, u.id)}>
-                {u.name}
-              </MenuItemRadio>
-            ))}
-          </MenuGroup>
+          {lock ? (
+            <MenuItem disabled secondaryContent={lock.registered ? undefined : t('未登録', 'Not registered')}>
+              {lock.email}
+            </MenuItem>
+          ) : (
+            <MenuGroup>
+              <MenuGroupHeader>{t('ユーザーを切り替える(デモ)', 'Switch user (demo)')}</MenuGroupHeader>
+              {users.map((u) => (
+                <MenuItemRadio key={u.id} name="me" value={u.id} secondaryContent={groupNames(people, u.id)}>
+                  {u.name}
+                </MenuItemRadio>
+              ))}
+            </MenuGroup>
+          )}
           <MenuDivider />
           {/* 表示の大きさ(X60。ノート PC など、画面が狭いときに縮める。このブラウザで覚える)。非公開なら出さない(X87) */}
           {isOn('common.zoom') && (
@@ -200,14 +205,27 @@ export function MePicker({ className, ariaLabel }: Props) {
               </MenuItemCheckbox>
             </>
           )}
-          <MenuDivider />
-          {/* ログアウト(デモ): 覚えている人を消し、最初の「だれでログインしますか?」をもう一度出す */}
-          <MenuItem icon={<SignOutRegular />} disabled={!picked} onClick={() => setMe(undefined)}>
-            {t('ログアウト', 'Sign out')}
-          </MenuItem>
-          <div className={styles.menuNote}>
-            {t('ログインが入るまでの見本の機能です。選んだ人として、依頼・承認・やり取りが記録されます。', 'A demo feature until sign-in is added. Requests, approvals and comments are recorded as the chosen person.')}
-          </div>
+          {lock ? (
+            lock.source === 'oidc' && (
+              <>
+                <MenuDivider />
+                <MenuItem icon={<SignOutRegular />} onClick={() => location.assign(appPath('/auth/logout'))}>
+                  {t('ログアウト', 'Sign out')}
+                </MenuItem>
+              </>
+            )
+          ) : (
+            <>
+              <MenuDivider />
+              {/* ログアウト(デモ): 覚えている人を消し、最初の「だれでログインしますか?」をもう一度出す */}
+              <MenuItem icon={<SignOutRegular />} disabled={!picked} onClick={() => setMe(undefined)}>
+                {t('ログアウト', 'Sign out')}
+              </MenuItem>
+              <div className={styles.menuNote}>
+                {t('ログインが入るまでの見本の機能です。選んだ人として、依頼・承認・やり取りが記録されます。', 'A demo feature until sign-in is added. Requests, approvals and comments are recorded as the chosen person.')}
+              </div>
+            </>
+          )}
         </MenuList>
       </MenuPopover>
     </Menu>

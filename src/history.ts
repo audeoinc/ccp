@@ -31,6 +31,8 @@ export const setMe = (user?: { id: string; name: string }) => {
 export interface MeLock {
   email: string
   registered: boolean
+  /** どのログインか(oidc なら、CCP からログアウトできる) */
+  source?: 'oidc' | 'iap' | 'env' | null
 }
 let lock: MeLock | null = null
 export const meLock = (): MeLock | null => lock
