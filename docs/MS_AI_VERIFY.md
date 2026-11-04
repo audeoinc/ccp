@@ -1,6 +1,6 @@
 # Microsoft の AI を CCP から呼ぶ検証の手順
 
-2026-10-29 作成、2026-11-04 まとめ。CCP の AI を外の層に頼む作りは [AI_OUTLET_PLAN.md](AI_OUTLET_PLAN.md)、Gemini と Microsoft の候補の比較は [AI_PLATFORMS.md](AI_PLATFORMS.md)。
+2026-10-29 作成、2026-11-04 まとめ。**別の環境で作り直す手順と、これから作るもの(層)は [MS_AI_SETUP.md](MS_AI_SETUP.md)**(この文書は、検証の手順と記録)。CCP の AI を外の層に頼む作りは [AI_OUTLET_PLAN.md](AI_OUTLET_PLAN.md)、Gemini と Microsoft の候補の比較は [AI_PLATFORMS.md](AI_PLATFORMS.md)。
 
 ## 結論(2026-11-04 時点)
 

@@ -1,6 +1,6 @@
 # AI の出口(AI_OUTLET_URL)— ほかの AI を使うときの設定と、層との約束(版 1)
 
-CCP は、ふだん Google の Gemini(Vertex AI)を使います。**使う組織の都合でほかの AI を使いたいときは、CCP の外に「層」を置き、CCP の AI をすべてその層に頼む**ことができます。この文書は、その設定と、層が守る約束です。考え方と経緯は [AI_OUTLET_PLAN.md](AI_OUTLET_PLAN.md)。
+CCP は、ふだん Google の Gemini(Vertex AI)を使います。**使う組織の都合でほかの AI を使いたいときは、CCP の外に「層」を置き、CCP の AI をすべてその層に頼む**ことができます。この文書は、その設定と、層が守る約束です。考え方と経緯は [AI_OUTLET_PLAN.md](AI_OUTLET_PLAN.md)。Microsoft の Copilot Studio(Direct Line)・AI Builder につなぐ層の作り方と、検証の結果は [MS_AI_SETUP.md](MS_AI_SETUP.md)(0 章に、作るものの一覧)。
 
 ```
   画面 ──► CCP のサーバー
