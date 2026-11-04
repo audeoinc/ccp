@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-04 UI 2: X108 差分の一覧を main に(`npm run client:diff`。AWS_CUSTOMIZE の 5.2 の最初に置いた)。X109 は形を連絡係に提案済み。
 - 2026-11-04 UI 2: X107 書き出さない変更を止める確認を main に(`scripts/check-client-changes.mjs`。ZIP に入る `server/schema.base.json` と比べる。開発側にはこのファイルがないので何もしない)。
 - 2026-11-04 UI 2: X106 スキーマの重ね読みを main に(`server/ccp/client/schema.json`。足すだけ。ぶつかれば verify・起動・check が理由を出して止める。ファイルがなければ今までと同じ)。次は X107 → X108 → X109。
 - 2026-11-04 要件の相談役: AWS 版の取り込みを、総入れ替えからマージ(`vendor` → `main`。CCP はリポジトリの中の `ccp/`)に変えると決めた。AWS 側はデータに合わせてスキーマ・表・画面を変える。文書は [AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md)。**開発側の新機能は、AWS 側の追加がなくても動くように作る。** スキーマの重ね読みなどの仕組みは未着手(その文書の 7 章)
