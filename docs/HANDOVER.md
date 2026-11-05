@@ -4,7 +4,7 @@
 作業の詳しい記録・経緯は [handover-archive/](handover-archive/README.md)、設計の判断と理由は [handover-archive/DECISIONS.md](handover-archive/DECISIONS.md)。**どちらも、必要なときだけ** ID(X47 など)や節の番号(「HANDOVER 6.13」など)で grep して読む。
 作る機能の一覧と順番は [BACKLOG.md](BACKLOG.md)。作業を終える前に、この文書を更新する(最後の章)。
 
-- 最終更新: 2026-11-04
+- 最終更新: 2026-11-05
 
 ---
 
@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-05 クラウド: CLAUDE.md を整理(冒頭に「必ず守る 5 つ」、経緯は DECISIONS.md へ。中身は削っていない。ブランチ `cloud/claude-md-tidy`)。5 つの選び方は利用者の確認待ち。verify は環境の都合で未実行
 - 2026-11-04 1 日の終わりの文書の更新(11-03 午後〜11-04 の分)。`source-map.drawio` は直していない
 - 2026-11-04 AWS 版 `20261104-9b5cf79` を公開(5 章)。AWS 側へは利用者が渡す。`20261104-ec7d58d` は渡さない
 - 2026-11-04 UI 2: AWS 側が共通の定義を変えても止めない形に(利用者 OK): 重ねるファイルは共通の列の型・retired・choices も変えられる(重ねる側を採り、注意を出す)。X107 は注意だけ。止めるのは、読めない・知らない型・SQL に入れられない名前・共通の表の unique だけ。列を text にはしない。
