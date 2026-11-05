@@ -1,8 +1,8 @@
 // npm run verify の中身。表・承認・決まりの確かめ(速い)のあとに、型チェック・lint(同時に)・ビルドを通す。
-// CLAUDE.md の作業の約束 1 の確かめは、これ 1 つで足りる(中で tsc -b・eslint・vite build を流す。別に 3 つを流し直さない)。
+// CLAUDE.md の「必ず守る 5 つ」の 2(作業の進め方)の確かめは、これ 1 つで足りる(中で tsc -b・eslint・vite build を流す。別に 3 つを流し直さない)。
 //   node scripts/verify.mjs          ← 変えたファイルが文書(.md)だけなら、重い所を飛ばす
 //   node scripts/verify.mjs --full   ← いつでも全部(VERIFY_FULL=1 でも同じ)
-// 文書だけの変更では、型チェック・lint・ビルドの結果は変わらない(CLAUDE.md の作業の約束 1)ので、待ち時間を減らすために飛ばす(2026-10-23)。
+// 文書だけの変更では、型チェック・lint・ビルドの結果は変わらない(CLAUDE.md の「作業の進め方」)ので、待ち時間を減らすために飛ばす(2026-10-23)。
 // 変えたファイルは、まだコミットしていないものと、origin/main にまだ入っていないコミットのもの。
 // Git がない所(Workbench 版の ZIP を展開した先など)や、変えたファイルが分からないとき・1 つもないときは、全部を通す
 import { execFileSync, spawn, spawnSync } from 'node:child_process'

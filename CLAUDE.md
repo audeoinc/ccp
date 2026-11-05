@@ -23,6 +23,11 @@ React 19 + TypeScript + Vite + Fluent UI v9 の画面と、Python(FastAPI)のサ
 - HANDOVER は短く保つ(目安 10KB 以下)。詳しい記録は `docs/handover-archive/` のいちばん新しいファイルの末尾に足し、HANDOVER には 1 行だけ書く。古い行は消す。BACKLOG で済んだ・外した行は `docs/backlog-archive/DONE.md` へ移す。
 - 困ったら、まず `cd server && .venv/bin/python -m ccp.cli check`(設定・DB への接続・写真・画面のビルドを確かめる。何も変えない)。
 
+## 資料を作るとき
+
+- 人が読む資料(Confluence のページ・社内向けの説明・報告・提案、パワポ・スライド・プレゼン)を作るときは、頼まれなくても `.claude/skills/` のスキルを使う。日本語は `confluence-page-writing`・`slide-deck-writing`、英語は `confluence-page-writing-en`・`slide-deck-writing-en`。
+- リポジトリの中の文書(`docs/`・HANDOVER・この文書など)は AI が読む元データなので、このスキルは使わず、網羅を優先して書く。
+
 ## 設計の方針
 
 - 忘れないようにするのではなく、忘れていても問題ないようにする。めったにしない設定・手順は、人が覚えている前提で作らず、サーバーと画面が足りない物と次にやることを教える形にする(起動のときの初期設定の画面、`check` と ⚙ の「設定の状態」など)。新しい設定・外とのつなぎ・定期の処理を足すときは、「忘れていたらどうなるか、どこで気づけるか」を作る前に決める。ARCHITECTURE の 0 章。

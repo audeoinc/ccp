@@ -1,6 +1,6 @@
 ---
 name: confluence-page-writing-en
-description: Use when writing a Confluence page or internal explainer in English. Sets reader and purpose, puts the conclusion first, and writes in plain prose that reads like a person wrote it.
+description: Use whenever writing an English Confluence page or other human-facing document (explainer, report, proposal, how-to, meeting notes), even if not asked. Confirms reader and purpose first, puts the conclusion first, and writes in plain prose that reads like a person wrote it.
 ---
 
 # Writing a Confluence page (English)

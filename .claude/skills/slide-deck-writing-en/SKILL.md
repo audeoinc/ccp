@@ -1,6 +1,6 @@
 ---
 name: slide-deck-writing-en
-description: Use when drafting the content of an English slide deck or PowerPoint. Sets audience and goal, builds a storyline readable from titles alone, and avoids the templated AI look.
+description: Use whenever drafting an English slide deck, PowerPoint, or presentation, even if not asked. Confirms audience and goal first, builds a storyline readable from titles alone, and avoids the templated AI look.
 ---
 
 # Writing slide content (English)
