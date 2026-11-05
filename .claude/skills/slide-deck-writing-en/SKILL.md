@@ -26,9 +26,10 @@ What to confirm:
 How to ask:
 
 - One round of questions, four at most, answerable by choosing an option. Use a multiple-choice tool if one is available.
-- Put your inferred answer first, marked as recommended. Don't ask about anything the conversation already settles.
+- **Always ask about the audience and the purpose (format and goal) first, every time.** Even when you can infer them, don't skip the question: put your inference first as the recommended option.
+- For the other items, put your inferred answer first, marked as recommended. Don't ask about anything the conversation already settles.
 - Once answered, show the title-only storyline (next section) and get a yes before building slide content.
-- If the person says "just make it" or no answer is coming, state your assumptions first and proceed.
+- Skip asking only when the person explicitly says "just make it", or in a scheduled run where no answer can come. Then, including the audience and purpose (format and goal), state your assumptions first and proceed.
 
 If `examples/` exists, read it first. If there is a company template, follow it.
 

@@ -1,6 +1,6 @@
 ---
 name: confluence-page-writing-en
-description: Use whenever writing an English Confluence page or other human-facing document (explainer, report, proposal, how-to, meeting notes), even if not asked. Confirms reader and purpose first, puts the conclusion first, and writes in plain prose that reads like a person wrote it.
+description: Use whenever writing an English Confluence page or other human-facing document (explainer, report, proposal, how-to, meeting notes), even if not asked, including when creating or editing a page directly in Confluence. Confirms reader and purpose first, puts the conclusion first, and writes in plain prose that reads like a person wrote it.
 ---
 
 # Writing a Confluence page (English)
@@ -10,6 +10,8 @@ AI-written pages usually feel off not because the content is wrong but because t
 For Japanese pages, use `confluence-page-writing` instead.
 
 ## 1. Confirm the direction before writing
+
+This applies when creating or editing a page directly in Confluence (through a connector or a browser) too: follow these steps before writing anything there.
 
 Always confirm the direction before writing the body. Don't ask from scratch: infer what you can from the conversation, propose it ("here's what I'm assuming"), and ask whether it's right.
 
@@ -23,9 +25,10 @@ What to confirm:
 How to ask:
 
 - One round of questions, four at most, answerable by choosing an option. Use a multiple-choice tool if one is available.
-- Put your inferred answer first, marked as recommended. Don't ask about anything the conversation already settles.
+- **Always ask about the reader and the purpose first, every time.** Even when you can infer them, don't skip the question: put your inference first as the recommended option.
+- For the other items, put your inferred answer first, marked as recommended. Don't ask about anything the conversation already settles.
 - Once answered, show the heading list with one line per heading on what it will say, and get a yes before writing the body.
-- If the person says "just write it" or no answer is coming, state your assumptions at the top of the page and proceed.
+- Skip asking only when the person explicitly says "just write it", or in a scheduled run where no answer can come. Then, including the reader and purpose, state your assumptions at the top of the page and proceed.
 
 If `examples/` exists, read it before writing. `good/` shows the conventions to follow; `bad/` shows what to avoid and why.
 
