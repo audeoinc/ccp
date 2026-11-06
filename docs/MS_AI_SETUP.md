@@ -4,6 +4,7 @@
 
 - 検証の手順と、測った数字の記録は [MS_AI_VERIFY.md](MS_AI_VERIFY.md)(この文書の数字は、そこの記録から写した。推測のものは推測と書く)。
 - CCP の側の出口(設定と、層との約束)は [AI_OUTLET.md](AI_OUTLET.md)。考え方は [AI_OUTLET_PLAN.md](AI_OUTLET_PLAN.md)。
+- 利用先の組織で、どの形が実装できるかの制約を `pac` で調べる手順は [MS_AI_CONSTRAINTS.md](MS_AI_CONSTRAINTS.md)(利用先の Claude に渡す)。
 - 本命は **Direct Line 版**(2 章)。**AI Builder 版**(3 章)は、組織の都合で Power Platform の流れを使いたいときのために残す。比べた結果は 4 章と、MS_AI_VERIFY.md の「暫定の評価」。
 
 この文書には、組織・環境の名前、ID、URL、鍵を書かない。値は `<環境の ID>` のように書く。実際の値は、各自の秘密の置き場に置く。

@@ -4,7 +4,7 @@
 作業の詳しい記録・経緯は [handover-archive/](handover-archive/README.md)、設計の判断と理由は [handover-archive/DECISIONS.md](handover-archive/DECISIONS.md)。**どちらも、必要なときだけ** ID(X47 など)や節の番号(「HANDOVER 6.13」など)で grep して読む。
 作る機能の一覧と順番は [BACKLOG.md](BACKLOG.md)。作業を終える前に、この文書を更新する(最後の章)。
 
-- 最終更新: 2026-11-05
+- 最終更新: 2026-11-06
 
 ---
 
@@ -18,6 +18,7 @@
 
 ## 2. 最近の作業(1 行ずつ。中身は [handover-archive/2026-10-28_.md](handover-archive/2026-10-28_.md) の末尾。前の行もそこに移した)
 
+- 2026-11-06 利用先の Claude に渡す手順書 [MS_AI_CONSTRAINTS.md](MS_AI_CONSTRAINTS.md)(Copilot の形ごとの制約を pac で読み取りだけで調べる)を足した。本物のテナントでは未実行。「認証なし」のグレーアウトの記録(MS_AI_SETUP の 2.1.1)はまだ枝 `claude/ai-outlet-b3c4ae` にあり、main に入っていない
 - 2026-11-05 クラウド: CLAUDE.md を整理(冒頭に「必ず守る 5 つ」、経緯は DECISIONS.md へ。中身は削っていない。利用者の指示で main に入れた)。verify は環境の都合で未実行
 - 2026-11-05 クラウド: 資料づくりのスキル 4 つ(Confluence・スライド、日本語・英語)を `.claude/skills/` に足した(利用者の指示で main に入れた)。資料を作るときは CLAUDE.md の「資料を作るとき」から使う。誰向け・用途は毎回必ず最初に聞く(Confluence に直接書き込むときも)。verify は環境の都合で未実行
 - 2026-11-04 1 日の終わりの文書の更新(11-03 午後〜11-04 の分)。`source-map.drawio` は直していない
@@ -27,10 +28,6 @@
 - 2026-11-04 要件の相談役: AWS 版の取り込みをマージに変えると決めた([AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md))。データと設定項目は AWS 側、UI・UX・機能は開発側から。**開発側の新機能は、AWS 側の追加がなくても動き、空の値・知らない値で落ちないように作る**
 - 2026-11-04 UI 3: X105 取り込んだデータの一覧(`settings.datalist`)は main。商品のページの作り方は `productPageUrl` だけ
 - 2026-11-04 連絡係: Copilot Studio の検証(docs/MS_AI_VERIFY.md・tools/ms-verify/)。残りは AI Builder で何枚も送る(T9)・道具をサーバーでも使える手直し
-- 2026-11-03 UI 1: W2 の SSO・入口の認証がないときの扱い(中継の印は 503。**AWS は `CCP_AUTH=none` などが要る**)・X103・X104 は main。SSO の画面の見た目は利用者が未確認。残りは X104 を本物の DB で確認
-- 2026-11-03 UI 2: settings.dataimport・settings.ai・settings.setup の健康診断・`app_settings` は main。本番の `BQ_AUTO_SYNC=0` を消すかは利用者
-- 2026-11-03 UI 3: X56 (b)〜(d)・W5・`cli remove-seed` は main。残り物は AB の案 B の「詳しく」をプレビューに(`vs.details`)と、パックの商品の消し方の相談
-- 2026-11-02 X86・X89・X90・X80・X92〜X94 は main。**未決**: `prod.htmlcode` の FEATURE_FLAGS の書き方(連絡係が確認中)
 
 ## 3. 次にやること
 
