@@ -14,7 +14,11 @@ node measure.mjs --via dl --runs 1                            # 方式 1(Direct 
 node measure.mjs --via dl --only T6 --image images\<写真>.jpg  # T6 を、画像を付けて送る(写真は下の「T6 の写真」)
 node measure.mjs --runs 1                                     # 方式 2(Agents SDK)。最初の 1 回だけブラウザが開く(人がサインイン)
 node check-token-endpoint.mjs                                 # 鍵なしの入口で断られるか
+node measure.mjs --via dl --only T1 --runs 1 --dump-trace     # trace などの知らせも出す(DLP で止まったときの ErrorCode を見る)
+node measure.mjs --via sdk --suffix DLP --only T1 --runs 1    # 設定の APP_CLIENT_ID_DLP などで、別のアプリ登録・エージェントを試す
 ```
+
+DLP(データポリシー)を切り替えて試した手順と結果は [docs/MS_AI_DLP.md](../../docs/MS_AI_DLP.md)。
 
 ## T6 の写真
 

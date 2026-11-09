@@ -3,6 +3,7 @@
 2026-11-04 作成(案)。CCP の AI を、Gemini から Microsoft の AI(Copilot Studio・AI Builder)に替えたいとき、**CCP を動かす環境と、使う Power Platform の環境が、検証したときと違っても**同じ手順で作り直せるように書いた。
 
 - 検証の手順と、測った数字の記録は [MS_AI_VERIFY.md](MS_AI_VERIFY.md)(この文書の数字は、そこの記録から写した。推測のものは推測と書く)。
+- DLP(データポリシー)で Direct Line・Agents SDK が止まる条件と、直し方は [MS_AI_DLP.md](MS_AI_DLP.md)(2026-11-09)。
 - CCP の側の出口(設定と、層との約束)は [AI_OUTLET.md](AI_OUTLET.md)。考え方は [AI_OUTLET_PLAN.md](AI_OUTLET_PLAN.md)。
 - 利用先で、どの形が実装できるかの制約を `pac` で調べる手順は [MS_AI_CONSTRAINTS.md](MS_AI_CONSTRAINTS.md)(利用先の Claude に渡す)。
 - 本命は **Direct Line 版**(2 章)。**AI Builder 版**(3 章)は、Power Platform の流れを使いたいときのために残す。比べた結果は 4 章と、MS_AI_VERIFY.md の「暫定の評価」。
@@ -22,7 +23,7 @@
 | Agents SDK | 利用者一人ひとりのサインインが要る(アプリだけでは呼べない)。CCP には向かない | 確か |
 | ハーネス | 標準のハーネスを勧める。GitHub Copilot ハーネスも Direct Line からは呼べたが、2 倍ほど遅い | 確か(1 回ずつ) |
 | AI Builder | 流れを窓口にすれば、文も画像(8 枚まで。空いた欄は白い画像で埋める)も通る。次点 | 確か |
-| 環境による違い | 上の結果は**環境 A**(検証を行った Developer の環境)のもの。**環境 B**(CCP 用の Developer の環境)では、Direct Line の「認証なし」・流れの HTTP のトリガー・アプリ登録が止められていて、環境 A で通った形がそのままでは使えなかった(2026-11-05〜06)。差の理由と、環境 B で判断するために要るものは **8 章** | 環境 B の結果は画面で見た。理由は見込み |
+| 環境による違い | 上の結果は**環境 A**(検証を行った Developer の環境)のもの。**環境 B**(CCP 用の Developer の環境)では、Direct Line の「認証なし」・流れの HTTP のトリガー・アプリ登録が止められていて、環境 A で通った形がそのままでは使えなかった(2026-11-05〜06)。差の理由と、環境 B で判断するために要るものは **8 章**。のちに環境 B で Agents SDK を試すと、返事が `DataLossPreventionViolation` になった。環境 A で再現し、「Direct Line channels in Copilot Studio」のブロックが原因と分かった(2026-11-09。[MS_AI_DLP.md](MS_AI_DLP.md)) | 環境 B の結果は画面で見た。DLP の原因は環境 A で実測 |
 | まだ分からないこと | 同時に呼んだときの上限・頼みの文の長さの上限・会話の記録の残り方・データの地域(GPT Chat Latest は日本の外で処理されることがある)・本番の環境のライセンス | 未確認 |
 
 **暫定の結論(環境 A で): Direct Line(標準のハーネス)が最も有力、AI Builder(流れ)が次点、Agents SDK は外す。** 環境 B のように止められている所があるときは、8 章で案を選び直す。
@@ -283,8 +284,8 @@ Power Automate の流れを窓口にして、AI Builder のプロンプトを呼
 |---|---|---|---|
 | **P1** Direct Line + 鍵(エージェントは認証なし) | **使える**(本命) | **作れない**。「認証なし」がグレーアウトし、ポリシーで設定できない旨が出た | DLP のポリシーで、Copilot Studio の「Entra ID の認証なしのチャット」(コネクタ「Chat without Microsoft Entra ID authentication in Copilot Studio」)がブロックされている |
 | P5 Direct Line + 手動で認証 | 試していない | **作れない**。「手動で認証する」も選べず、選べるのは「Microsoft で認証する」だけ | 同じポリシーか、手動の認証に要るアプリ登録が止められている |
-| Direct Line + Microsoft で認証 | 試していない | トークン・会話・送信は通ったが、**答える段でエージェントに断られた** | 「Microsoft で認証」のエージェントは、利用者の Entra の券を求める。Direct Line には券を渡す手段がない(Teams・Microsoft 365・Agents SDK 向けの設定) |
-| P2 Agents SDK(利用者の身分) | 動く(要るのはアプリ登録 1 つ・利用者のサインイン) | **未検証**。アプリ登録の画面に入れなかった(アクセス許可がありません) | 環境の外の設定で、一般の利用者のアプリ登録が止められている |
+| Direct Line + Microsoft で認証 | **使える**(2026-11-09。DLP に当たらなければ、シークレットだけで返事が来た) | トークン・会話・送信は通ったが、**答える段でエージェントに断られた** | 前は「利用者の Entra の券を求めるから」と見込んだ。環境 A の結果から、**DLP(Direct Line channels のブロック、か「Chat without…」と箱が分かれている)が原因だった見込み**。[MS_AI_DLP.md](MS_AI_DLP.md) 5 章 |
+| P2 Agents SDK(利用者の身分) | 動く(要るのはアプリ登録 1 つ・利用者のサインイン) | 初めはアプリ登録の画面に入れなかった(アクセス許可がありません)。のちに試すと、接続はできたが返事が **`DataLossPreventionViolation`** | 「Direct Line channels in Copilot Studio」のブロック。環境 A で同じ形を再現し、ブロックを外すと通った(実測。[MS_AI_DLP.md](MS_AI_DLP.md)) |
 | **P4** AI Builder + 流れ(HTTP 要求の受信時) | **使える**(次点) | **有効にできない**。保存はできるが、有効にすると DLP と矛盾すると出た | DLP のポリシーで、「HTTP 要求の受信時」のコネクタ(要求)がブロックされている |
 | P3 Predict を直接(アプリだけの券) | 呼べなかった(「Source is null」) | 試していない | 環境に依らない見込み(外のプログラムから、アプリだけの券で呼ぶ前提でない) |
 | P2s・S 専用のアカウントをサーバーに持たせる | 試していない | 試していない | — |
@@ -347,7 +348,7 @@ X1・X2 は、開発者の身分で呼ぶので、開発者だけが使う CCP �
 
 | # | 聞くこと | 分かること・決まること |
 |---|---|---|
-| 1 | CCP の環境にかかっている DLP のポリシーで、ブロックされているコネクタ(「認証なしのチャット」「要求」「Dataverse」など) | P1・P4 の例外がありうるか。X2・S2 が当たらないか |
+| 1 | CCP の環境にかかっている DLP のポリシーで、ブロックされているコネクタ(「Direct Line channels」「認証なしのチャット」「要求」「Dataverse」など)。Agents SDK なら「Direct Line channels」のブロックを外すだけで通る(頼み方は [MS_AI_DLP.md](MS_AI_DLP.md) 7 章) | P1・P2・P4 の例外がありうるか。X2・S2 が当たらないか |
 | 2 | CCP の環境だけ、P1 か P4 の例外を作れるか(作れるなら、かかる時間) | P1・P4 に進めるか |
 | 3 | 条件付きアクセスで、Azure CLI のサインインを止めているか | X1・X2・S1 が使えるか |
 | 4 | アプリ登録を 1 つ用意できるか(委任・公開クライアント。か、アプリケーション ユーザー付きのサービス プリンシパル) | P2・P2s・S2 に進めるか |

@@ -27,7 +27,7 @@
 - 2026-11-04 UI 2: `ui2-secrets`(初期設定・秘密の設定・設定の型)・コンテナの対策(`CCP_ENV_FILE`、docs/AWS.md「コンテナで動かすとき」)・W1・W3・X106〜X108 は main。**X109 は利用者の指示で戻した**(着手しない。どう作るかは利用者と決める。AWS 側で変わるのはデータと設定のすべて)
 - 2026-11-04 要件の相談役: AWS 版の取り込みをマージに変えると決めた([AWS_CUSTOMIZE.md](AWS_CUSTOMIZE.md))。データと設定項目は AWS 側、UI・UX・機能は開発側から。**開発側の新機能は、AWS 側の追加がなくても動き、空の値・知らない値で落ちないように作る**
 - 2026-11-04 UI 3: X105 取り込んだデータの一覧(`settings.datalist`)は main。商品のページの作り方は `productPageUrl` だけ
-- 2026-11-04 連絡係: Copilot Studio の検証(docs/MS_AI_VERIFY.md・tools/ms-verify/)。残りは AI Builder で何枚も送る(T9)・道具をサーバーでも使える手直し
+- 2026-11-09 Copilot Studio と DLP: Agents SDK も「Direct Line channels in Copilot Studio」のブロックで止まる(環境 A で再現)。docs/MS_AI_DLP.md。残りは SDK で画像・同時呼び出し、Power Automate の Execute Agent and wait
 
 ## 3. 次にやること
 

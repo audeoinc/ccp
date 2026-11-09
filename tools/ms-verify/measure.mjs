@@ -61,6 +61,9 @@ const via = opt('--via') ?? 'sdk'
 const DL_SECRET_NAME = opt('--secret-name') ?? 'DIRECT_LINE_SECRET'
 if (!/^[A-Z_]+$/.test(DL_SECRET_NAME)) throw new Error(`--secret-name は大文字と _ だけの名前です: ${DL_SECRET_NAME}`)
 if (!['sdk', 'dl', 'aib', 'flow'].includes(via)) throw new Error(`--via は sdk・dl・aib・flow です: ${via}`)
+// SDK で別のエージェント・別のアプリ登録を試すとき(例: --suffix DLP で APP_CLIENT_ID_DLP などを使う)。値がない名前は、いつもの値のまま
+const SUFFIX = opt('--suffix')
+if (SUFFIX !== undefined && !/^[A-Z0-9]+$/.test(SUFFIX)) throw new Error(`--suffix は大文字と数字だけです: ${SUFFIX}`)
 
 function readEnv() {
   if (!fs.existsSync(ENV_FILE)) throw new Error(`設定のファイルがありません: ${ENV_FILE}`)
@@ -68,6 +71,16 @@ function readEnv() {
   for (const line of fs.readFileSync(ENV_FILE, 'utf8').split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/)
     if (m) env[m[1]] = m[2]
+  }
+  if (SUFFIX) {
+    const used = []
+    for (const k of ['APP_CLIENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'COPILOT_ENVIRONMENT_ID', 'TENANT_ID']) {
+      if (env[`${k}_${SUFFIX}`]) {
+        env[k] = env[`${k}_${SUFFIX}`]
+        used.push(k)
+      }
+    }
+    console.log(`--suffix ${SUFFIX}: ${used.length ? used.join(', ') : '(_' + SUFFIX + ' の値なし)'} を差し替えた`)
   }
   const need =
     via === 'dl' ? [DL_SECRET_NAME] : via === 'flow' ? ['AIB_FLOW_URL'] : via === 'aib' ? ['TENANT_ID', 'AIB_CLIENT_ID', 'AIB_CLIENT_SECRET', 'DATAVERSE_URL'] : ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME', 'TENANT_ID', 'APP_CLIENT_ID']
@@ -202,6 +215,8 @@ async function askOnceDl(dl, prompt, images) {
       if (a.from?.id === DL_ME) continue
       if (first === null) first = performance.now()
       types.push(a.type)
+      // DLP などのエラーの中身を見るとき(--dump-trace)。trace には、どの決まりで止めたかが入ることがある
+      if (args.includes('--dump-trace') && a.type !== 'message') console.log(`[${a.type}] ${a.name ?? ''} ${a.valueType ?? ''} ${JSON.stringify(a.value ?? a.text ?? '').slice(0, 1500)}`)
       if (a.type === 'message' && a.text && (!a.replyToId || a.replyToId === myId)) {
         if (firstText === null) firstText = performance.now()
         texts.push(a.text)
